@@ -858,6 +858,7 @@ export class CanvasManager {
         angle: obj.angle,
         scaleX: obj.scaleX,
         scaleY: obj.scaleY,
+        textType: textObj.type, // ✅ 保存原始文本类型
       };
 
       // 提取装饰配置
@@ -900,6 +901,7 @@ export class CanvasManager {
         angle: obj.angle,
         scaleX: obj.scaleX,
         scaleY: obj.scaleY,
+        textType: obj.type, // ✅ 保存原始文本类型
       };
     } else {
       return null;
@@ -910,24 +912,44 @@ export class CanvasManager {
 
   // 创建带装饰的文本
   private createDecoratedText(config: any) {
-    // 设置最大宽度为画布宽度减去 padding，超过自动换行
-    const maxTextWidth = this.width - 40; // 左右各留 20px
+    // 根据原始类型决定使用 IText 还是 Textbox
+    // 如果没有 textType，默认使用 textbox（向后兼容）
+    const useTextbox = config.textType === 'textbox' || !config.textType;
 
-    // 使用 Textbox 而不是 IText，支持固定宽度和自动换行
-    const text = new fabric.Textbox(config.text || '文字', {
-      width: maxTextWidth,
-      fontSize: config.fontSize || 60,
-      fontFamily: config.fontFamily || 'Noto Sans SC',
-      fill: config.fill || '#333333',
-      lineHeight: config.lineHeight || 1.2,
-      charSpacing: config.charSpacing || 0,
-      editable: true,
-      selectable: true,
-      originX: 'center',
-      originY: 'center',
-      textBaseline: 'middle',
-      splitByGrapheme: true, // 支持中文字符换行
-    });
+    let text: fabric.IText | fabric.Textbox;
+
+    if (useTextbox) {
+      // 多行文本：使用 Textbox，支持固定宽度和自动换行
+      const maxTextWidth = this.width - 40; // 左右各留 20px
+      text = new fabric.Textbox(config.text || '文字', {
+        width: maxTextWidth,
+        fontSize: config.fontSize || 60,
+        fontFamily: config.fontFamily || 'Noto Sans SC',
+        fill: config.fill || '#333333',
+        lineHeight: config.lineHeight || 1.2,
+        charSpacing: config.charSpacing || 0,
+        editable: true,
+        selectable: true,
+        originX: 'center',
+        originY: 'center',
+        textBaseline: 'middle',
+        splitByGrapheme: true, // 支持中文字符换行
+      });
+    } else {
+      // 单行文本：使用 IText，不自动换行
+      text = new fabric.IText(config.text || '文字', {
+        fontSize: config.fontSize || 60,
+        fontFamily: config.fontFamily || 'Noto Sans SC',
+        fill: config.fill || '#333333',
+        lineHeight: config.lineHeight || 1.2,
+        charSpacing: config.charSpacing || 0,
+        editable: true,
+        selectable: true,
+        originX: 'center',
+        originY: 'center',
+        textBaseline: 'middle',
+      });
+    }
 
     // 强制计算文本尺寸
     text.setCoords();
