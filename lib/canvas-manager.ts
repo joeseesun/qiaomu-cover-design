@@ -200,6 +200,10 @@ export class CanvasManager {
         break;
     }
 
+    // 确保背景和文本的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
+    background!.set({ left: 0, top: 0 });
+    text.set({ left: 0, top: 0 });
+
     const group = new fabric.Group([background!, text], {
       left: finalLeft,
       top: finalTop,
@@ -214,33 +218,24 @@ export class CanvasManager {
     // 监听双击事件，进入文本编辑模式
     group.on('mousedblclick', () => {
       // 保存 Group 的所有变换属性
-      const savedConfig = {
-        left: group.left || 0,
-        top: group.top || 0,
-        angle: group.angle || 0,
-        scaleX: group.scaleX || 1,
-        scaleY: group.scaleY || 1,
-      };
+      const savedLeft = group.left || 0;
+      const savedTop = group.top || 0;
+      const savedAngle = group.angle || 0;
+      const savedScaleX = group.scaleX || 1;
+      const savedScaleY = group.scaleY || 1;
 
       // 解散 Group，获取文本对象
       const items = (group as any)._objects || [];
       const textObj = items.find((obj: any) => obj.type === 'i-text');
 
       if (textObj) {
-        // 计算文本在画布中的绝对位置
-        const matrix = group.calcTransformMatrix();
-        const textCenter = fabric.util.transformPoint(
-          { x: textObj.left || 0, y: textObj.top || 0 },
-          matrix
-        );
-
         this.canvas.remove(group);
 
-        // 设置文本到正确的绝对位置
+        // 直接使用 Group 的位置（Group 和文本都是 center origin）
         textObj.set({
-          left: textCenter.x,
-          top: textCenter.y,
-          angle: savedConfig.angle,
+          left: savedLeft,
+          top: savedTop,
+          angle: savedAngle,
           scaleX: 1,  // 重置缩放，保持原始字体大小
           scaleY: 1,
           originX: 'center',
@@ -261,8 +256,8 @@ export class CanvasManager {
             left: textObj.left,
             top: textObj.top,
             angle: textObj.angle,
-            scaleX: savedConfig.scaleX,  // 恢复原始缩放
-            scaleY: savedConfig.scaleY,
+            scaleX: savedScaleX,  // 恢复原始缩放
+            scaleY: savedScaleY,
           };
           this.canvas.remove(textObj);
           this.addHighlightText(newConfig);
@@ -686,6 +681,14 @@ export class CanvasManager {
 
     // 如果有装饰，创建 Group；否则只添加文本
     if (objects.length > 1) {
+      // 确保所有对象的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
+      objects.forEach(obj => {
+        obj.set({
+          left: 0,
+          top: 0,
+        });
+      });
+
       const group = new fabric.Group(objects, {
         left: config.left || this.width / 2,
         top: config.top || this.height / 2,
@@ -698,27 +701,17 @@ export class CanvasManager {
 
       // 双击编辑
       group.on('mousedblclick', () => {
-        const savedConfig = {
-          left: group.left || 0,
-          top: group.top || 0,
-          angle: group.angle || 0,
-          scaleX: group.scaleX || 1,
-          scaleY: group.scaleY || 1,
-        };
-
-        // 计算文本在画布中的绝对位置
-        // 使用 fabric 的矩阵变换来获取准确位置
-        const matrix = group.calcTransformMatrix();
-        const textCenter = fabric.util.transformPoint(
-          { x: text.left || 0, y: text.top || 0 },
-          matrix
-        );
+        const savedLeft = group.left || 0;
+        const savedTop = group.top || 0;
+        const savedAngle = group.angle || 0;
+        const savedScaleX = group.scaleX || 1;
+        const savedScaleY = group.scaleY || 1;
 
         this.canvas.remove(group);
         text.set({
-          left: textCenter.x,
-          top: textCenter.y,
-          angle: savedConfig.angle,
+          left: savedLeft,
+          top: savedTop,
+          angle: savedAngle,
           scaleX: 1,  // 重置缩放，保持原始字体大小
           scaleY: 1,
           originX: 'center',
@@ -736,8 +729,8 @@ export class CanvasManager {
             left: text.left,
             top: text.top,
             angle: text.angle,
-            scaleX: savedConfig.scaleX,  // 恢复原始缩放
-            scaleY: savedConfig.scaleY,
+            scaleX: savedScaleX,  // 恢复原始缩放
+            scaleY: savedScaleY,
           };
           this.canvas.remove(text);
           this.createDecoratedText(newConfig);
