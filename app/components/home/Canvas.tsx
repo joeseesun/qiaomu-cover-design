@@ -22,6 +22,12 @@ export default function Canvas({
 }: CanvasProps) {
   const [autoScale, setAutoScale] = useState(1);
 
+  // 画布平移状态
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+
   // 计算自动缩放比例（移除最大值限制，允许缩小显示大画布）
   useEffect(() => {
     const updateScale = () => {
@@ -93,13 +99,71 @@ export default function Canvas({
     };
   }, [userZoom, onUserZoomChange]);
 
+  // 监听空格键按下/释放
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsSpacePressed(false);
+        setIsPanning(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // 处理画布拖拽
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isSpacePressed) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isPanning && isSpacePressed) {
+      setPanOffset({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsPanning(false);
+  };
+
   const finalScale = (autoScale * userZoom) / 100;
 
   return (
     <div
       id="canvas-container"
-      className="flex-1 flex flex-col items-center justify-center relative"
-      style={{ backgroundColor: '#F7F8FA' }}
+      className="flex-1 flex flex-col items-center justify-center relative overflow-hidden"
+      style={{
+        backgroundColor: '#F7F8FA',
+        cursor: isSpacePressed ? (isPanning ? 'grabbing' : 'grab') : 'default',
+      }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
     >
       {/* 画布容器（带边框和阴影） */}
       <div
@@ -111,7 +175,9 @@ export default function Canvas({
           boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
           backgroundColor: '#fff',
           overflow: 'hidden',
-          transition: 'all 0.2s ease-out',
+          transition: isPanning ? 'none' : 'all 0.2s ease-out',
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+          pointerEvents: isSpacePressed ? 'none' : 'auto',
         }}
       >
         {/* 画布（缩放） */}
@@ -134,6 +200,15 @@ export default function Canvas({
         </div>
       </div>
 
+      {/* 提示信息 */}
+      {isSpacePressed && (
+        <div
+          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/75 text-white px-4 py-2 rounded-lg text-sm font-medium pointer-events-none"
+          style={{ zIndex: 1000 }}
+        >
+          按住空格键拖拽画布
+        </div>
+      )}
     </div>
   );
 }
