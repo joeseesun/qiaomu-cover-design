@@ -282,8 +282,7 @@ export class CanvasManager {
       originY: 'center',
       editable: true,
       selectable: true,
-      textBaseline: 'middle',
-    });
+    } as any);
 
     this.canvas.add(obj);
     this.canvas.setActiveObject(obj);
