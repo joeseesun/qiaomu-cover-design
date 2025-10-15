@@ -27,6 +27,7 @@ export class CanvasManager {
       selectionLineWidth: 0, // 选择框边框宽度为 0
       fireRightClick: true, // 允许右键事件
       stopContextMenu: false, // 不阻止contextmenu事件
+      preserveObjectStacking: true, // 🔥 保持对象图层顺序,选中时不自动置顶
     });
 
     // 监听画布变化，保存历史记录（使用防抖）
