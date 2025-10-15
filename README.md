@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 小红书封面生成器
 
-## Getting Started
+一个基于 Next.js 14 + Fabric.js 的在线小红书封面制作工具。
 
-First, run the development server:
+## ✨ 核心功能
+
+- **画布编辑**：1242×1660px 标准小红书封面尺寸
+- **文字高亮**：支持荧光笔、下划线、边框三种高亮样式
+- **版本管理**：最多支持 5 个版本，可自由切换和复制
+- **导出功能**：下载 PNG 图片或复制到剪贴板
+- **自动保存**：每 2 秒自动保存当前版本
+
+## 🚀 快速开始
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 启动开发服务器
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开浏览器访问 [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 构建生产版本
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## 📁 项目结构
 
-To learn more about Next.js, take a look at the following resources:
+```
+cover4xiaohongshu/
+├── app/
+│   ├── components/          # React 组件
+│   │   ├── Header.tsx       # 头部组件
+│   │   ├── VersionBar.tsx   # 版本栏组件
+│   │   ├── Toolbar.tsx      # 工具栏组件
+│   │   └── PropertyPanel.tsx # 属性面板组件
+│   ├── page.tsx             # 主页面
+│   ├── layout.tsx           # 布局
+│   └── globals.css          # 全局样式
+├── lib/
+│   ├── types.ts             # 类型定义
+│   ├── canvas-manager.ts    # 画布管理器
+│   └── version-manager.ts   # 版本管理器
+└── package.json
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🛠️ 技术栈
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **框架**：Next.js 14 (App Router)
+- **语言**：TypeScript
+- **画布**：Fabric.js 5.3
+- **样式**：Tailwind CSS
+- **字体**：思源黑体、思源宋体
 
-## Deploy on Vercel
+## 📖 使用说明
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **添加文本**：点击左侧工具栏的"添加文本"按钮
+2. **添加高亮文字**：在右侧属性面板输入文字，选择样式和颜色，点击"添加到画布"
+3. **编辑文本**：双击画布上的文字进行编辑
+4. **调整样式**：选中文字后，在右侧属性面板调整字号、字体、颜色
+5. **版本管理**：点击顶部版本栏切换版本，点击"+"复制当前版本
+6. **导出**：点击右上角"下载"或"复制"按钮
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🎨 高亮样式
+
+- **荧光笔**：半透明彩色背景
+- **下划线**：文字下方彩色线条
+- **边框**：文字周围彩色边框
+
+## 💾 数据存储
+
+所有版本数据自动保存在浏览器的 localStorage 中，无需担心数据丢失。
+
+## 📄 License
+
+MIT

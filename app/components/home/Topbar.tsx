@@ -1,0 +1,273 @@
+// 顶部导航栏
+'use client';
+
+
+import { CanvasVersion, CanvasSize, CANVAS_RATIOS } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X } from 'lucide-react';
+import { useState } from 'react';
+
+interface TopbarProps {
+  versions: CanvasVersion[];
+  activeVersionId: string;
+  canvasSize: CanvasSize;
+  canvasScale: number;
+  onVersionChange: (id: string) => void;
+  onNewVersion: () => void;
+  onDuplicateVersion: () => void;
+  onRenameVersion: (id: string, newName: string) => void;
+  onDeleteVersion: (id: string) => void;
+  onCanvasSizeChange: (size: CanvasSize) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
+  onDownload: () => void;
+  onShare: () => void;
+}
+
+export default function Topbar({
+  versions,
+  activeVersionId,
+  canvasSize,
+  canvasScale,
+  onVersionChange,
+  onNewVersion,
+  onDuplicateVersion,
+  onRenameVersion,
+  onDeleteVersion,
+  onCanvasSizeChange,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  onDownload,
+  onShare,
+}: TopbarProps) {
+  const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+  const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3'>('3:4');
+  const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+
+  const activeVersion = versions.find((v) => v.id === activeVersionId);
+
+  const handleStartRename = (version: CanvasVersion) => {
+    setEditingVersionId(version.id);
+    setEditingName(version.name);
+  };
+
+  const handleSaveRename = () => {
+    if (editingVersionId && editingName.trim()) {
+      onRenameVersion(editingVersionId, editingName.trim());
+    }
+    setEditingVersionId(null);
+    setEditingName('');
+  };
+
+  const handleCancelRename = () => {
+    setEditingVersionId(null);
+    setEditingName('');
+  };
+
+  return (
+    <header
+      className="flex items-center justify-between px-8 bg-background"
+      style={{ height: '64px', borderBottom: '1px solid hsl(var(--border))' }}
+    >
+      {/* 左侧：Logo + 版本选择 + 尺寸选择 */}
+      <div className="flex items-center gap-6">
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          <Menu className="h-5 w-5 text-muted-foreground" />
+          <span className="font-semibold text-foreground text-base">小红书封面</span>
+        </div>
+
+        {/* 版本选择 */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-10 px-5">
+              {activeVersion?.name || '版本 1'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-72">
+            {/* 版本列表 */}
+            <div className="max-h-80 overflow-y-auto">
+              {versions.map((version) => (
+                <div
+                  key={version.id}
+                  className={`group flex items-center justify-between px-2 py-2 hover:bg-accent rounded-sm ${
+                    version.id === activeVersionId ? 'bg-accent' : ''
+                  }`}
+                >
+                  {editingVersionId === version.id ? (
+                    // 编辑模式
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename();
+                          if (e.key === 'Escape') handleCancelRename();
+                        }}
+                        className="flex-1 px-2 py-1 text-sm border rounded"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveRename}
+                        className="p-1 hover:bg-background rounded"
+                      >
+                        <Check className="h-4 w-4 text-green-600" />
+                      </button>
+                      <button
+                        onClick={handleCancelRename}
+                        className="p-1 hover:bg-background rounded"
+                      >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  ) : (
+                    // 正常模式
+                    <>
+                      <button
+                        onClick={() => onVersionChange(version.id)}
+                        className="flex-1 text-left px-2 py-1 text-sm"
+                      >
+                        {version.name}
+                      </button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartRename(version);
+                          }}
+                          className="p-1 hover:bg-background rounded"
+                          title="重命名"
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                        {versions.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`确定删除版本"${version.name}"吗？`)) {
+                                onDeleteVersion(version.id);
+                              }
+                            }}
+                            className="p-1 hover:bg-background rounded"
+                            title="删除"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onNewVersion}>
+              <Plus className="mr-2 h-4 w-4" />
+              新建版本
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicateVersion}>
+              <Copy className="mr-2 h-4 w-4" />
+              复制当前版本
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* 尺寸选择 */}
+        <DropdownMenu open={sizeMenuOpen} onOpenChange={setSizeMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-10 px-5">
+              {canvasSize.name} ({canvasSize.ratio})
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-80">
+            {/* 比例 Tab */}
+            <div className="flex border-b">
+              {(['3:4', '1:1', '4:3'] as const).map((ratio) => (
+                <button
+                  key={ratio}
+                  onClick={() => setActiveRatio(ratio)}
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    activeRatio === ratio
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {ratio}
+                </button>
+              ))}
+            </div>
+
+            {/* 尺寸列表 */}
+            <div className="p-3">
+              {CANVAS_RATIOS[activeRatio].map((size) => (
+                <button
+                  key={size.name}
+                  onClick={() => {
+                    onCanvasSizeChange(size);
+                    setSizeMenuOpen(false);
+                  }}
+                  className={`w-full px-4 py-3 text-left rounded-md transition-colors flex items-center justify-between ${
+                    canvasSize.name === size.name
+                      ? 'bg-primary/10 text-primary'
+                      : 'hover:bg-accent'
+                  }`}
+                >
+                  <span className="text-sm font-medium">{size.name}</span>
+                  {canvasSize.name === size.name && (
+                    <span className="text-xs">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* 右侧：缩放控制 + 复制 + 下载 */}
+      <div className="flex items-center gap-3">
+        {/* 缩放控制 */}
+        <div className="flex items-center gap-1 px-2 py-1 rounded-md border bg-background">
+          <button
+            onClick={onZoomOut}
+            className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ZoomOut className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={onZoomReset}
+            className="px-3 py-1 text-sm rounded hover:bg-accent transition-colors text-foreground min-w-[50px]"
+          >
+            {Math.round(canvasScale * 100)}%
+          </button>
+          <button
+            onClick={onZoomIn}
+            className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ZoomIn className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <Button variant="outline" className="h-10 px-6 py-2 gap-2" onClick={onShare}>
+          <Copy className="h-4 w-4" />
+          复制
+        </Button>
+        <Button className="h-10 px-6 py-2 gap-2 shadow-sm" onClick={onDownload}>
+          <Download className="h-4 w-4" />
+          下载
+        </Button>
+      </div>
+    </header>
+  );
+}
+
