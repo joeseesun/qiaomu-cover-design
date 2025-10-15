@@ -43,7 +43,14 @@ export class CanvasManager {
       editable: true,
       selectable: true,
       textBaseline: 'middle', // 修复 'alphabetical' 错误
+      splitByGrapheme: true, // 支持中文字符换行
     });
+
+    // 设置最大宽度为画布宽度，超过自动换行
+    obj.set({
+      width: this.width,
+    });
+
     this.canvas.add(obj);
     this.canvas.setActiveObject(obj);
     this.canvas.renderAll();
@@ -809,6 +816,13 @@ export class CanvasManager {
       originX: 'center',
       originY: 'center',
       textBaseline: 'middle', // 修复 'alphabetical' 错误
+      splitByGrapheme: true, // 支持中文字符换行
+    });
+
+    // 设置最大宽度为画布宽度减去 padding，超过自动换行
+    const maxTextWidth = this.width - 40; // 左右各留 20px
+    text.set({
+      width: maxTextWidth,
     });
 
     // 强制计算文本尺寸
@@ -817,7 +831,7 @@ export class CanvasManager {
     const objects: fabric.Object[] = [];
     const paddingX = 20;
     const paddingY = 12;
-    const textWidth = text.width || 0;
+    const textWidth = Math.min(text.width || 0, maxTextWidth);
     const textHeight = text.height || 0;
 
     // 背景
