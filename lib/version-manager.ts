@@ -102,13 +102,34 @@ export class VersionManager {
   // 保存到 localStorage
   private save() {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        this.storageKey,
-        JSON.stringify({
-          versions: this.versions,
-          activeId: this.activeId,
-        })
-      );
+      try {
+        localStorage.setItem(
+          this.storageKey,
+          JSON.stringify({
+            versions: this.versions,
+            activeId: this.activeId,
+          })
+        );
+      } catch (error) {
+        if (error instanceof Error && error.name === 'QuotaExceededError') {
+          console.error('localStorage 已满，无法保存版本');
+          // 尝试清理：删除最旧的版本（除了当前激活的）
+          const oldestVersion = this.versions
+            .filter(v => v.id !== this.activeId)
+            .sort((a, b) => a.updatedAt - b.updatedAt)[0];
+
+          if (oldestVersion) {
+            console.warn(`自动删除最旧的版本: ${oldestVersion.name}`);
+            this.delete(oldestVersion.id);
+            // 重试保存
+            this.save();
+          } else {
+            throw error; // 如果没有可删除的版本，抛出错误
+          }
+        } else {
+          throw error;
+        }
+      }
     }
   }
 

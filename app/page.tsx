@@ -192,14 +192,29 @@ export default function Home() {
     };
   }, []);
 
-  // 自动保存
+  // 自动保存（增加间隔，减少 localStorage 写入）
   useEffect(() => {
+    let lastSavedData = '';
+
     const timer = setInterval(() => {
       if (managerRef.current && versionRef.current && activeId) {
         const data = managerRef.current.toJSON();
-        versionRef.current.update(activeId, data);
+
+        // 只有数据变化时才保存，避免重复写入
+        if (data !== lastSavedData) {
+          try {
+            versionRef.current.update(activeId, data);
+            lastSavedData = data;
+          } catch (error) {
+            console.error('自动保存失败:', error);
+            // 如果 localStorage 满了，清理旧版本
+            if (error instanceof Error && error.name === 'QuotaExceededError') {
+              console.warn('localStorage 已满，请考虑删除一些版本');
+            }
+          }
+        }
       }
-    }, 2000);
+    }, 5000); // 从 2 秒改为 5 秒
 
     return () => clearInterval(timer);
   }, [activeId]);

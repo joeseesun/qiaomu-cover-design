@@ -9,6 +9,7 @@ export class CanvasManager {
   private history: string[] = [];
   private historyIndex: number = -1;
   private isUndoRedoing: boolean = false;
+  private saveHistoryTimer: NodeJS.Timeout | null = null;
 
   constructor(element: HTMLCanvasElement, width = CANVAS_WIDTH, height = CANVAS_HEIGHT) {
     this.width = width;
@@ -23,10 +24,10 @@ export class CanvasManager {
       selectionLineWidth: 0, // 选择框边框宽度为 0
     });
 
-    // 监听画布变化，保存历史记录
-    this.canvas.on('object:added', () => this.saveHistory());
-    this.canvas.on('object:modified', () => this.saveHistory());
-    this.canvas.on('object:removed', () => this.saveHistory());
+    // 监听画布变化，保存历史记录（使用防抖）
+    this.canvas.on('object:added', () => this.scheduleHistorySave());
+    this.canvas.on('object:modified', () => this.scheduleHistorySave());
+    this.canvas.on('object:removed', () => this.scheduleHistorySave());
   }
 
   // 添加普通文本
@@ -1141,11 +1142,26 @@ export class CanvasManager {
   // 原因：rebindGroupEvents 已经处理了 Group 的双击编辑功能
   // 不再需要将 Group 转换为 IText
 
+  // 调度历史记录保存（防抖）
+  private scheduleHistorySave() {
+    if (this.saveHistoryTimer) {
+      clearTimeout(this.saveHistoryTimer);
+    }
+    this.saveHistoryTimer = setTimeout(() => {
+      this.saveHistory();
+    }, 300); // 300ms 防抖
+  }
+
   // 保存历史记录
   private saveHistory() {
     if (this.isUndoRedoing) return;
 
     const json = JSON.stringify(this.canvas.toJSON(['data', 'selectable', 'evented']));
+
+    // 检查是否与上一个状态相同，避免重复保存
+    if (this.history.length > 0 && this.history[this.historyIndex] === json) {
+      return;
+    }
 
     // 如果当前不在历史记录的末尾，删除后面的记录
     if (this.historyIndex < this.history.length - 1) {
@@ -1156,8 +1172,8 @@ export class CanvasManager {
     this.history.push(json);
     this.historyIndex++;
 
-    // 限制历史记录数量（最多50条）
-    if (this.history.length > 50) {
+    // 限制历史记录数量（最多 20 条，减少内存占用）
+    if (this.history.length > 20) {
       this.history.shift();
       this.historyIndex--;
     }
