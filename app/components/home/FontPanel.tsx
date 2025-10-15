@@ -6,7 +6,7 @@ import { FONTS, FontConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
-import { Loader2, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Minus, Plus, X } from 'lucide-react';
 import ColorPicker from './ColorPicker';
 
 // 预设颜色
@@ -64,9 +64,25 @@ export default function FontPanel({
   // 装饰 Tab 状态
   const [activeDecorationTab, setActiveDecorationTab] = useState<'background' | 'underline' | 'border'>('background');
 
+  // 本地状态用于实时显示
+  const [localLetterSpacing, setLocalLetterSpacing] = useState(letterSpacing);
+  const [localLineHeight, setLocalLineHeight] = useState(lineHeight);
+
+  // 同步 selectedObject 的值到本地状态
+  useEffect(() => {
+    if (selectedObject) {
+      setLocalLetterSpacing(selectedObject.charSpacing ?? letterSpacing);
+      setLocalLineHeight(selectedObject.lineHeight ?? lineHeight);
+    } else {
+      setLocalLetterSpacing(letterSpacing);
+      setLocalLineHeight(lineHeight);
+    }
+  }, [selectedObject, letterSpacing, lineHeight]);
+
   // 背景状态
   const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
   const [backgroundColor, setBackgroundColor] = useState('#FFE066');
+  const [recentBackgroundColors, setRecentBackgroundColors] = useState<string[]>([]);
 
   // 下划线状态
   const [underlineStyle, setUnderlineStyle] = useState<'none' | 'solid' | 'wavy' | 'dotted'>('none');
@@ -89,6 +105,17 @@ export default function FontPanel({
         console.error('Failed to load recent fonts:', error);
       }
     }
+
+    // 加载最近使用的背景颜色
+    const storedColors = localStorage.getItem('recent-background-colors');
+    if (storedColors) {
+      try {
+        const colors = JSON.parse(storedColors) as string[];
+        setRecentBackgroundColors(colors.slice(0, 6));
+      } catch (error) {
+        console.error('Failed to load recent background colors:', error);
+      }
+    }
   }, []);
 
   // 预加载第一页的字体
@@ -106,6 +133,16 @@ export default function FontPanel({
       const filtered = prev.filter((f) => f !== font.family);
       const updated = [font.family, ...filtered].slice(0, MAX_RECENT_FONTS);
       localStorage.setItem(RECENT_FONTS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // 添加到最近使用的背景颜色
+  const addToRecentBackgroundColors = (color: string) => {
+    setRecentBackgroundColors((prev) => {
+      const filtered = prev.filter((c) => c !== color);
+      const updated = [color, ...filtered].slice(0, 6);
+      localStorage.setItem('recent-background-colors', JSON.stringify(updated));
       return updated;
     });
   };
@@ -286,11 +323,11 @@ export default function FontPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
                 onClick={() => {
                   if (!selectedObject) return;
-                  const current = selectedObject.charSpacing || letterSpacing;
-                  const newValue = Math.max(-500, current - 10);
+                  const newValue = Math.max(-500, localLetterSpacing - 10);
+                  setLocalLetterSpacing(newValue);
                   onLetterSpacingChange?.(newValue);
                 }}
                 disabled={!selectedObject}
@@ -299,17 +336,17 @@ export default function FontPanel({
               </Button>
               <div className="flex-1 text-center h-8 flex items-center justify-center">
                 <div className="text-base font-semibold tabular-nums">
-                  {Math.round((selectedObject?.charSpacing ?? letterSpacing) || 0)}
+                  {Math.round(localLetterSpacing)}
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
                 onClick={() => {
                   if (!selectedObject) return;
-                  const current = selectedObject.charSpacing || letterSpacing;
-                  const newValue = Math.min(1000, current + 10);
+                  const newValue = Math.min(1000, localLetterSpacing + 10);
+                  setLocalLetterSpacing(newValue);
                   onLetterSpacingChange?.(newValue);
                 }}
                 disabled={!selectedObject}
@@ -326,11 +363,11 @@ export default function FontPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
                 onClick={() => {
                   if (!selectedObject) return;
-                  const current = selectedObject.lineHeight || lineHeight;
-                  const newValue = Math.max(0.5, Number((current - 0.1).toFixed(1)));
+                  const newValue = Math.max(0.5, Number((localLineHeight - 0.1).toFixed(1)));
+                  setLocalLineHeight(newValue);
                   onLineHeightChange?.(newValue);
                 }}
                 disabled={!selectedObject}
@@ -339,17 +376,17 @@ export default function FontPanel({
               </Button>
               <div className="flex-1 text-center h-8 flex items-center justify-center">
                 <div className="text-base font-semibold tabular-nums">
-                  {((selectedObject?.lineHeight ?? lineHeight) || 1.5).toFixed(1)}
+                  {localLineHeight.toFixed(1)}
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
                 onClick={() => {
                   if (!selectedObject) return;
-                  const current = selectedObject.lineHeight || lineHeight;
-                  const newValue = Math.min(5, Number((current + 0.1).toFixed(1)));
+                  const newValue = Math.min(5, Number((localLineHeight + 0.1).toFixed(1)));
+                  setLocalLineHeight(newValue);
                   onLineHeightChange?.(newValue);
                 }}
                 disabled={!selectedObject}
@@ -375,7 +412,7 @@ export default function FontPanel({
             }`}
             onClick={() => setActiveDecorationTab('background')}
           >
-            背景
+            字体背景
             {activeDecorationTab === 'background' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
             )}
@@ -414,76 +451,92 @@ export default function FontPanel({
         {/* 背景 Tab 内容 */}
         {activeDecorationTab === 'background' && (
           <div className="space-y-4">
-
-        {/* 样式选择 */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className={`flex-1 border-black ${
-              backgroundStyle === 'none'
-                ? 'bg-black text-white hover:bg-black hover:text-white'
-                : 'bg-white text-black hover:bg-gray-50'
-            }`}
-            onClick={() => {
-              setBackgroundStyle('none');
-              onBackgroundChange?.('none');
-            }}
-            disabled={!selectedObject}
-          >
-            无
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={`flex-1 border-black ${
-              backgroundStyle === 'solid'
-                ? 'bg-black text-white hover:bg-black hover:text-white'
-                : 'bg-white text-black hover:bg-gray-50'
-            }`}
-            onClick={() => {
-              setBackgroundStyle('solid');
-              onBackgroundChange?.('solid', backgroundColor);
-            }}
-            disabled={!selectedObject}
-          >
-            纯色
-          </Button>
-        </div>
-
-        {/* 颜色选择 */}
-        {backgroundStyle !== 'none' && (
-          <div className="space-y-3">
-            <label className="text-xs text-muted-foreground">颜色</label>
-            <div className="grid grid-cols-6 gap-2">
-              {PRESET_COLORS.map((color) => (
+            {/* 推荐颜色 */}
+            <div className="space-y-3">
+              <label className="text-xs text-muted-foreground">推荐颜色</label>
+              <div className="grid grid-cols-6 gap-2">
+                {/* 第一个：无背景 */}
                 <button
-                  key={color}
                   onClick={() => {
-                    setBackgroundColor(color);
-                    onBackgroundChange?.(backgroundStyle, color);
+                    setBackgroundStyle('none');
+                    onBackgroundChange?.('none');
                   }}
                   disabled={!selectedObject}
-                  className={`w-full aspect-square rounded border transition-all hover:scale-110 ${
-                    backgroundColor === color
-                      ? 'border-primary ring-2 ring-primary/20'
-                      : 'border-border/30'
+                  className={`w-full aspect-square rounded border-2 transition-all hover:scale-110 flex items-center justify-center ${
+                    backgroundStyle === 'none'
+                      ? 'border-primary ring-2 ring-primary/20 bg-gray-50'
+                      : 'border-border bg-white'
                   }`}
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
+                  title="无背景"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+
+                {/* 推荐颜色 */}
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => {
+                      setBackgroundStyle('solid');
+                      setBackgroundColor(color);
+                      onBackgroundChange?.('solid', color);
+                      addToRecentBackgroundColors(color);
+                    }}
+                    disabled={!selectedObject}
+                    className={`w-full aspect-square rounded border-2 transition-all hover:scale-110 ${
+                      backgroundStyle === 'solid' && backgroundColor === color
+                        ? 'border-primary ring-2 ring-primary/20'
+                        : 'border-border'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+              </div>
             </div>
-            <ColorPicker
-              color={backgroundColor}
-              onChange={(color) => {
-                setBackgroundColor(color);
-                onBackgroundChange?.(backgroundStyle, color);
-              }}
-              disabled={!selectedObject}
-            />
-          </div>
-        )}
+
+            {/* 最近使用 */}
+            {recentBackgroundColors.length > 0 && (
+              <div className="space-y-3">
+                <label className="text-xs text-muted-foreground">最近使用</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {recentBackgroundColors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        setBackgroundStyle('solid');
+                        setBackgroundColor(color);
+                        onBackgroundChange?.('solid', color);
+                        addToRecentBackgroundColors(color);
+                      }}
+                      disabled={!selectedObject}
+                      className={`w-full aspect-square rounded border-2 transition-all hover:scale-110 ${
+                        backgroundStyle === 'solid' && backgroundColor === color
+                          ? 'border-primary ring-2 ring-primary/20'
+                          : 'border-border'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 自定义颜色 */}
+            <div className="space-y-3">
+              <label className="text-xs text-muted-foreground">自定义颜色</label>
+              <ColorPicker
+                color={backgroundColor}
+                onChange={(color) => {
+                  setBackgroundStyle('solid');
+                  setBackgroundColor(color);
+                  onBackgroundChange?.('solid', color);
+                  addToRecentBackgroundColors(color);
+                }}
+                disabled={!selectedObject}
+              />
+            </div>
           </div>
         )}
 
