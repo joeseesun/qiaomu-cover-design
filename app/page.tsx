@@ -97,11 +97,6 @@ export default function Home() {
 
     canvasElement.addEventListener('contextmenu', handleContextMenu);
 
-    // 清理函数
-    return () => {
-      canvasElement.removeEventListener('contextmenu', handleContextMenu);
-    };
-
     // 点击画布空白区域取消选中
     managerRef.current.canvas.on('mouse:down', (e) => {
       if (!e.target) {
@@ -230,6 +225,7 @@ export default function Home() {
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
+      canvasElement.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []); // 空依赖数组，只在组件挂载时执行一次
 
