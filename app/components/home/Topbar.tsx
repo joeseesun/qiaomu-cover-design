@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -52,7 +52,7 @@ export default function Topbar({
   onClearStorage,
 }: TopbarProps) {
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
-  const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3'>('3:4');
+  const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3' | '16:9' | '9:16'>('3:4');
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -85,25 +85,26 @@ export default function Topbar({
       <div className="flex items-center gap-6">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <Menu className="h-5 w-5 text-muted-foreground" />
-          <span className="font-semibold text-foreground text-base">小红书封面</span>
+          <Palette className="h-5 w-5 text-muted-foreground" />
+          <span className="font-semibold text-foreground text-base">乔木画布 Beta</span>
         </div>
 
         {/* 版本选择 */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-10 px-5">
-              {activeVersion?.name || '版本 1'}
+            <Button variant="outline" className="h-10 px-5 border-gray-200 gap-2">
+              {activeVersion?.name || '画布 1'}
+              <ChevronDown className="h-4 w-4 text-gray-500" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-72">
+          <DropdownMenuContent align="start" className="w-72 border-gray-200">
             {/* 版本列表 */}
             <div className="max-h-80 overflow-y-auto">
               {versions.map((version) => (
                 <div
                   key={version.id}
-                  className={`group flex items-center justify-between px-2 py-2 hover:bg-accent rounded-sm ${
-                    version.id === activeVersionId ? 'bg-accent' : ''
+                  className={`group flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded-sm ${
+                    version.id === activeVersionId ? 'bg-gray-100' : ''
                   }`}
                 >
                   {editingVersionId === version.id ? (
@@ -117,18 +118,18 @@ export default function Topbar({
                           if (e.key === 'Enter') handleSaveRename();
                           if (e.key === 'Escape') handleCancelRename();
                         }}
-                        className="flex-1 px-2 py-1 text-sm border rounded"
+                        className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded"
                         autoFocus
                       />
                       <button
                         onClick={handleSaveRename}
-                        className="p-1 hover:bg-background rounded"
+                        className="p-1 hover:bg-gray-50 rounded"
                       >
                         <Check className="h-4 w-4 text-green-600" />
                       </button>
                       <button
                         onClick={handleCancelRename}
-                        className="p-1 hover:bg-background rounded"
+                        className="p-1 hover:bg-gray-50 rounded"
                       >
                         <X className="h-4 w-4 text-muted-foreground" />
                       </button>
@@ -148,7 +149,7 @@ export default function Topbar({
                             e.stopPropagation();
                             handleStartRename(version);
                           }}
-                          className="p-1 hover:bg-background rounded"
+                          className="p-1 hover:bg-white rounded"
                           title="重命名"
                         >
                           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -157,11 +158,11 @@ export default function Topbar({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm(`确定删除版本"${version.name}"吗？`)) {
+                              if (confirm(`确定删除画布"${version.name}"吗？`)) {
                                 onDeleteVersion(version.id);
                               }
                             }}
-                            className="p-1 hover:bg-background rounded"
+                            className="p-1 hover:bg-white rounded"
                             title="删除"
                           >
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -176,11 +177,11 @@ export default function Topbar({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onNewVersion}>
               <Plus className="mr-2 h-4 w-4" />
-              新建版本
+              新建画布
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onDuplicateVersion}>
               <Copy className="mr-2 h-4 w-4" />
-              复制当前版本
+              复制当前画布
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -188,21 +189,22 @@ export default function Topbar({
         {/* 尺寸选择 */}
         <DropdownMenu open={sizeMenuOpen} onOpenChange={setSizeMenuOpen}>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-10 px-5">
+            <Button variant="outline" className="h-10 px-5 border-gray-200 gap-2">
               {canvasSize.name} ({canvasSize.ratio})
+              <ChevronDown className="h-4 w-4 text-gray-500" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-80">
+          <DropdownMenuContent align="start" className="w-80 border-gray-200">
             {/* 比例 Tab */}
-            <div className="flex border-b">
-              {(['3:4', '1:1', '4:3'] as const).map((ratio) => (
+            <div className="flex border-b border-gray-200">
+              {(['3:4', '1:1', '4:3', '16:9', '9:16'] as const).map((ratio) => (
                 <button
                   key={ratio}
                   onClick={() => setActiveRatio(ratio)}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
                     activeRatio === ratio
-                      ? 'text-primary border-b-2 border-primary'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'text-gray-900 border-b-2 border-gray-400'
+                      : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   {ratio}
@@ -221,8 +223,8 @@ export default function Topbar({
                   }}
                   className={`w-full px-4 py-3 text-left rounded-md transition-colors flex items-center justify-between ${
                     canvasSize.name === size.name
-                      ? 'bg-primary/10 text-primary'
-                      : 'hover:bg-accent'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'hover:bg-gray-50'
                   }`}
                 >
                   <span className="text-sm font-medium">{size.name}</span>
@@ -239,7 +241,7 @@ export default function Topbar({
       {/* 右侧：缩放控制 + 复制 + 下载 */}
       <div className="flex items-center gap-3">
         {/* 缩放控制 */}
-        <div className="flex items-center gap-1 px-2 py-1 rounded-md border bg-background">
+        <div className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-background">
           <button
             onClick={onZoomOut}
             className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -260,7 +262,7 @@ export default function Topbar({
           </button>
         </div>
 
-        <Button variant="outline" className="h-10 px-6 py-2 gap-2" onClick={onShare}>
+        <Button className="h-10 px-6 py-2 gap-2 shadow-sm" onClick={onShare}>
           <Copy className="h-4 w-4" />
           复制
         </Button>

@@ -66,10 +66,10 @@ export class VersionManager {
     }
   }
 
-  // 删除版本
+  // 删除画布
   delete(id: string) {
     if (this.versions.length === 1) {
-      throw new Error('至少需要保留 1 个版本');
+      throw new Error('至少需要保留 1 个画布');
     }
     this.versions = this.versions.filter((v) => v.id !== id);
     if (this.activeId === id) {

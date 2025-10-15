@@ -83,6 +83,16 @@ export const CANVAS_RATIOS = {
     { name: '1280×960', width: 1280, height: 960, ratio: '4:3' },
     { name: '1440×1080', width: 1440, height: 1080, ratio: '4:3' },
   ],
+  '16:9': [
+    { name: '1280×720', width: 1280, height: 720, ratio: '16:9' },
+    { name: '1920×1080', width: 1920, height: 1080, ratio: '16:9' },
+    { name: '2560×1440', width: 2560, height: 1440, ratio: '16:9' },
+  ],
+  '9:16': [
+    { name: '720×1280', width: 720, height: 1280, ratio: '9:16' },
+    { name: '1080×1920', width: 1080, height: 1920, ratio: '9:16' },
+    { name: '1440×2560', width: 1440, height: 2560, ratio: '9:16' },
+  ],
 };
 
 // 默认画布尺寸（960×1280, 3:4）

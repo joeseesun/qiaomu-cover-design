@@ -10,6 +10,7 @@ interface CanvasProps {
   canvasSize: CanvasSize;
   userZoom?: number; // 用户手动缩放（50-200）
   onScaleChange?: (scale: number) => void;
+  onUserZoomChange?: (zoom: number) => void; // 新增：通知父组件用户缩放变化
 }
 
 export default function Canvas({
@@ -17,6 +18,7 @@ export default function Canvas({
   canvasSize,
   userZoom = 100,
   onScaleChange,
+  onUserZoomChange,
 }: CanvasProps) {
   const [autoScale, setAutoScale] = useState(1);
 
@@ -57,6 +59,39 @@ export default function Canvas({
     const finalScale = (autoScale * userZoom) / 100;
     onScaleChange?.(finalScale);
   }, [autoScale, userZoom, onScaleChange]);
+
+  // 双指缩放（触控板手势）
+  useEffect(() => {
+    const container = document.getElementById('canvas-container');
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // 检测是否是触控板双指缩放手势（ctrlKey 为 true）
+      if (e.ctrlKey) {
+        e.preventDefault();
+
+        // 触控板双指缩放手势：
+        // - 双指分开(放大): deltaY < 0
+        // - 双指合拢(缩小): deltaY > 0
+        // 因此需要取反: zoomChange = -deltaY
+        const zoomSpeed = 0.3;
+        const zoomChange = -e.deltaY * zoomSpeed;
+
+        // 计算新的缩放值（限制在 50-200 之间）
+        const newZoom = Math.min(200, Math.max(50, userZoom + zoomChange));
+
+        // 通知父组件更新缩放
+        onUserZoomChange?.(newZoom);
+      }
+    };
+
+    // 添加事件监听器，使用 passive: false 以允许 preventDefault
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [userZoom, onUserZoomChange]);
 
   const finalScale = (autoScale * userZoom) / 100;
 

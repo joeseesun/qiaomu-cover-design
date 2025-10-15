@@ -373,7 +373,7 @@ export default function Home() {
 
   const createNewVersion = () => {
     if (!versionRef.current) return;
-    const newVersion = versionRef.current.create(`版本 ${versions.length + 1}`);
+    const newVersion = versionRef.current.create(`画布 ${versions.length + 1}`);
     setVersions(versionRef.current.getAll());
     switchVersion(newVersion.id);
   };
@@ -411,7 +411,7 @@ export default function Home() {
 
   // 清理 localStorage
   const handleClearStorage = () => {
-    if (confirm('确定要清理所有缓存吗？这将删除所有版本数据，此操作不可恢复！')) {
+    if (confirm('确定要清理所有缓存吗？这将删除所有画布数据，此操作不可恢复！')) {
       localStorage.clear();
       alert('缓存已清理，页面即将刷新');
       window.location.reload();
@@ -652,6 +652,7 @@ export default function Home() {
           canvasSize={canvasSize}
           userZoom={userZoom}
           onScaleChange={setCanvasScale}
+          onUserZoomChange={setUserZoom}
         />
 
         {/* 右侧字体面板 */}

@@ -154,9 +154,9 @@ body {
   }
 }
 
-/* Tabs 选中态样式 */
+/* Tabs 选中态样式 - 使用黑色 */
 [data-slot="tabs-trigger"][data-state="active"] {
-  color: #000000;
+  color: #000000 !important;
 }
 
 [data-slot="tabs-trigger"][data-state="active"]::after {
@@ -166,6 +166,6 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background-color: #000000;
+  background-color: #000000 !important;
   border-radius: 9999px 9999px 0 0;
 }
