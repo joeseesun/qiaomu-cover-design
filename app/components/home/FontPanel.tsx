@@ -267,10 +267,10 @@ export default function FontPanel({
 
       {/* 文字属性：颜色 + 字间距 + 行间距 */}
       <div className="px-8 py-6">
-        <div className="grid grid-cols-3 gap-3">
-          {/* 文字颜色 */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">文字颜色</label>
+        <div className="flex items-start gap-4">
+          {/* 文字颜色 - 小方块 */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">颜色</label>
             <ColorPicker
               color={currentColor}
               onChange={onColorChange}
@@ -280,13 +280,13 @@ export default function FontPanel({
           </div>
 
           {/* 字间距 */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">字间距</label>
-            <div className="flex items-center gap-1">
+          <div className="flex-1 flex flex-col gap-2">
+            <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">字间距</label>
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-8 shrink-0"
+                className="h-8 w-8 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const current = selectedObject.charSpacing || letterSpacing;
@@ -295,17 +295,17 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Minus className="h-3 w-3" />
+                <Minus className="h-3.5 w-3.5" />
               </Button>
-              <div className="flex-1 text-center min-w-0">
-                <div className="text-sm font-semibold tabular-nums">
+              <div className="flex-1 text-center h-8 flex items-center justify-center">
+                <div className="text-base font-semibold tabular-nums">
                   {Math.round((selectedObject?.charSpacing ?? letterSpacing) || 0)}
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-8 shrink-0"
+                className="h-8 w-8 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const current = selectedObject.charSpacing || letterSpacing;
@@ -314,19 +314,19 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
 
           {/* 行间距 */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">行间距</label>
-            <div className="flex items-center gap-1">
+          <div className="flex-1 flex flex-col gap-2">
+            <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">行间距</label>
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-8 shrink-0"
+                className="h-8 w-8 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const current = selectedObject.lineHeight || lineHeight;
@@ -335,17 +335,17 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Minus className="h-3 w-3" />
+                <Minus className="h-3.5 w-3.5" />
               </Button>
-              <div className="flex-1 text-center min-w-0">
-                <div className="text-sm font-semibold tabular-nums">
+              <div className="flex-1 text-center h-8 flex items-center justify-center">
+                <div className="text-base font-semibold tabular-nums">
                   {((selectedObject?.lineHeight ?? lineHeight) || 1.5).toFixed(1)}
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-8 shrink-0"
+                className="h-8 w-8 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const current = selectedObject.lineHeight || lineHeight;
@@ -354,7 +354,7 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>

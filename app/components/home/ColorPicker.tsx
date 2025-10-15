@@ -43,12 +43,12 @@ export default function ColorPicker({ color, onChange, label, compact = false, d
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className={compact ? "w-full h-10 p-0" : "w-full justify-start gap-3 h-12"}
+            className={compact ? "h-8 w-8 p-0 shrink-0" : "w-full justify-start gap-3 h-12"}
             disabled={disabled}
           >
             {compact ? (
               <div
-                className="w-full h-full rounded border border-border/40"
+                className="w-full h-full rounded-sm"
                 style={{ backgroundColor: color }}
               />
             ) : (
