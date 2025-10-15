@@ -116,21 +116,26 @@ export class CanvasManager {
       color,
       fontSize: textObj.fontSize,
       fontFamily: textObj.fontFamily,
+      left: group.left,
+      top: group.top,
+      angle: group.angle,
+      scaleX: group.scaleX,
+      scaleY: group.scaleY,
     };
 
-    const left = group.left;
-    const top = group.top;
-
     this.canvas.remove(group);
-    this.addHighlightText(config, left, top);
+    this.addHighlightText(config);
   }
 
   // 添加高亮文本（使用 Group 但支持双击编辑）
   addHighlightText(config: HighlightConfig, left?: number, top?: number) {
     // 获取当前选中对象的位置（如果有）
     const activeObj = this.canvas.getActiveObject();
-    const finalLeft = left ?? activeObj?.left ?? this.width / 2;
-    const finalTop = top ?? activeObj?.top ?? this.height / 2;
+    const finalLeft = left ?? config.left ?? activeObj?.left ?? this.width / 2;
+    const finalTop = top ?? config.top ?? activeObj?.top ?? this.height / 2;
+    const finalAngle = config.angle ?? 0;
+    const finalScaleX = config.scaleX ?? 1;
+    const finalScaleY = config.scaleY ?? 1;
 
     const text = new fabric.IText(config.text, {
       fontSize: config.fontSize || 60,
@@ -198,6 +203,9 @@ export class CanvasManager {
     const group = new fabric.Group([background!, text], {
       left: finalLeft,
       top: finalTop,
+      angle: finalAngle,
+      scaleX: finalScaleX,
+      scaleY: finalScaleY,
       originX: 'center',
       originY: 'center',
       subTargetCheck: true, // 允许选中子对象
@@ -205,6 +213,13 @@ export class CanvasManager {
 
     // 监听双击事件，进入文本编辑模式
     group.on('mousedblclick', () => {
+      // 保存 Group 的所有变换属性
+      const groupLeft = group.left;
+      const groupTop = group.top;
+      const groupAngle = group.angle;
+      const groupScaleX = group.scaleX;
+      const groupScaleY = group.scaleY;
+
       // 解散 Group
       const items = (group as any)._objects || [];
       const textObj = items.find((obj: any) => obj.type === 'i-text');
@@ -212,8 +227,11 @@ export class CanvasManager {
       if (textObj) {
         this.canvas.remove(group);
         textObj.set({
-          left: group.left,
-          top: group.top,
+          left: groupLeft,
+          top: groupTop,
+          angle: groupAngle,
+          scaleX: groupScaleX,
+          scaleY: groupScaleY,
           originX: 'center',
           originY: 'center',
         });
@@ -225,17 +243,17 @@ export class CanvasManager {
 
         // 监听文本编辑完成，重新创建 Group
         textObj.on('editing:exited', () => {
-          const left = textObj.left;
-          const top = textObj.top;
+          const newConfig = {
+            ...config,
+            text: textObj.text || '',
+            left: textObj.left,
+            top: textObj.top,
+            angle: textObj.angle,
+            scaleX: textObj.scaleX,
+            scaleY: textObj.scaleY,
+          };
           this.canvas.remove(textObj);
-          this.addHighlightText(
-            {
-              ...config,
-              text: textObj.text || '',
-            },
-            left,
-            top
-          );
+          this.addHighlightText(newConfig);
         });
       }
     });

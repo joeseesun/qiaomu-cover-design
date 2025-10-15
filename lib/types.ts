@@ -14,6 +14,11 @@ export interface HighlightConfig {
   color: string;
   fontSize?: number;
   fontFamily?: string;
+  left?: number;
+  top?: number;
+  angle?: number;
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export interface FontConfig {
