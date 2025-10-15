@@ -3,12 +3,13 @@
 
 import { useEffect, useState, RefObject } from 'react';
 import { CanvasSize } from '@/lib/types';
-import { ZoomIn, ZoomOut } from 'lucide-react';
+import { ZoomIn, ZoomOut, Hand } from 'lucide-react';
 
 interface CanvasProps {
   canvasRef: RefObject<HTMLCanvasElement>;
   canvasSize: CanvasSize;
   userZoom?: number; // 用户手动缩放（50-200）
+  isPanMode?: boolean; // 是否锁定拖拽模式
   onScaleChange?: (scale: number) => void;
   onUserZoomChange?: (zoom: number) => void; // 新增：通知父组件用户缩放变化
 }
@@ -17,6 +18,7 @@ export default function Canvas({
   canvasRef,
   canvasSize,
   userZoom = 100,
+  isPanMode = false,
   onScaleChange,
   onUserZoomChange,
 }: CanvasProps) {
@@ -27,6 +29,9 @@ export default function Canvas({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+  // 判断是否可以拖拽：锁定模式 或 按住空格键
+  const canPan = isPanMode || isSpacePressed;
 
   // 计算自动缩放比例（移除最大值限制，允许缩小显示大画布）
   useEffect(() => {
@@ -127,14 +132,14 @@ export default function Canvas({
 
   // 处理画布拖拽
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isSpacePressed) {
+    if (canPan) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning && isSpacePressed) {
+    if (isPanning && canPan) {
       setPanOffset({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
@@ -158,7 +163,7 @@ export default function Canvas({
       className="flex-1 flex flex-col items-center justify-center relative overflow-hidden"
       style={{
         backgroundColor: '#F7F8FA',
-        cursor: isSpacePressed ? (isPanning ? 'grabbing' : 'grab') : 'default',
+        cursor: canPan ? (isPanning ? 'grabbing' : 'grab') : 'default',
       }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -177,7 +182,7 @@ export default function Canvas({
           overflow: 'hidden',
           transition: isPanning ? 'none' : 'all 0.2s ease-out',
           transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-          pointerEvents: isSpacePressed ? 'none' : 'auto',
+          pointerEvents: canPan ? 'none' : 'auto',
         }}
       >
         {/* 画布（缩放） */}
@@ -201,12 +206,21 @@ export default function Canvas({
       </div>
 
       {/* 提示信息 */}
-      {isSpacePressed && (
+      {canPan && !isPanMode && (
         <div
           className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/75 text-white px-4 py-2 rounded-lg text-sm font-medium pointer-events-none"
           style={{ zIndex: 1000 }}
         >
           按住空格键拖拽画布
+        </div>
+      )}
+      {isPanMode && (
+        <div
+          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium pointer-events-none flex items-center gap-2"
+          style={{ zIndex: 1000 }}
+        >
+          <Hand className="h-4 w-4" />
+          拖拽模式已激活
         </div>
       )}
     </div>

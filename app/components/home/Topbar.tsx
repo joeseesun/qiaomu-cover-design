@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -19,6 +19,7 @@ interface TopbarProps {
   activeVersionId: string;
   canvasSize: CanvasSize;
   canvasScale: number;
+  isPanMode?: boolean;
   onVersionChange: (id: string) => void;
   onNewVersion: () => void;
   onDuplicateVersion: () => void;
@@ -28,6 +29,7 @@ interface TopbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
+  onPanModeToggle?: () => void;
   onDownload: () => void;
   onShare: () => void;
   onClearStorage?: () => void;
@@ -38,6 +40,7 @@ export default function Topbar({
   activeVersionId,
   canvasSize,
   canvasScale,
+  isPanMode = false,
   onVersionChange,
   onNewVersion,
   onDuplicateVersion,
@@ -47,6 +50,7 @@ export default function Topbar({
   onZoomIn,
   onZoomOut,
   onZoomReset,
+  onPanModeToggle,
   onDownload,
   onShare,
   onClearStorage,
@@ -242,6 +246,21 @@ export default function Topbar({
       <div className="flex items-center gap-3">
         {/* 缩放控制 */}
         <div className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-background">
+          {/* 拖拽模式切换 */}
+          <button
+            onClick={onPanModeToggle}
+            className={`p-1 rounded transition-colors ${
+              isPanMode
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'hover:bg-accent text-muted-foreground'
+            }`}
+            title={isPanMode ? '退出拖拽模式' : '进入拖拽模式 (或按住空格键)'}
+          >
+            <Hand className="h-4 w-4" />
+          </button>
+
+          <div className="w-px h-4 bg-gray-200" />
+
           <button
             onClick={onZoomOut}
             className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

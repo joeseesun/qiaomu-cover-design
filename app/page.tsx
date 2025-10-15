@@ -23,6 +23,7 @@ export default function Home() {
   const [canvasScale, setCanvasScale] = useState(1);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(DEFAULT_CANVAS_SIZE);
   const [userZoom, setUserZoom] = useState(100); // 用户手动缩放（50-200%）
+  const [isPanMode, setIsPanMode] = useState(false); // 拖拽模式锁定状态
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAIImageDialog, setShowAIImageDialog] = useState(false);
@@ -449,6 +450,11 @@ export default function Home() {
     }
   };
 
+  // 切换拖拽模式
+  const handlePanModeToggle = () => {
+    setIsPanMode(!isPanMode);
+  };
+
   // 画布尺寸改变
   const handleCanvasSizeChange = (newSize: CanvasSize) => {
     if (!managerRef.current) return;
@@ -573,6 +579,7 @@ export default function Home() {
         activeVersionId={activeId}
         canvasSize={canvasSize}
         canvasScale={canvasScale}
+        isPanMode={isPanMode}
         onVersionChange={switchVersion}
         onNewVersion={createNewVersion}
         onDuplicateVersion={duplicateVersion}
@@ -582,6 +589,7 @@ export default function Home() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
+        onPanModeToggle={handlePanModeToggle}
         onDownload={handleDownload}
         onShare={handleShare}
         onClearStorage={handleClearStorage}
@@ -651,6 +659,7 @@ export default function Home() {
           canvasRef={canvasRef}
           canvasSize={canvasSize}
           userZoom={userZoom}
+          isPanMode={isPanMode}
           onScaleChange={setCanvasScale}
           onUserZoomChange={setUserZoom}
         />
