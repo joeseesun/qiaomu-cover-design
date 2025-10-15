@@ -2331,6 +2331,21 @@ export class CanvasManager {
 
     for (const obj of activeObjects) {
       try {
+        // 如果是图片对象,直接使用它的URL
+        if (obj.type === 'image') {
+          const imageObj = obj as fabric.Image;
+          const imageSrc = (imageObj as any)._originalElement?.src || (imageObj as any).getSrc?.();
+
+          if (imageSrc) {
+            console.log('✅ 使用图片对象的原始URL:', imageSrc);
+            imageUrls.push(imageSrc);
+            continue; // 跳过渲染和上传步骤
+          }
+        }
+
+        // 对于非图片对象(文本、形状等),需要渲染并上传
+        console.log('🎨 渲染对象为图片:', obj.type);
+
         // 创建临时画布
         const tempCanvas = document.createElement('canvas');
         const padding = 20; // 添加一些内边距
@@ -2376,9 +2391,10 @@ export class CanvasManager {
           `image-to-image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.png`
         );
 
+        console.log('✅ 对象已上传到七牛云:', uploadedUrl);
         imageUrls.push(uploadedUrl);
       } catch (error) {
-        console.error('转换对象为图片失败:', error);
+        console.error('❌ 转换对象为图片失败:', error);
         throw error;
       }
     }
