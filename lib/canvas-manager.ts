@@ -303,9 +303,8 @@ export class CanvasManager {
       originY: 'center',
       editable: true,
       selectable: true,
-      textBaseline: 'middle',
       splitByGrapheme: true, // 支持中文字符换行
-    });
+    } as any);
 
     this.canvas.add(obj);
     this.canvas.setActiveObject(obj);
@@ -1633,9 +1632,8 @@ export class CanvasManager {
         selectable: true,
         originX: 'center',
         originY: 'center',
-        textBaseline: 'middle',
         splitByGrapheme: true, // 支持中文字符换行
-      });
+      } as any);
     } else {
       // 单行文本：使用 IText，不自动换行
       text = new fabric.IText(config.text || '文字', {
@@ -1649,8 +1647,7 @@ export class CanvasManager {
         selectable: true,
         originX: 'center',
         originY: 'center',
-        textBaseline: 'middle',
-      });
+      } as any);
     }
 
     // 强制计算文本尺寸
@@ -1816,9 +1813,8 @@ export class CanvasManager {
             originY: 'center',
             editable: true,
             selectable: true,
-            textBaseline: 'middle',
             splitByGrapheme: true,
-          });
+          } as any);
         } else {
           // 单行文本
           editText = new fabric.IText(textContent, {
@@ -1836,8 +1832,7 @@ export class CanvasManager {
             originY: 'center',
             editable: true,
             selectable: true,
-            textBaseline: 'middle',
-          });
+          } as any);
         }
 
         this.canvas.add(editText);
@@ -2063,9 +2058,8 @@ export class CanvasManager {
               originY: 'center',
               editable: true,
               selectable: true,
-              textBaseline: 'middle',
               splitByGrapheme: true,
-            });
+            } as any);
           } else {
             // 单行文本
             editText = new fabric.IText(textContent, {
@@ -2083,8 +2077,7 @@ export class CanvasManager {
               originY: 'center',
               editable: true,
               selectable: true,
-              textBaseline: 'middle',
-            });
+            } as any);
           }
 
           this.canvas.add(editText);
