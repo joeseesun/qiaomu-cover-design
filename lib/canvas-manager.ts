@@ -41,6 +41,133 @@ export class CanvasManager {
     return obj;
   }
 
+  // 添加图片
+  addImage(file: File): Promise<fabric.Image> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const imgUrl = e.target?.result as string;
+
+        fabric.Image.fromURL(imgUrl, (img) => {
+          if (!img) {
+            reject(new Error('Failed to load image'));
+            return;
+          }
+
+          // 计算缩放比例，确保图片不超过画布的 80%
+          const maxWidth = this.width * 0.8;
+          const maxHeight = this.height * 0.8;
+          const scale = Math.min(
+            maxWidth / (img.width || 1),
+            maxHeight / (img.height || 1),
+            1 // 不放大，只缩小
+          );
+
+          img.set({
+            left: this.width / 2,
+            top: this.height / 2,
+            originX: 'center',
+            originY: 'center',
+            scaleX: scale,
+            scaleY: scale,
+          });
+
+          this.canvas.add(img);
+          this.canvas.setActiveObject(img);
+          this.canvas.renderAll();
+          resolve(img);
+        });
+      };
+
+      reader.onerror = () => {
+        reject(new Error('Failed to read file'));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // 从剪贴板添加图片
+  addImageFromClipboard(blob: Blob): Promise<fabric.Image> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const imgUrl = e.target?.result as string;
+
+        fabric.Image.fromURL(imgUrl, (img) => {
+          if (!img) {
+            reject(new Error('Failed to load image'));
+            return;
+          }
+
+          // 计算缩放比例
+          const maxWidth = this.width * 0.8;
+          const maxHeight = this.height * 0.8;
+          const scale = Math.min(
+            maxWidth / (img.width || 1),
+            maxHeight / (img.height || 1),
+            1
+          );
+
+          img.set({
+            left: this.width / 2,
+            top: this.height / 2,
+            originX: 'center',
+            originY: 'center',
+            scaleX: scale,
+            scaleY: scale,
+          });
+
+          this.canvas.add(img);
+          this.canvas.setActiveObject(img);
+          this.canvas.renderAll();
+          resolve(img);
+        });
+      };
+
+      reader.onerror = () => {
+        reject(new Error('Failed to read blob'));
+      };
+
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // 调整图层顺序
+  bringToFront() {
+    const activeObject = this.canvas.getActiveObject();
+    if (activeObject) {
+      this.canvas.bringToFront(activeObject);
+      this.canvas.renderAll();
+    }
+  }
+
+  sendToBack() {
+    const activeObject = this.canvas.getActiveObject();
+    if (activeObject) {
+      this.canvas.sendToBack(activeObject);
+      this.canvas.renderAll();
+    }
+  }
+
+  bringForward() {
+    const activeObject = this.canvas.getActiveObject();
+    if (activeObject) {
+      this.canvas.bringForward(activeObject);
+      this.canvas.renderAll();
+    }
+  }
+
+  sendBackward() {
+    const activeObject = this.canvas.getActiveObject();
+    if (activeObject) {
+      this.canvas.sendBackward(activeObject);
+      this.canvas.renderAll();
+    }
+  }
+
   // 更新现有高亮文本的背景色
   updateHighlightBackground(
     group: fabric.Group,
@@ -659,7 +786,7 @@ export class CanvasManager {
 
     // 下划线
     if (config.underlineStyle && config.underlineStyle !== 'none') {
-      const lineY = textHeight / 2 + 8;
+      const lineY = textHeight / 2 + 8;  // 文本底部 + 8px
       const lineWidth = config.underlineWidth || 2;
       const lineColor = config.underlineColor || '#FF2442';
 
@@ -670,8 +797,7 @@ export class CanvasManager {
           {
             stroke: lineColor,
             strokeWidth: lineWidth,
-            originX: 'center',
-            originY: 'center',
+            // ✅ 不设置 origin，让它使用默认的 'left', 'top'
           }
         );
       } else if (config.underlineStyle === 'dotted') {
@@ -681,8 +807,7 @@ export class CanvasManager {
             stroke: lineColor,
             strokeWidth: lineWidth,
             strokeDashArray: [lineWidth * 2, lineWidth * 2],
-            originX: 'center',
-            originY: 'center',
+            // ✅ 不设置 origin，让它使用默认的 'left', 'top'
           }
         );
       } else {
@@ -700,8 +825,7 @@ export class CanvasManager {
           stroke: lineColor,
           strokeWidth: lineWidth,
           fill: '',
-          originX: 'center',
-          originY: 'center',
+          // ✅ 不设置 origin，让它使用默认的 'left', 'top'
         });
       }
       objects.push(underline);

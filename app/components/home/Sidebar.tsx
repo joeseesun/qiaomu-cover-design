@@ -11,10 +11,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import {
   Type,
-  Square,
-  Palette,
-  AlignCenter,
-  Highlighter,
+  Image,
   Undo2,
   Redo2,
 } from 'lucide-react';
@@ -38,10 +35,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const tools = [
     { id: 'text', label: '文本', icon: Type },
-    { id: 'shape', label: '形状', icon: Square },
-    { id: 'color', label: '颜色', icon: Palette },
-    { id: 'align', label: '对齐', icon: AlignCenter },
-    { id: 'highlight', label: '高亮', icon: Highlighter },
+    { id: 'image', label: '图片', icon: Image },
   ];
 
   return (

@@ -21,6 +21,7 @@ export default function Home() {
   const [canvasScale, setCanvasScale] = useState(1);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(DEFAULT_CANVAS_SIZE);
   const [userZoom, setUserZoom] = useState(100); // 用户手动缩放（50-200%）
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // 初始化
   useEffect(() => {
@@ -55,6 +56,17 @@ export default function Home() {
       setSelectedObject(null);
     });
 
+    // 监听右键菜单
+    managerRef.current.canvas.on('mouse:down', (e: any) => {
+      if (e.button === 3 && e.target) {
+        // 右键点击
+        e.e.preventDefault();
+        setContextMenu({ x: e.e.clientX, y: e.e.clientY });
+      } else {
+        setContextMenu(null);
+      }
+    });
+
     // 点击画布空白区域取消选中
     managerRef.current.canvas.on('mouse:down', (e) => {
       if (!e.target) {
@@ -83,7 +95,7 @@ export default function Home() {
       }
     };
 
-    // 键盘事件：删除选中对象
+    // 键盘事件：删除选中对象、图层调整
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && managerRef.current) {
         const activeObject = managerRef.current.canvas.getActiveObject();
@@ -99,15 +111,63 @@ export default function Home() {
           // 如果处于编辑状态，让浏览器处理默认的删除行为（删除选中的文字）
         }
       }
+
+      // 图层调整快捷键
+      if (managerRef.current && managerRef.current.canvas.getActiveObject()) {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+        if (cmdOrCtrl && e.key === ']') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            managerRef.current.bringToFront(); // Cmd/Ctrl + Shift + ]
+          } else {
+            managerRef.current.bringForward(); // Cmd/Ctrl + ]
+          }
+        } else if (cmdOrCtrl && e.key === '[') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            managerRef.current.sendToBack(); // Cmd/Ctrl + Shift + [
+          } else {
+            managerRef.current.sendBackward(); // Cmd/Ctrl + [
+          }
+        }
+      }
+    };
+
+    // 剪贴板粘贴事件：支持粘贴图片
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (!managerRef.current) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          if (blob) {
+            try {
+              await managerRef.current.addImageFromClipboard(blob);
+            } catch (error) {
+              console.error('Failed to paste image:', error);
+            }
+          }
+          break;
+        }
+      }
     };
 
     window.addEventListener('click', handleGlobalClick);
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('paste', handlePaste);
 
     return () => {
       managerRef.current?.dispose();
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('paste', handlePaste);
     };
   }, []);
 
@@ -128,6 +188,22 @@ export default function Home() {
     setActiveTool(tool);
     if (tool === 'text' && managerRef.current) {
       managerRef.current.addText();
+    } else if (tool === 'image' && managerRef.current) {
+      // 触发文件选择
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file && managerRef.current) {
+          try {
+            await managerRef.current.addImage(file);
+          } catch (error) {
+            console.error('Failed to add image:', error);
+          }
+        }
+      };
+      input.click();
     }
   };
 
@@ -385,6 +461,63 @@ export default function Home() {
           onBorderChange={handleBorderChange}
         />
       </div>
+
+      {/* 右键菜单 */}
+      {contextMenu && selectedObject && (
+        <>
+          {/* 背景遮罩，点击关闭菜单 */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+          />
+          {/* 菜单 */}
+          <div
+            className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={() => {
+                managerRef.current?.bringToFront();
+                setContextMenu(null);
+              }}
+            >
+              <span>置于顶层</span>
+              <span className="text-xs text-gray-400">⌘⇧]</span>
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={() => {
+                managerRef.current?.bringForward();
+                setContextMenu(null);
+              }}
+            >
+              <span>上移一层</span>
+              <span className="text-xs text-gray-400">⌘]</span>
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={() => {
+                managerRef.current?.sendBackward();
+                setContextMenu(null);
+              }}
+            >
+              <span>下移一层</span>
+              <span className="text-xs text-gray-400">⌘[</span>
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={() => {
+                managerRef.current?.sendToBack();
+                setContextMenu(null);
+              }}
+            >
+              <span>置于底层</span>
+              <span className="text-xs text-gray-400">⌘⇧[</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
