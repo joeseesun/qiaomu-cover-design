@@ -564,20 +564,31 @@ export class CanvasManager {
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
 
-        // 保存当前滚动位置，防止 enterEditing 导致页面滚动
-        const scrollX = window.scrollX;
-        const scrollY = window.scrollY;
+        // 保存当前滚动位置，防止编辑期间页面滚动
+        const savedScrollX = window.scrollX;
+        const savedScrollY = window.scrollY;
+
+        // 持续监听滚动事件，在编辑期间阻止任何滚动
+        const preventScroll = () => {
+          window.scrollTo(savedScrollX, savedScrollY);
+        };
 
         editText.enterEditing();
         editText.selectAll();
 
-        // 恢复滚动位置
-        window.scrollTo(scrollX, scrollY);
+        // 立即恢复滚动位置
+        window.scrollTo(savedScrollX, savedScrollY);
+
+        // 添加滚动监听器，持续阻止滚动
+        window.addEventListener('scroll', preventScroll, { passive: false });
 
         this.canvas.renderAll();
 
         // 监听文本编辑完成，重新创建 Group
         editText.on('editing:exited', () => {
+          // 移除滚动监听器
+          window.removeEventListener('scroll', preventScroll);
+
           const newConfig = {
             ...config,
             text: editText.text || '',
@@ -1151,17 +1162,28 @@ export class CanvasManager {
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
 
-        // 保存当前滚动位置，防止 enterEditing 导致页面滚动
-        const scrollX = window.scrollX;
-        const scrollY = window.scrollY;
+        // 保存当前滚动位置，防止编辑期间页面滚动
+        const savedScrollX = window.scrollX;
+        const savedScrollY = window.scrollY;
+
+        // 持续监听滚动事件，在编辑期间阻止任何滚动
+        const preventScroll = () => {
+          window.scrollTo(savedScrollX, savedScrollY);
+        };
 
         editText.enterEditing();
         editText.selectAll();
 
-        // 恢复滚动位置
-        window.scrollTo(scrollX, scrollY);
+        // 立即恢复滚动位置
+        window.scrollTo(savedScrollX, savedScrollY);
+
+        // 添加滚动监听器，持续阻止滚动
+        window.addEventListener('scroll', preventScroll, { passive: false });
 
         editText.on('editing:exited', () => {
+          // 移除滚动监听器
+          window.removeEventListener('scroll', preventScroll);
+
           const newConfig = {
             ...config,
             text: editText.text || '',
@@ -1298,17 +1320,28 @@ export class CanvasManager {
           this.canvas.add(editText);
           this.canvas.setActiveObject(editText);
 
-          // 保存当前滚动位置，防止 enterEditing 导致页面滚动
-          const scrollX = window.scrollX;
-          const scrollY = window.scrollY;
+          // 保存当前滚动位置，防止编辑期间页面滚动
+          const savedScrollX = window.scrollX;
+          const savedScrollY = window.scrollY;
+
+          // 持续监听滚动事件，在编辑期间阻止任何滚动
+          const preventScroll = () => {
+            window.scrollTo(savedScrollX, savedScrollY);
+          };
 
           editText.enterEditing();
           editText.selectAll();
 
-          // 恢复滚动位置
-          window.scrollTo(scrollX, scrollY);
+          // 立即恢复滚动位置
+          window.scrollTo(savedScrollX, savedScrollY);
+
+          // 添加滚动监听器，持续阻止滚动
+          window.addEventListener('scroll', preventScroll, { passive: false });
 
           editText.on('editing:exited', () => {
+            // 移除滚动监听器
+            window.removeEventListener('scroll', preventScroll);
+
             const newConfig = {
               ...config,
               text: editText.text || '',
