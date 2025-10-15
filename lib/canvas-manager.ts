@@ -32,9 +32,11 @@ export class CanvasManager {
 
   // 添加普通文本
   addText(text = '双击编辑') {
-    const obj = new fabric.IText(text, {
+    // 使用 Textbox 而不是 IText，支持固定宽度和自动换行
+    const obj = new fabric.Textbox(text, {
       left: this.width / 2,
       top: this.height / 2,
+      width: this.width - 40, // 画布宽度减去左右边距
       fontSize: 60,
       fontFamily: 'Noto Sans SC',
       fill: '#333333',
@@ -42,13 +44,8 @@ export class CanvasManager {
       originY: 'center',
       editable: true,
       selectable: true,
-      textBaseline: 'middle', // 修复 'alphabetical' 错误
+      textBaseline: 'middle',
       splitByGrapheme: true, // 支持中文字符换行
-    });
-
-    // 设置最大宽度为画布宽度，超过自动换行
-    obj.set({
-      width: this.width,
     });
 
     this.canvas.add(obj);
@@ -738,7 +735,7 @@ export class CanvasManager {
 
     if (obj.type === 'group') {
       const items = (obj as any)._objects || [];
-      textObj = items.find((o: any) => o.type === 'i-text');
+      textObj = items.find((o: any) => o.type === 'i-text' || o.type === 'textbox');
       if (!textObj) return null;
 
       config = {
@@ -782,7 +779,7 @@ export class CanvasManager {
           config.underlineColor = item.stroke;
         }
       });
-    } else if (obj.type === 'i-text' || obj.type === 'text') {
+    } else if (obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox') {
       config = {
         text: obj.text,
         fontSize: obj.fontSize,
@@ -805,7 +802,12 @@ export class CanvasManager {
 
   // 创建带装饰的文本
   private createDecoratedText(config: any) {
-    const text = new fabric.IText(config.text || '文字', {
+    // 设置最大宽度为画布宽度减去 padding，超过自动换行
+    const maxTextWidth = this.width - 40; // 左右各留 20px
+
+    // 使用 Textbox 而不是 IText，支持固定宽度和自动换行
+    const text = new fabric.Textbox(config.text || '文字', {
+      width: maxTextWidth,
       fontSize: config.fontSize || 60,
       fontFamily: config.fontFamily || 'Noto Sans SC',
       fill: config.fill || '#333333',
@@ -815,14 +817,8 @@ export class CanvasManager {
       selectable: true,
       originX: 'center',
       originY: 'center',
-      textBaseline: 'middle', // 修复 'alphabetical' 错误
+      textBaseline: 'middle',
       splitByGrapheme: true, // 支持中文字符换行
-    });
-
-    // 设置最大宽度为画布宽度减去 padding，超过自动换行
-    const maxTextWidth = this.width - 40; // 左右各留 20px
-    text.set({
-      width: maxTextWidth,
     });
 
     // 强制计算文本尺寸
@@ -831,7 +827,7 @@ export class CanvasManager {
     const objects: fabric.Object[] = [];
     const paddingX = 20;
     const paddingY = 12;
-    const textWidth = Math.min(text.width || 0, maxTextWidth);
+    const textWidth = text.width || 0;
     const textHeight = text.height || 0;
 
     // 背景
@@ -1045,7 +1041,7 @@ export class CanvasManager {
 
     objects.forEach((obj: any) => {
       if (obj.type === 'group' && obj._objects) {
-        const textObj = obj._objects.find((o: any) => o.type === 'i-text');
+        const textObj = obj._objects.find((o: any) => o.type === 'i-text' || o.type === 'textbox');
         if (!textObj) return;
 
         // 提取配置
@@ -1072,8 +1068,10 @@ export class CanvasManager {
           // 移除 Group
           this.canvas.remove(obj);
 
-          // 创建新的文本对象用于编辑
-          const editText = new fabric.IText(textContent, {
+          // 创建新的文本对象用于编辑（使用 Textbox 支持自动换行）
+          const maxTextWidth = this.width - 40;
+          const editText = new fabric.Textbox(textContent, {
+            width: maxTextWidth,
             left: savedLeft,
             top: savedTop,
             angle: savedAngle,
@@ -1090,6 +1088,7 @@ export class CanvasManager {
             selectable: true,
             textAlign: 'center',
             textBaseline: 'middle',
+            splitByGrapheme: true,
           });
 
           this.canvas.add(editText);
