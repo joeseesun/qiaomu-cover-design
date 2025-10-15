@@ -73,6 +73,31 @@ export default function Home() {
       setSelectedObject(null);
     });
 
+    // 在Fabric.js的upperCanvasEl上监听右键
+    const upperCanvas = managerRef.current.canvas.upperCanvasEl;
+    const handleCanvasContextMenu = (e: MouseEvent) => {
+      console.log('🟡🟡🟡 upperCanvasEl contextmenu触发!');
+      e.preventDefault();
+      e.stopPropagation();
+
+      const pointer = managerRef.current!.canvas.getPointer(e);
+      const target = managerRef.current!.canvas.findTarget(e as any, false);
+
+      console.log('🖱️ 右键点击:', { target: target?.type, pointer });
+
+      if (target) {
+        managerRef.current!.canvas.setActiveObject(target);
+        managerRef.current!.canvas.renderAll();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+        console.log('✅ 显示菜单');
+      } else {
+        setContextMenu(null);
+        console.log('⚠️ 关闭菜单');
+      }
+    };
+
+    upperCanvas.addEventListener('contextmenu', handleCanvasContextMenu);
+
 
 
     // 点击画布空白区域取消选中
@@ -199,6 +224,7 @@ export default function Home() {
     window.addEventListener('paste', handlePaste);
 
     return () => {
+      upperCanvas.removeEventListener('contextmenu', handleCanvasContextMenu);
       managerRef.current?.dispose();
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown);
