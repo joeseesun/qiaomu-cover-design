@@ -44,7 +44,7 @@ export default function ColorPicker({ color, onChange, label }: ColorPickerProps
             className="w-full justify-start gap-3 h-12"
           >
             <div
-              className="w-8 h-8 rounded border-2 border-border"
+              className="w-8 h-8 rounded border border-border/40"
               style={{ backgroundColor: color }}
             />
             <span className="text-sm font-mono">{color.toUpperCase()}</span>
@@ -74,10 +74,10 @@ export default function ColorPicker({ color, onChange, label }: ColorPickerProps
                       onChange(presetColor);
                       setInputValue(presetColor);
                     }}
-                    className={`w-7 h-7 rounded border-2 transition-all hover:scale-110 ${
+                    className={`w-7 h-7 rounded border transition-all hover:scale-110 ${
                       color.toUpperCase() === presetColor.toUpperCase()
                         ? 'border-primary ring-2 ring-primary/20'
-                        : 'border-border'
+                        : 'border-border/30'
                     }`}
                     style={{ backgroundColor: presetColor }}
                     title={presetColor}

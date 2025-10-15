@@ -46,11 +46,13 @@ export default function Home() {
     }
 
     // 监听选择事件
-    managerRef.current.canvas.on('selection:created', (e) => {
-      setSelectedObject(e.selected?.[0]);
+    managerRef.current.canvas.on('selection:created', (e: any) => {
+      const target = e.selected?.[0] || e.target;
+      setSelectedObject(target);
     });
-    managerRef.current.canvas.on('selection:updated', (e) => {
-      setSelectedObject(e.selected?.[0]);
+    managerRef.current.canvas.on('selection:updated', (e: any) => {
+      const target = e.selected?.[0] || e.target;
+      setSelectedObject(target);
     });
     managerRef.current.canvas.on('selection:cleared', () => {
       setSelectedObject(null);
@@ -89,8 +91,16 @@ export default function Home() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && managerRef.current) {
         const activeObject = managerRef.current.canvas.getActiveObject();
         if (activeObject) {
-          managerRef.current.canvas.remove(activeObject);
-          managerRef.current.canvas.renderAll();
+          // 检查是否处于编辑状态
+          const isEditing = (activeObject as any).isEditing;
+
+          // 只有在非编辑状态下才删除整个对象
+          if (!isEditing) {
+            e.preventDefault(); // 阻止默认行为
+            managerRef.current.canvas.remove(activeObject);
+            managerRef.current.canvas.renderAll();
+          }
+          // 如果处于编辑状态，让浏览器处理默认的删除行为（删除选中的文字）
         }
       }
     };
@@ -269,34 +279,62 @@ export default function Home() {
     managerRef.current?.updateProperty('fill', color);
   };
 
-  const handleHighlight = (
-    type: 'marker' | 'underline' | 'box',
-    color: string
+  const handleLineHeightChange = (lineHeight: number) => {
+    managerRef.current?.updateProperty('lineHeight', lineHeight);
+  };
+
+  const handleLetterSpacingChange = (letterSpacing: number) => {
+    managerRef.current?.updateProperty('charSpacing', letterSpacing);
+  };
+
+  const handleBackgroundChange = (
+    style: 'none' | 'solid' | 'gradient',
+    color?: string
   ) => {
-    if (!selectedObject || !managerRef.current) return;
+    managerRef.current?.updateBackground(style, color);
+  };
 
-    // 如果已经是高亮文本（Group），只更新背景色
-    if (selectedObject.type === 'group') {
-      managerRef.current.updateHighlightBackground(selectedObject, type, color);
-    } else {
-      // 如果是普通文本，转换为高亮文本
-      const text = selectedObject.text || '高亮文字';
-      const left = selectedObject.left;
-      const top = selectedObject.top;
+  const handleUnderlineChange = (
+    style: 'none' | 'solid' | 'wavy' | 'dotted',
+    width?: number,
+    color?: string
+  ) => {
+    managerRef.current?.updateUnderline(style, width, color);
+  };
 
-      managerRef.current.deleteActive();
-      managerRef.current.addHighlightText(
-        {
-          text,
-          type,
-          color,
-          fontSize: selectedObject.fontSize,
-          fontFamily: selectedObject.fontFamily,
-        },
-        left,
-        top
-      );
+  const handleBorderChange = (
+    style: 'none' | 'solid' | 'dashed',
+    width?: number,
+    color?: string
+  ) => {
+    managerRef.current?.updateBorder(style, width, color);
+  };
+
+  // 获取选中对象的属性（支持多选）
+  const getSelectedObjectProperty = (property: string, defaultValue: any) => {
+    if (!selectedObject) return defaultValue;
+
+    // 如果是多选，获取第一个对象的属性
+    if (selectedObject.type === 'activeSelection') {
+      const objects = (selectedObject as any).getObjects();
+      if (objects.length === 0) return defaultValue;
+
+      const firstObj = objects[0];
+      // 如果是 Group，获取内部文本对象的属性
+      if (firstObj.type === 'group') {
+        const textObj = (firstObj as any)._objects?.find((o: any) => o.type === 'i-text');
+        return textObj?.[property] || defaultValue;
+      }
+      return firstObj[property] || defaultValue;
     }
+
+    // 单个对象
+    if (selectedObject.type === 'group') {
+      const textObj = (selectedObject as any)._objects?.find((o: any) => o.type === 'i-text');
+      return textObj?.[property] || defaultValue;
+    }
+
+    return selectedObject[property] || defaultValue;
   };
 
   return (
@@ -335,14 +373,20 @@ export default function Home() {
 
         {/* 右侧字体面板 */}
         <FontPanel
-          selectedFont={selectedObject?.fontFamily || 'Noto Sans SC'}
-          fontSize={selectedObject?.fontSize || 60}
-          textColor={selectedObject?.fill || '#333333'}
+          selectedFont={getSelectedObjectProperty('fontFamily', 'Noto Sans SC')}
+          fontSize={getSelectedObjectProperty('fontSize', 60)}
+          textColor={getSelectedObjectProperty('fill', '#333333')}
+          lineHeight={getSelectedObjectProperty('lineHeight', 1.2)}
+          letterSpacing={getSelectedObjectProperty('charSpacing', 0)}
           selectedObject={selectedObject}
           onFontChange={handleFontChange}
           onFontSizeChange={handleFontSizeChange}
           onColorChange={handleColorChange}
-          onHighlight={handleHighlight}
+          onLineHeightChange={handleLineHeightChange}
+          onLetterSpacingChange={handleLetterSpacingChange}
+          onBackgroundChange={handleBackgroundChange}
+          onUnderlineChange={handleUnderlineChange}
+          onBorderChange={handleBorderChange}
         />
       </div>
     </div>
