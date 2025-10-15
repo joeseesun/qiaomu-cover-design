@@ -213,6 +213,7 @@ export class CanvasManager {
       originX: 'center',
       originY: 'center',
       subTargetCheck: true, // 允许选中子对象
+      data: { isDecoratedText: true }, // ✅ 标记为新的装饰文本，避免被迁移
     });
 
     // 监听双击事件，进入文本编辑模式
@@ -938,71 +939,9 @@ export class CanvasManager {
     this.canvas.setBackgroundColor('#ffffff', () => this.canvas.renderAll());
   }
 
-  // 迁移旧的 Group 对象为新的 IText（修复双击编辑问题）
-  migrateOldGroups() {
-    const objects = this.canvas.getObjects();
-    const groupsToMigrate: any[] = [];
-
-    // 找到所有 Group 对象
-    objects.forEach((obj: any) => {
-      if (obj.type === 'group' && obj._objects) {
-        const textObj = obj._objects.find((o: any) => o.type === 'i-text');
-        if (textObj) {
-          groupsToMigrate.push({ group: obj, text: textObj });
-        }
-      }
-    });
-
-    // 转换每个 Group
-    groupsToMigrate.forEach(({ group, text }) => {
-      // 创建新的 IText
-      const newText = new fabric.IText(text.text, {
-        fontSize: text.fontSize,
-        fontFamily: text.fontFamily,
-        fill: text.fill,
-        left: group.left,
-        top: group.top,
-        originX: 'center',
-        originY: 'center',
-        editable: true,
-        selectable: true,
-        textAlign: 'center',
-      });
-
-      // 检测高亮类型并应用样式
-      const bgObj = group._objects.find((o: any) => o.type === 'rect' && o.fill !== 'transparent');
-      const strokeObj = group._objects.find((o: any) => o.type === 'rect' && o.fill === 'transparent');
-      const lineObj = group._objects.find((o: any) => o.type === 'line');
-
-      if (bgObj) {
-        // 荧光笔效果
-        newText.set({
-          backgroundColor: bgObj.fill,
-          padding: 10,
-        });
-      } else if (strokeObj) {
-        // 边框效果
-        newText.set({
-          stroke: strokeObj.stroke,
-          strokeWidth: 3,
-          padding: 12,
-        });
-      } else if (lineObj) {
-        // 下划线效果
-        newText.set({
-          underline: true,
-          fill: lineObj.stroke,
-        });
-      }
-
-      // 删除旧 Group，添加新 IText
-      this.canvas.remove(group);
-      this.canvas.add(newText);
-    });
-
-    this.canvas.renderAll();
-    console.log(`已迁移 ${groupsToMigrate.length} 个旧的 Group 对象`);
-  }
+  // ✅ 已移除 migrateOldGroups 方法
+  // 原因：rebindGroupEvents 已经处理了 Group 的双击编辑功能
+  // 不再需要将 Group 转换为 IText
 
   // 销毁画布
   dispose() {

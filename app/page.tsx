@@ -39,10 +39,7 @@ export default function Home() {
     const active = versionRef.current.getActive();
     if (active?.data) {
       managerRef.current.loadFromJSON(active.data);
-      // 迁移旧的 Group 对象为新的 IText（修复双击编辑问题）
-      setTimeout(() => {
-        managerRef.current?.migrateOldGroups();
-      }, 100);
+      // ✅ 不再需要 migrateOldGroups，因为 rebindGroupEvents 已经处理了双击编辑
     }
 
     // 监听选择事件
