@@ -8,37 +8,48 @@ export class QiniuUploader {
   private domain = 'https://img.t5t6.com'; // 访问域名
   private uploadUrl = 'https://up.qiniup.com'; // 华东区域上传地址
 
-  // 生成上传 token
+  // 生成上传 token（按照七牛云官方文档）
   private generateUploadToken(key?: string): string {
+    // 1. 构造上传策略
     const putPolicy = {
       scope: key ? `${this.bucket}:${key}` : this.bucket,
       deadline: Math.floor(Date.now() / 1000) + 3600, // 1小时后过期
     };
 
-    // 1. 将 putPolicy 转为 JSON 字符串，然后 Base64 编码（URL 安全）
+    // 2. 将上传策略序列化为 JSON
     const policyStr = JSON.stringify(putPolicy);
+
+    // 3. 对 JSON 编码的上传策略进行 URL 安全的 Base64 编码
     const encodedPutPolicy = this.urlSafeBase64Encode(policyStr);
 
-    // 2. 使用 HMAC-SHA1 对 encodedPutPolicy 签名，然后 Base64 编码（URL 安全）
+    // 4. 使用 SecretKey 对 encodedPutPolicy 计算 HMAC-SHA1 签名（二进制）
     const sign = CryptoJS.HmacSHA1(encodedPutPolicy, this.secretKey);
-    const signBase64 = CryptoJS.enc.Base64.stringify(sign);
-    const encodedSign = signBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-    // 3. 拼接 token: AccessKey:EncodedSign:EncodedPutPolicy
+    // 5. 对签名进行 URL 安全的 Base64 编码
+    const encodedSign = this.urlSafeBase64EncodeWordArray(sign);
+
+    // 6. 拼接 token: AccessKey:EncodedSign:EncodedPutPolicy
     const uploadToken = `${this.accessKey}:${encodedSign}:${encodedPutPolicy}`;
 
     console.log('🔑 生成上传 Token:', {
       putPolicy,
-      encodedPutPolicy: encodedPutPolicy.substring(0, 30) + '...',
-      encodedSign: encodedSign.substring(0, 20) + '...',
+      policyStr,
+      encodedPutPolicy,
+      encodedSign,
     });
 
     return uploadToken;
   }
 
-  // URL 安全的 Base64 编码
+  // URL 安全的 Base64 编码（字符串）
   private urlSafeBase64Encode(str: string): string {
     const wordArray = CryptoJS.enc.Utf8.parse(str);
+    const base64 = CryptoJS.enc.Base64.stringify(wordArray);
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  // URL 安全的 Base64 编码（WordArray，用于签名）
+  private urlSafeBase64EncodeWordArray(wordArray: CryptoJS.lib.WordArray): string {
     const base64 = CryptoJS.enc.Base64.stringify(wordArray);
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
