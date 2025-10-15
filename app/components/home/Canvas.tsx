@@ -35,6 +35,21 @@ export default function Canvas({
   // 判断是否可以拖拽：锁定模式 或 按住空格键
   const canPan = isPanMode || isSpacePressed;
 
+  // 测试原生contextmenu事件
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const handleNativeContextMenu = (e: MouseEvent) => {
+      console.log('🟢🟢🟢 原生contextmenu事件触发了!', e.type, e.button);
+    };
+
+    canvasRef.current.addEventListener('contextmenu', handleNativeContextMenu);
+
+    return () => {
+      canvasRef.current?.removeEventListener('contextmenu', handleNativeContextMenu);
+    };
+  }, [canvasRef]);
+
   // 计算自动缩放比例（移除最大值限制，允许缩小显示大画布）
   useEffect(() => {
     const updateScale = () => {
@@ -227,7 +242,10 @@ export default function Canvas({
         >
           <canvas
             ref={canvasRef}
-            onContextMenu={onContextMenu}
+            onContextMenu={(e) => {
+              console.log('🔴🔴🔴 Canvas内部: contextmenu事件触发了!', e.type);
+              onContextMenu?.(e);
+            }}
             style={{
               display: 'block',
               width: `${canvasSize.width}px`,
