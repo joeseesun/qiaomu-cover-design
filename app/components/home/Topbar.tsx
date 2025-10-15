@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -254,9 +254,13 @@ export default function Topbar({
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                 : 'hover:bg-accent text-muted-foreground'
             }`}
-            title={isPanMode ? '退出拖拽模式' : '进入拖拽模式 (或按住空格键)'}
+            title={isPanMode ? '退出拖拽模式 (点击或按ESC)' : '进入拖拽模式 (或按住空格键)'}
           >
-            <Hand className="h-4 w-4" />
+            {isPanMode ? (
+              <Hand className="h-4 w-4" />
+            ) : (
+              <MousePointer2 className="h-4 w-4" />
+            )}
           </button>
 
           <div className="w-px h-4 bg-gray-200" />

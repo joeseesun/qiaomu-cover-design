@@ -59,7 +59,7 @@ export class CanvasManager {
     const obj = new fabric.Textbox(text, {
       left: this.width / 2,
       top: this.height / 2,
-      width: this.width - 40, // 画布宽度减去左右边距
+      width: this.width * 0.8, // 画布宽度的80%
       fontSize: 60,
       fontFamily: 'Noto Sans SC',
       fill: '#333333',
@@ -564,30 +564,37 @@ export class CanvasManager {
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
 
-        // 保存当前滚动位置，防止编辑期间页面滚动
+        // 保存当前滚动位置
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
 
-        // 持续监听滚动事件，在编辑期间阻止任何滚动
-        const preventScroll = () => {
-          window.scrollTo(savedScrollX, savedScrollY);
-        };
+        // 使用 requestAnimationFrame 确保在下一帧进入编辑模式，避免抖动
+        requestAnimationFrame(() => {
+          // 保存滚动位置
+          const scrollX = window.scrollX;
+          const scrollY = window.scrollY;
 
-        editText.enterEditing();
-        editText.selectAll();
+          editText.enterEditing();
+          editText.selectAll();
 
-        // 立即恢复滚动位置
-        window.scrollTo(savedScrollX, savedScrollY);
-
-        // 添加滚动监听器，持续阻止滚动
-        window.addEventListener('scroll', preventScroll, { passive: false });
+          // 立即恢复滚动位置
+          window.scrollTo(scrollX, scrollY);
+        });
 
         this.canvas.renderAll();
 
+        // 监听ESC键退出编辑
+        const handleEscape = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+            editText.exitEditing();
+          }
+        };
+        window.addEventListener('keydown', handleEscape);
+
         // 监听文本编辑完成，重新创建 Group
         editText.on('editing:exited', () => {
-          // 移除滚动监听器
-          window.removeEventListener('scroll', preventScroll);
+          // 移除ESC监听器
+          window.removeEventListener('keydown', handleEscape);
 
           const newConfig = {
             ...config,
@@ -941,7 +948,7 @@ export class CanvasManager {
 
     if (useTextbox) {
       // 多行文本：使用 Textbox，支持固定宽度和自动换行
-      const maxTextWidth = this.width - 40; // 左右各留 20px
+      const maxTextWidth = this.width * 0.8; // 画布宽度的80%
       text = new fabric.Textbox(config.text || '文字', {
         width: maxTextWidth,
         fontSize: config.fontSize || 60,
@@ -1118,7 +1125,7 @@ export class CanvasManager {
 
         if (textType === 'textbox') {
           // 多行文本
-          const maxTextWidth = this.width - 40;
+          const maxTextWidth = this.width * 0.8;
           editText = new fabric.Textbox(textContent, {
             width: maxTextWidth,
             left: savedLeft,
@@ -1162,27 +1169,34 @@ export class CanvasManager {
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
 
-        // 保存当前滚动位置，防止编辑期间页面滚动
+        // 保存当前滚动位置
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
 
-        // 持续监听滚动事件，在编辑期间阻止任何滚动
-        const preventScroll = () => {
-          window.scrollTo(savedScrollX, savedScrollY);
+        // 使用 requestAnimationFrame 确保在下一帧进入编辑模式，避免抖动
+        requestAnimationFrame(() => {
+          // 保存滚动位置
+          const scrollX = window.scrollX;
+          const scrollY = window.scrollY;
+
+          editText.enterEditing();
+          editText.selectAll();
+
+          // 立即恢复滚动位置
+          window.scrollTo(scrollX, scrollY);
+        });
+
+        // 监听ESC键退出编辑
+        const handleEscape = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+            editText.exitEditing();
+          }
         };
-
-        editText.enterEditing();
-        editText.selectAll();
-
-        // 立即恢复滚动位置
-        window.scrollTo(savedScrollX, savedScrollY);
-
-        // 添加滚动监听器，持续阻止滚动
-        window.addEventListener('scroll', preventScroll, { passive: false });
+        window.addEventListener('keydown', handleEscape);
 
         editText.on('editing:exited', () => {
-          // 移除滚动监听器
-          window.removeEventListener('scroll', preventScroll);
+          // 移除ESC监听器
+          window.removeEventListener('keydown', handleEscape);
 
           const newConfig = {
             ...config,
@@ -1276,7 +1290,7 @@ export class CanvasManager {
 
           if (textType === 'textbox') {
             // 多行文本
-            const maxTextWidth = this.width - 40;
+            const maxTextWidth = this.width * 0.8;
             editText = new fabric.Textbox(textContent, {
               width: maxTextWidth,
               left: savedLeft,
@@ -1320,27 +1334,34 @@ export class CanvasManager {
           this.canvas.add(editText);
           this.canvas.setActiveObject(editText);
 
-          // 保存当前滚动位置，防止编辑期间页面滚动
+          // 保存当前滚动位置
           const savedScrollX = window.scrollX;
           const savedScrollY = window.scrollY;
 
-          // 持续监听滚动事件，在编辑期间阻止任何滚动
-          const preventScroll = () => {
-            window.scrollTo(savedScrollX, savedScrollY);
+          // 使用 requestAnimationFrame 确保在下一帧进入编辑模式，避免抖动
+          requestAnimationFrame(() => {
+            // 保存滚动位置
+            const scrollX = window.scrollX;
+            const scrollY = window.scrollY;
+
+            editText.enterEditing();
+            editText.selectAll();
+
+            // 立即恢复滚动位置
+            window.scrollTo(scrollX, scrollY);
+          });
+
+          // 监听ESC键退出编辑
+          const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+              editText.exitEditing();
+            }
           };
-
-          editText.enterEditing();
-          editText.selectAll();
-
-          // 立即恢复滚动位置
-          window.scrollTo(savedScrollX, savedScrollY);
-
-          // 添加滚动监听器，持续阻止滚动
-          window.addEventListener('scroll', preventScroll, { passive: false });
+          window.addEventListener('keydown', handleEscape);
 
           editText.on('editing:exited', () => {
-            // 移除滚动监听器
-            window.removeEventListener('scroll', preventScroll);
+            // 移除ESC监听器
+            window.removeEventListener('keydown', handleEscape);
 
             const newConfig = {
               ...config,

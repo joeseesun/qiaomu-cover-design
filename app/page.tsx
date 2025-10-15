@@ -455,6 +455,18 @@ export default function Home() {
     setIsPanMode(!isPanMode);
   };
 
+  // 监听ESC键退出拖拽模式
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPanMode) {
+        setIsPanMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPanMode]);
+
   // 画布尺寸改变
   const handleCanvasSizeChange = (newSize: CanvasSize) => {
     if (!managerRef.current) return;
