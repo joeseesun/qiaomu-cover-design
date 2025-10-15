@@ -12,9 +12,9 @@ const QINIU_BUCKET = 'joemarkdown';
 const QINIU_UPLOAD_URL = 'https://upload.qiniup.com';
 const QINIU_DOMAIN = 'https://newimg.t5t6.com';
 
-// Base64 URL 安全编码
+// Base64 URL 安全编码（不移除 = 号，与前端保持一致）
 function base64urlEscape(str: string): string {
-  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return str.replace(/\+/g, '-').replace(/\//g, '_');
 }
 
 // 生成七牛云上传 Token
@@ -23,6 +23,7 @@ function generateUploadToken(key: string): string {
   const putPolicy = {
     scope: `${QINIU_BUCKET}:${key}`,
     deadline: deadline,
+    returnBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}'
   };
 
   const policyStr = JSON.stringify(putPolicy);
@@ -36,7 +37,15 @@ function generateUploadToken(key: string): string {
     .digest('base64');
   const encodedSign = base64urlEscape(sign);
 
-  return `${QINIU_ACCESS_KEY}:${encodedSign}:${encodedPutPolicy}`;
+  const token = `${QINIU_ACCESS_KEY}:${encodedSign}:${encodedPutPolicy}`;
+
+  console.log('🔑 生成上传 Token:', {
+    key,
+    deadline: new Date(deadline * 1000).toISOString(),
+    token: token.substring(0, 50) + '...',
+  });
+
+  return token;
 }
 
 export async function POST(request: NextRequest) {
@@ -117,6 +126,7 @@ export async function POST(request: NextRequest) {
     const formData = new FormData();
     formData.append('token', token);
     formData.append('key', key);
+    formData.append('x:name', 'ai-generated.jpg');
     formData.append('file', new Blob([imageBuffer], { type: 'image/jpeg' }));
 
     const uploadResponse = await fetch(QINIU_UPLOAD_URL, {
