@@ -176,6 +176,61 @@ export class CanvasManager {
     }
   }
 
+  // 复制选中的对象
+  duplicateActive() {
+    const activeObject = this.canvas.getActiveObject();
+    if (!activeObject) return;
+
+    // 处理多选
+    if (activeObject.type === 'activeSelection') {
+      const selection = activeObject as fabric.ActiveSelection;
+      const objects = selection.getObjects();
+
+      // 取消选择
+      this.canvas.discardActiveObject();
+
+      // 复制每个对象
+      const clonedObjects: fabric.Object[] = [];
+      objects.forEach((obj: any) => {
+        obj.clone((cloned: fabric.Object) => {
+          cloned.set({
+            left: (cloned.left || 0) + 20,
+            top: (cloned.top || 0) + 20,
+          });
+          this.canvas.add(cloned);
+          clonedObjects.push(cloned);
+        }, ['data', 'selectable', 'evented']);
+      });
+
+      // 选中复制的对象
+      setTimeout(() => {
+        const sel = new fabric.ActiveSelection(clonedObjects, {
+          canvas: this.canvas,
+        });
+        this.canvas.setActiveObject(sel);
+        this.canvas.renderAll();
+      }, 10);
+
+      return;
+    }
+
+    // 处理单个对象
+    activeObject.clone((cloned: fabric.Object) => {
+      cloned.set({
+        left: (cloned.left || 0) + 20,
+        top: (cloned.top || 0) + 20,
+      });
+      this.canvas.add(cloned);
+      this.canvas.setActiveObject(cloned);
+      this.canvas.renderAll();
+
+      // 如果是 Group，需要重新绑定事件
+      if (cloned.type === 'group') {
+        this.rebindGroupEvents(cloned as fabric.Group);
+      }
+    }, ['data', 'selectable', 'evented']);
+  }
+
   // 更新现有高亮文本的背景色
   updateHighlightBackground(
     group: fabric.Group,

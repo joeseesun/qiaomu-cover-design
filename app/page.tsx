@@ -126,10 +126,17 @@ export default function Home() {
         }
       }
 
-      // 图层调整快捷键
+      // 图层调整快捷键和复制快捷键
       if (managerRef.current && managerRef.current.canvas.getActiveObject()) {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+        // 复制快捷键 Cmd/Ctrl + D
+        if (cmdOrCtrl && e.key === 'd') {
+          e.preventDefault();
+          managerRef.current.duplicateActive();
+          return;
+        }
 
         if (cmdOrCtrl && e.key === ']') {
           e.preventDefault();
