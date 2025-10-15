@@ -23,6 +23,8 @@ export default function Home() {
   const [userZoom, setUserZoom] = useState(100); // 用户手动缩放（50-200%）
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   // 初始化
   useEffect(() => {
@@ -75,6 +77,17 @@ export default function Home() {
         managerRef.current?.canvas.renderAll();
       }
     });
+
+    // 监听画布变化，更新撤销/重做状态
+    const updateUndoRedoState = () => {
+      if (managerRef.current) {
+        setCanUndo(managerRef.current.canUndo());
+        setCanRedo(managerRef.current.canRedo());
+      }
+    };
+    managerRef.current.canvas.on('object:added', updateUndoRedoState);
+    managerRef.current.canvas.on('object:modified', updateUndoRedoState);
+    managerRef.current.canvas.on('object:removed', updateUndoRedoState);
 
     // 全局点击事件：只有点击画布容器的灰色背景区域时才取消选中
     const handleGlobalClick = (e: MouseEvent) => {
@@ -216,6 +229,24 @@ export default function Home() {
     if (managerRef.current) {
       managerRef.current.addText(emoji);
       setShowEmojiPicker(false);
+    }
+  };
+
+  // 撤销
+  const handleUndo = () => {
+    if (managerRef.current) {
+      managerRef.current.undo();
+      setCanUndo(managerRef.current.canUndo());
+      setCanRedo(managerRef.current.canRedo());
+    }
+  };
+
+  // 重做
+  const handleRedo = () => {
+    if (managerRef.current) {
+      managerRef.current.redo();
+      setCanUndo(managerRef.current.canUndo());
+      setCanRedo(managerRef.current.canRedo());
     }
   };
 
@@ -446,7 +477,14 @@ export default function Home() {
       {/* 主内容区 */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* 左侧工具栏 */}
-        <Sidebar activeTool={activeTool} onToolChange={handleToolChange} />
+        <Sidebar
+          activeTool={activeTool}
+          onToolChange={handleToolChange}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+        />
 
         {/* Emoji 选择器 */}
         {showEmojiPicker && (

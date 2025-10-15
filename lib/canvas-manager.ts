@@ -6,6 +6,9 @@ export class CanvasManager {
   canvas: fabric.Canvas;
   width: number;
   height: number;
+  private history: string[] = [];
+  private historyIndex: number = -1;
+  private isUndoRedoing: boolean = false;
 
   constructor(element: HTMLCanvasElement, width = CANVAS_WIDTH, height = CANVAS_HEIGHT) {
     this.width = width;
@@ -19,6 +22,11 @@ export class CanvasManager {
       selectionBorderColor: 'transparent', // 隐藏选择框边框
       selectionLineWidth: 0, // 选择框边框宽度为 0
     });
+
+    // 监听画布变化，保存历史记录
+    this.canvas.on('object:added', () => this.saveHistory());
+    this.canvas.on('object:modified', () => this.saveHistory());
+    this.canvas.on('object:removed', () => this.saveHistory());
   }
 
   // 添加普通文本
@@ -1077,6 +1085,58 @@ export class CanvasManager {
   // ✅ 已移除 migrateOldGroups 方法
   // 原因：rebindGroupEvents 已经处理了 Group 的双击编辑功能
   // 不再需要将 Group 转换为 IText
+
+  // 保存历史记录
+  private saveHistory() {
+    if (this.isUndoRedoing) return;
+
+    const json = JSON.stringify(this.canvas.toJSON(['data', 'selectable', 'evented']));
+
+    // 如果当前不在历史记录的末尾，删除后面的记录
+    if (this.historyIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.historyIndex + 1);
+    }
+
+    // 添加新记录
+    this.history.push(json);
+    this.historyIndex++;
+
+    // 限制历史记录数量（最多50条）
+    if (this.history.length > 50) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+  }
+
+  // 撤销
+  undo() {
+    if (this.historyIndex > 0) {
+      this.isUndoRedoing = true;
+      this.historyIndex--;
+      this.loadFromJSON(this.history[this.historyIndex]);
+      this.isUndoRedoing = false;
+    }
+  }
+
+  // 重做
+  redo() {
+    if (this.historyIndex < this.history.length - 1) {
+      this.isUndoRedoing = true;
+      this.historyIndex++;
+      this.loadFromJSON(this.history[this.historyIndex]);
+      this.isUndoRedoing = false;
+    }
+  }
+
+  // 检查是否可以撤销
+  canUndo(): boolean {
+    return this.historyIndex > 0;
+  }
+
+  // 检查是否可以重做
+  canRedo(): boolean {
+    return this.historyIndex < this.history.length - 1;
+  }
 
   // 销毁画布
   dispose() {
