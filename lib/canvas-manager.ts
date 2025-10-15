@@ -32,15 +32,21 @@ export class CanvasManager {
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
 
-    // 监听双击事件,在进入编辑前就开始防滚动
-    this.canvas.on('mouse:dblclick', (e: any) => {
-      const target = e.target;
+    // 监听原生双击事件,在Fabric.js处理之前就开始防滚动
+    const canvasElement = this.canvas.getElement();
+    canvasElement.addEventListener('dblclick', (e: MouseEvent) => {
+      console.log('🖱️ [防滚动] 检测到原生双击事件');
+      // 获取点击位置的对象
+      const pointer = this.canvas.getPointer(e);
+      const target = this.canvas.findTarget(e as any, false);
+      console.log('🎯 [防滚动] 双击目标:', target?.type);
+
       // 只处理文本对象的双击
       if (target && (target.type === 'i-text' || target.type === 'textbox')) {
-        console.log('🖱️ [防滚动] 检测到文本双击');
+        console.log('✅ [防滚动] 确认是文本对象,开始防滚动');
         this.preventScrollOnEdit();
       }
-    });
+    }, { capture: true }); // 使用capture确保在Fabric.js之前执行
 
     // 监听所有文本对象进入编辑模式
     this.canvas.on('text:editing:entered', (e: any) => {
