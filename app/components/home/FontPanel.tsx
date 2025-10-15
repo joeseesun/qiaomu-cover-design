@@ -746,10 +746,11 @@ export default function FontPanel({
         </TabsContent>
       </Tabs>
 
-      <Separator />
-
-      {/* 装饰 Tab 组 */}
-      <Tabs value={activeDecorationTab} onValueChange={(value) => setActiveDecorationTab(value as any)} className="space-y-0">
+      {/* 装饰 Tab 组 - 只在字体设置Tab时显示 */}
+      {activeMainTab === 'font' && (
+        <>
+          <Separator />
+          <Tabs value={activeDecorationTab} onValueChange={(value) => setActiveDecorationTab(value as any)} className="space-y-0">
         <TabsList>
           <TabsTrigger value="background">字体背景</TabsTrigger>
           <TabsTrigger value="underline">下划线</TabsTrigger>
@@ -1195,7 +1196,9 @@ export default function FontPanel({
           </div>
         )}
         </TabsContent>
-      </Tabs>
+          </Tabs>
+        </>
+      )}
     </aside>
   );
 }
