@@ -1314,35 +1314,14 @@ export class CanvasManager {
 
   // 更新单个对象的文本对齐
   private updateSingleObjectTextAlign(obj: any, align: 'left' | 'center' | 'right') {
-    // 如果是Group,需要重新创建以应用对齐
+    // 如果是Group,找到内部的文本对象并更新
     if (obj.type === 'group') {
-      const config = this.extractTextConfig(obj);
-      if (!config) return;
-
-      // 更新对齐方式
-      config.textAlign = align;
-
-      // 删除旧对象
-      this.canvas.remove(obj);
-
-      // 重新创建
-      const newGroup = this.createTextWithEffects(
-        config.text,
-        config.fontFamily,
-        config.fontSize,
-        config.fill,
-        config
-      );
-
-      // 保持位置
-      newGroup.set({
-        left: obj.left,
-        top: obj.top,
-      });
-
-      this.canvas.add(newGroup);
-      this.canvas.setActiveObject(newGroup);
-      console.log('✅ Group文本对齐已更新:', align);
+      const textObj = obj._objects?.find((o: any) => o.type === 'i-text' || o.type === 'textbox');
+      if (textObj) {
+        textObj.set('textAlign', align);
+        obj.addWithUpdate(); // 更新Group
+        console.log('✅ Group文本对齐已更新:', align);
+      }
     } else if (obj.type === 'i-text' || obj.type === 'textbox') {
       // 普通文本对象直接设置
       obj.set('textAlign', align);
