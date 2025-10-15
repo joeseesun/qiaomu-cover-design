@@ -13,6 +13,7 @@ import { AIImageDialog } from './components/home/AIImageDialog';
 import ImageLibrary from './components/home/ImageLibrary';
 import ImageUploadDialog from './components/home/ImageUploadDialog';
 import ConfirmDialog from './components/ui/ConfirmDialog';
+import Toast, { ToastType } from './components/ui/Toast';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,6 +38,11 @@ export default function Home() {
     message: string;
     onConfirm: () => void;
   }>({ open: false, message: '', onConfirm: () => {} });
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: ToastType;
+  }>({ show: false, message: '', type: 'success' });
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
@@ -514,8 +520,9 @@ export default function Home() {
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
+      setToast({ show: true, message: '下载成功', type: 'success' });
     } catch (error) {
-      alert('下载失败');
+      setToast({ show: true, message: '下载失败', type: 'error' });
     }
   };
 
@@ -527,9 +534,9 @@ export default function Home() {
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob }),
       ]);
-      alert('已复制到剪贴板');
+      setToast({ show: true, message: '已复制到剪贴板', type: 'success' });
     } catch (error) {
-      alert('复制失败，请使用导出功能');
+      setToast({ show: true, message: '复制失败，请使用下载功能', type: 'error' });
     }
   };
 
@@ -613,6 +620,10 @@ export default function Home() {
 
   const handleLetterSpacingChange = (letterSpacing: number) => {
     managerRef.current?.updateProperty('charSpacing', letterSpacing);
+  };
+
+  const handleTextAlignChange = (align: 'left' | 'center' | 'right') => {
+    managerRef.current?.updateTextAlign(align);
   };
 
   const handleBackgroundChange = (
@@ -773,6 +784,7 @@ export default function Home() {
           onColorChange={handleColorChange}
           onLineHeightChange={handleLineHeightChange}
           onLetterSpacingChange={handleLetterSpacingChange}
+          onTextAlignChange={handleTextAlignChange}
           onBackgroundChange={handleBackgroundChange}
           onUnderlineChange={handleUnderlineChange}
           onBorderChange={handleBorderChange}
@@ -869,6 +881,15 @@ export default function Home() {
         }}
         onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: () => {} })}
       />
+
+      {/* Toast提示 */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: 'success' })}
+        />
+      )}
     </div>
   );
 }

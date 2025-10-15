@@ -1093,6 +1093,71 @@ export class CanvasManager {
     }
   }
 
+  // 更新文本对齐方式
+  updateTextAlign(align: 'left' | 'center' | 'right') {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj) return;
+
+    console.log('🔄 更新文本对齐:', align, '对象类型:', activeObj.type);
+
+    // 处理多选
+    if (activeObj.type === 'activeSelection') {
+      const selection = activeObj as fabric.ActiveSelection;
+      const objects = selection.getObjects();
+
+      objects.forEach((obj: any) => {
+        this.updateSingleObjectTextAlign(obj, align);
+      });
+
+      this.canvas.renderAll();
+      this.canvas.fire('object:modified', { target: activeObj });
+      return;
+    }
+
+    // 处理单个对象
+    this.updateSingleObjectTextAlign(activeObj, align);
+    this.canvas.renderAll();
+    this.canvas.fire('object:modified', { target: activeObj });
+  }
+
+  // 更新单个对象的文本对齐
+  private updateSingleObjectTextAlign(obj: any, align: 'left' | 'center' | 'right') {
+    // 如果是Group,需要重新创建以应用对齐
+    if (obj.type === 'group') {
+      const config = this.extractTextConfig(obj);
+      if (!config) return;
+
+      // 更新对齐方式
+      config.textAlign = align;
+
+      // 删除旧对象
+      this.canvas.remove(obj);
+
+      // 重新创建
+      const newGroup = this.createTextWithEffects(
+        config.text,
+        config.fontFamily,
+        config.fontSize,
+        config.fill,
+        config
+      );
+
+      // 保持位置
+      newGroup.set({
+        left: obj.left,
+        top: obj.top,
+      });
+
+      this.canvas.add(newGroup);
+      this.canvas.setActiveObject(newGroup);
+      console.log('✅ Group文本对齐已更新:', align);
+    } else if (obj.type === 'i-text' || obj.type === 'textbox') {
+      // 普通文本对象直接设置
+      obj.set('textAlign', align);
+      console.log('✅ 文本对齐已更新:', align);
+    }
+  }
+
   // 删除选中对象
   deleteActive() {
     const activeObj = this.canvas.getActiveObject();
@@ -1293,6 +1358,7 @@ export class CanvasManager {
         fill: textObj.fill,
         lineHeight: textObj.lineHeight,
         charSpacing: textObj.charSpacing,
+        textAlign: textObj.textAlign || 'left', // ✅ 保存文本对齐
         left: obj.left,
         top: obj.top,
         angle: obj.angle,
@@ -1336,6 +1402,7 @@ export class CanvasManager {
         fill: obj.fill,
         lineHeight: obj.lineHeight,
         charSpacing: obj.charSpacing,
+        textAlign: obj.textAlign || 'left', // ✅ 保存文本对齐
         left: obj.left,
         top: obj.top,
         angle: obj.angle,
@@ -1368,6 +1435,7 @@ export class CanvasManager {
         fill: config.fill || '#333333',
         lineHeight: config.lineHeight || 1.2,
         charSpacing: config.charSpacing || 0,
+        textAlign: config.textAlign || 'left', // ✅ 使用保存的对齐方式
         editable: true,
         selectable: true,
         originX: 'center',
@@ -1383,6 +1451,7 @@ export class CanvasManager {
         fill: config.fill || '#333333',
         lineHeight: config.lineHeight || 1.2,
         charSpacing: config.charSpacing || 0,
+        textAlign: config.textAlign || 'center', // ✅ 使用保存的对齐方式
         editable: true,
         selectable: true,
         originX: 'center',
