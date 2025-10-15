@@ -80,6 +80,8 @@ export default function FontPanel({
   // 画布背景状态
   const [canvasBackgroundType, setCanvasBackgroundType] = useState<'solid' | 'image' | 'pattern'>('solid');
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#FFFFFF');
+  const [showCanvasColorPicker, setShowCanvasColorPicker] = useState(false);
+  const [uploadedBackgroundImage, setUploadedBackgroundImage] = useState<string | null>(null);
 
   // 字号输入框的本地状态
   const [fontSizeInput, setFontSizeInput] = useState<string>('');
@@ -602,11 +604,43 @@ export default function FontPanel({
           <div>
             <label className="text-sm font-semibold mb-3 block">纯色背景</label>
             <div className="grid grid-cols-6 gap-2">
-              {['#FFFFFF', '#F5F5F5', '#E8E8E8', '#FFE5E5', '#FFF4E5', '#FFFBE5',
+              {/* 第一个是自定义颜色选择器 */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowCanvasColorPicker(!showCanvasColorPicker)}
+                  className="w-full aspect-square rounded-md border-2 border-border hover:border-primary transition-colors flex items-center justify-center bg-gradient-to-br from-red-500 via-yellow-500 to-blue-500"
+                >
+                  <svg className="w-5 h-5 text-white drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
+                </button>
+                {showCanvasColorPicker && (
+                  <div className="absolute top-full left-0 mt-2 z-50">
+                    <div className="fixed inset-0" onClick={() => setShowCanvasColorPicker(false)} />
+                    <div className="relative bg-white rounded-lg shadow-lg p-3">
+                      <HexColorPicker
+                        color={canvasBackgroundColor}
+                        onChange={(color) => {
+                          setCanvasBackgroundColor(color);
+                          setCanvasBackgroundType('solid');
+                          onCanvasBackgroundChange?.('solid', color);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 预设颜色 */}
+              {['#F5F5F5', '#E8E8E8', '#FFE5E5', '#FFF4E5', '#FFFBE5',
                 '#E5F9FF', '#E5F0FF', '#F0E5FF', '#FFE5F5', '#E5FFE5', '#1A1A1A'].map((color) => (
                 <button
                   key={color}
-                  onClick={() => onCanvasBackgroundChange?.('solid', color)}
+                  onClick={() => {
+                    setCanvasBackgroundColor(color);
+                    setCanvasBackgroundType('solid');
+                    onCanvasBackgroundChange?.('solid', color);
+                  }}
                   className={`w-full aspect-square rounded-md border-2 hover:border-primary transition-colors ${
                     canvasBackgroundColor === color && canvasBackgroundType === 'solid'
                       ? 'border-primary ring-2 ring-primary/20'
@@ -623,19 +657,23 @@ export default function FontPanel({
             <label className="text-sm font-semibold mb-3 block">渐变背景</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-                'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-                'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+                // 柔和浅色渐变
                 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
                 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
                 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+                'linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%)',
+                'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)',
+                'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',
+                'linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%)',
+                'linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)',
               ].map((gradient, index) => (
                 <button
                   key={index}
-                  onClick={() => onCanvasBackgroundChange?.('gradient', gradient)}
+                  onClick={() => {
+                    setCanvasBackgroundType('solid'); // 设置为solid类型以便替换
+                    onCanvasBackgroundChange?.('gradient', gradient);
+                  }}
                   className="h-16 rounded-md border-2 border-border hover:border-primary transition-colors"
                   style={{ background: gradient }}
                 />
@@ -646,32 +684,63 @@ export default function FontPanel({
           {/* 图片背景上传 */}
           <div>
             <label className="text-sm font-semibold mb-3 block">图片背景</label>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              id="canvas-bg-upload"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    const imageUrl = event.target?.result as string;
-                    onCanvasBackgroundChange?.('image', imageUrl);
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }}
-            />
-            <label
-              htmlFor="canvas-bg-upload"
-              className="w-full h-24 rounded-md border-2 border-dashed border-border hover:border-primary transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer"
-            >
-              <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-sm text-muted-foreground">点击上传背景图片</span>
-            </label>
+            <div className="flex gap-3">
+              {/* 左侧预览 */}
+              <div className="flex-1">
+                {uploadedBackgroundImage ? (
+                  <div className="relative w-full h-32 rounded-md border-2 border-border overflow-hidden group">
+                    <img
+                      src={uploadedBackgroundImage}
+                      alt="背景预览"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-white text-sm">当前背景</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full h-32 rounded-md border-2 border-dashed border-border flex items-center justify-center">
+                    <span className="text-sm text-muted-foreground">暂无图片</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 右侧上传按钮 */}
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="canvas-bg-upload"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const imageUrl = event.target?.result as string;
+                        setUploadedBackgroundImage(imageUrl);
+                        setCanvasBackgroundType('solid'); // 设置类型以便替换
+                        onCanvasBackgroundChange?.('image', imageUrl);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                    // 重置input,允许上传同一文件
+                    e.target.value = '';
+                  }}
+                />
+                <label
+                  htmlFor="canvas-bg-upload"
+                  className="w-full h-32 rounded-md border-2 border-dashed border-border hover:border-primary transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm text-muted-foreground text-center px-2">
+                    {uploadedBackgroundImage ? '点击更换图片' : '点击上传图片'}
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
