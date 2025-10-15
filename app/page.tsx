@@ -100,7 +100,7 @@ export default function Home() {
     });
 
     // 在Fabric.js的upperCanvasEl上监听右键
-    const upperCanvas = managerRef.current.canvas.upperCanvasEl;
+    const upperCanvas = (managerRef.current.canvas as any).upperCanvasEl;
     const handleCanvasContextMenu = (e: MouseEvent) => {
       console.log('🟡🟡🟡 upperCanvasEl contextmenu触发!');
       e.preventDefault();
