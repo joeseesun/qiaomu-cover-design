@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, ChevronLeft, ChevronRight, Minus, Plus, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import ColorPicker from './ColorPicker';
+import { HexColorPicker } from 'react-colorful';
 
 // 预设颜色 - 去掉最后两个颜色
 const PRESET_COLORS = [
