@@ -208,11 +208,17 @@ export default function Home() {
         return;
       }
 
-      // Tab键 - 打开图片转换对话框（需要选中对象）
+      // Tab键 - 打开图片转换对话框（需要选中对象且不在编辑状态）
       if (e.key === 'Tab' && managerRef.current) {
+        const activeObject = managerRef.current.canvas.getActiveObject();
         const activeObjects = managerRef.current.canvas.getActiveObjects();
-        if (activeObjects.length > 0) {
+
+        // 检查是否处于文本编辑状态
+        const isEditing = activeObject && (activeObject as any).isEditing;
+
+        if (activeObjects.length > 0 && !isEditing) {
           e.preventDefault();
+          console.log('🎯 Tab键触发,打开图片转换对话框,选中对象数:', activeObjects.length);
           setShowImageToImageDialog(true);
           return;
         }
