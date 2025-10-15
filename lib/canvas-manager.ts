@@ -757,7 +757,7 @@ export class CanvasManager {
 
       // 如果是 Group，需要重新绑定事件
       if (cloned.type === 'group') {
-        this.rebindGroupEvents(cloned as fabric.Group);
+        this.rebindGroupEvents();
       }
     }, ['data', 'selectable', 'evented']);
   }
