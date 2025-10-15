@@ -778,19 +778,19 @@ export class CanvasManager {
 
     // 如果是 Group，需要更新内部的文本对象
     if (obj.type === 'group') {
-      const textObj = (obj as any)._objects?.find((o: any) => o.type === 'i-text');
+      const textObj = (obj as any)._objects?.find((o: any) => o.type === 'i-text' || o.type === 'textbox');
       if (textObj) {
         targetObj = textObj;
       }
     }
 
     // 对于文本颜色，需要特殊处理以支持多行文本
-    if (property === 'fill' && (targetObj.type === 'i-text' || targetObj.type === 'text')) {
+    if (property === 'fill' && (targetObj.type === 'i-text' || targetObj.type === 'textbox' || targetObj.type === 'text')) {
       // 设置整体颜色
       targetObj.set('fill', value);
 
-      // 如果是 i-text，清除所有选区样式，确保所有文本都使用统一颜色
-      if (targetObj.type === 'i-text') {
+      // 如果是 i-text 或 textbox，清除所有选区样式，确保所有文本都使用统一颜色
+      if (targetObj.type === 'i-text' || targetObj.type === 'textbox') {
         const textLength = (targetObj as any).text?.length || 0;
         if (textLength > 0) {
           // 清除所有字符的样式，让它们使用对象的 fill 属性

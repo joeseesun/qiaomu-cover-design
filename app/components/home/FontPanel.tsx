@@ -345,20 +345,48 @@ export default function FontPanel({
           {/* 字号 */}
           <div>
             <label className="text-sm font-semibold mb-3 block">字号</label>
-            <Input
-              type="number"
-              value={currentFontSize}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 12 && value <= 200) {
-                  onFontSizeChange(value);
-                }
-              }}
-              disabled={!selectedObject}
-              className="w-full"
-              min={12}
-              max={200}
-            />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const newValue = Math.max(12, currentFontSize - 2);
+                  onFontSizeChange(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Input
+                type="number"
+                value={currentFontSize}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (value >= 12 && value <= 200) {
+                    onFontSizeChange(value);
+                  }
+                }}
+                disabled={!selectedObject}
+                className="flex-1 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                min={12}
+                max={200}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const newValue = Math.min(200, currentFontSize + 2);
+                  onFontSizeChange(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </TabsContent>
 
