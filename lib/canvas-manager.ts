@@ -594,7 +594,7 @@ export class CanvasManager {
   }
 
   // 从 URL 添加图片（用于 AI 生图）
-  addImageFromURL(imageUrl: string): Promise<fabric.Image> {
+  addImageFromURL(imageUrl: string, saveToLibrary = true): Promise<fabric.Image> {
     return new Promise((resolve, reject) => {
       console.log('📥 从 URL 加载图片:', imageUrl);
 
@@ -625,6 +625,15 @@ export class CanvasManager {
         this.canvas.add(img);
         this.canvas.setActiveObject(img);
         this.canvas.renderAll();
+
+        // 保存到图片库
+        if (saveToLibrary) {
+          const library = getImageLibrary();
+          const fileName = imageUrl.split('/').pop() || 'ai-generated.jpg';
+          library.addImage(imageUrl, fileName);
+          console.log('✅ 图片已保存到图库:', fileName);
+        }
+
         resolve(img);
       }, { crossOrigin: 'anonymous' }); // 允许跨域
     });
