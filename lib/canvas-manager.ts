@@ -231,12 +231,16 @@ export class CanvasManager {
       if (textObj) {
         this.canvas.remove(group);
 
-        // 直接使用 Group 的位置（Group 和文本都是 center origin）
+        // 应用 Group 的缩放到文本的字体大小，这样视觉上大小不变
+        const originalFontSize = textObj.fontSize || 60;
+        const scaledFontSize = originalFontSize * savedScaleX;
+
         textObj.set({
           left: savedLeft,
           top: savedTop,
           angle: savedAngle,
-          scaleX: 1,  // 重置缩放，保持原始字体大小
+          fontSize: scaledFontSize,  // 应用缩放后的字体大小
+          scaleX: 1,
           scaleY: 1,
           originX: 'center',
           originY: 'center',
@@ -250,9 +254,15 @@ export class CanvasManager {
 
         // 监听文本编辑完成，重新创建 Group
         textObj.on('editing:exited', () => {
+          // 恢复原始字体大小
+          textObj.set({
+            fontSize: originalFontSize,
+          });
+
           const newConfig = {
             ...config,
             text: textObj.text || '',
+            fontSize: originalFontSize,
             left: textObj.left,
             top: textObj.top,
             angle: textObj.angle,
@@ -707,12 +717,17 @@ export class CanvasManager {
         const savedScaleX = group.scaleX || 1;
         const savedScaleY = group.scaleY || 1;
 
+        // 保存原始字体大小
+        const originalFontSize = text.fontSize || 60;
+        const scaledFontSize = originalFontSize * savedScaleX;
+
         this.canvas.remove(group);
         text.set({
           left: savedLeft,
           top: savedTop,
           angle: savedAngle,
-          scaleX: 1,  // 重置缩放，保持原始字体大小
+          fontSize: scaledFontSize,  // 应用缩放后的字体大小
+          scaleX: 1,
           scaleY: 1,
           originX: 'center',
           originY: 'center',
@@ -723,9 +738,15 @@ export class CanvasManager {
         text.selectAll();
 
         text.on('editing:exited', () => {
+          // 恢复原始字体大小
+          text.set({
+            fontSize: originalFontSize,
+          });
+
           const newConfig = {
             ...config,
             text: text.text || '',
+            fontSize: originalFontSize,
             left: text.left,
             top: text.top,
             angle: text.angle,
