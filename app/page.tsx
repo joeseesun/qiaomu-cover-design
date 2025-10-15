@@ -193,17 +193,34 @@ export default function Home() {
       }
     };
 
+    // 页面卸载前保存数据
+    const handleBeforeUnload = () => {
+      if (managerRef.current && versionRef.current && activeId) {
+        const data = managerRef.current.toJSON();
+        versionRef.current.update(activeId, data);
+        console.log('💾 页面卸载前保存:', {
+          版本ID: activeId,
+          数据大小: data.length,
+        });
+      }
+    };
+
     window.addEventListener('click', handleGlobalClick);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('paste', handlePaste);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      // 组件卸载时也保存一次
+      handleBeforeUnload();
+
       managerRef.current?.dispose();
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []);
+  }, [activeId]);
 
   // 自动保存（增加间隔，减少 localStorage 写入）
   useEffect(() => {
@@ -233,7 +250,7 @@ export default function Home() {
           }
         }
       }
-    }, 10000); // 10 秒自动保存一次，减少 localStorage 写入
+    }, 2000); // 2 秒自动保存一次，确保数据及时保存
 
     return () => clearInterval(timer);
   }, [activeId]);
