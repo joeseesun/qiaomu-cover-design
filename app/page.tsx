@@ -640,6 +640,21 @@ export default function Home() {
     managerRef.current?.updateTextAlign(align);
   };
 
+  const handleCanvasBackgroundChange = (type: 'solid' | 'gradient' | 'image', value: string) => {
+    if (!managerRef.current) return;
+
+    if (type === 'solid') {
+      // 纯色背景
+      managerRef.current.setBackgroundColor(value);
+    } else if (type === 'gradient') {
+      // 渐变背景
+      managerRef.current.setBackgroundGradient(value);
+    } else if (type === 'image') {
+      // 图片背景
+      managerRef.current.setBackgroundImage(value);
+    }
+  };
+
   const handleBackgroundChange = (
     style: 'none' | 'solid',
     color?: string,
@@ -802,6 +817,7 @@ export default function Home() {
           onBackgroundChange={handleBackgroundChange}
           onUnderlineChange={handleUnderlineChange}
           onBorderChange={handleBorderChange}
+          onCanvasBackgroundChange={handleCanvasBackgroundChange}
         />
       </div>
 

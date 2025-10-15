@@ -1037,6 +1037,60 @@ export class CanvasManager {
     this.canvas.setBackgroundColor(color, () => this.canvas.renderAll());
   }
 
+  // 设置渐变背景
+  setBackgroundGradient(gradientCSS: string) {
+    // 解析CSS渐变字符串
+    // 例如: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+    const match = gradientCSS.match(/linear-gradient\((\d+)deg,\s*([^,]+)\s+\d+%,\s*([^)]+)\s+\d+%\)/);
+
+    if (match) {
+      const angle = parseInt(match[1]);
+      const color1 = match[2].trim();
+      const color2 = match[3].trim();
+
+      // 将角度转换为Fabric.js的坐标
+      const angleRad = (angle - 90) * Math.PI / 180;
+      const coords = {
+        x1: this.width / 2 - Math.cos(angleRad) * this.width / 2,
+        y1: this.height / 2 - Math.sin(angleRad) * this.height / 2,
+        x2: this.width / 2 + Math.cos(angleRad) * this.width / 2,
+        y2: this.height / 2 + Math.sin(angleRad) * this.height / 2,
+      };
+
+      const gradient = new fabric.Gradient({
+        type: 'linear',
+        coords: coords,
+        colorStops: [
+          { offset: 0, color: color1 },
+          { offset: 1, color: color2 },
+        ],
+      });
+
+      this.canvas.setBackgroundColor(gradient as any, () => this.canvas.renderAll());
+    }
+  }
+
+  // 设置图片背景
+  setBackgroundImage(imageUrl: string) {
+    fabric.Image.fromURL(imageUrl, (img) => {
+      // 计算缩放比例以填满画布
+      const scaleX = this.width / (img.width || 1);
+      const scaleY = this.height / (img.height || 1);
+      const scale = Math.max(scaleX, scaleY);
+
+      img.set({
+        scaleX: scale,
+        scaleY: scale,
+        originX: 'center',
+        originY: 'center',
+        left: this.width / 2,
+        top: this.height / 2,
+      });
+
+      this.canvas.setBackgroundImage(img, () => this.canvas.renderAll());
+    });
+  }
+
   // 更新选中对象的属性
   updateProperty(property: string, value: any) {
     const activeObj = this.canvas.getActiveObject();

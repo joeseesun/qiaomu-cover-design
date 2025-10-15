@@ -36,6 +36,8 @@ interface FontPanelProps {
   onUnderlineChange?: (style: 'none' | 'solid' | 'wavy' | 'dotted', width?: number, color?: string) => void;
   // 边框
   onBorderChange?: (style: 'none' | 'solid' | 'dashed', width?: number, color?: string) => void;
+  // 画布背景
+  onCanvasBackgroundChange?: (type: 'solid' | 'gradient' | 'image', value: string) => void;
 }
 
 const RECENT_FONTS_KEY = 'xhs_recent_fonts';
@@ -57,6 +59,7 @@ export default function FontPanel({
   onBackgroundChange,
   onUnderlineChange,
   onBorderChange,
+  onCanvasBackgroundChange,
 }: FontPanelProps) {
   const [loadingFonts, setLoadingFonts] = useState<Set<string>>(new Set());
   const [loadedFonts, setLoadedFonts] = useState<Set<string>>(
@@ -66,13 +69,17 @@ export default function FontPanel({
   const [currentPage, setCurrentPage] = useState(0);
 
   // 主 Tab 状态
-  const [activeMainTab, setActiveMainTab] = useState<'font' | 'spacing'>('font');
+  const [activeMainTab, setActiveMainTab] = useState<'font' | 'spacing' | 'canvas'>('font');
 
   // 装饰 Tab 状态
   const [activeDecorationTab, setActiveDecorationTab] = useState<'background' | 'underline' | 'border'>('background');
 
   // 文本对齐状态
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+
+  // 画布背景状态
+  const [canvasBackgroundType, setCanvasBackgroundType] = useState<'solid' | 'image' | 'pattern'>('solid');
+  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#FFFFFF');
 
   // 字号输入框的本地状态
   const [fontSizeInput, setFontSizeInput] = useState<string>('');
@@ -302,11 +309,12 @@ export default function FontPanel({
       className="flex flex-col overflow-y-auto bg-background"
       style={{ width: '360px', borderLeft: '1px solid hsl(var(--border))' }}
     >
-      {/* 主 Tab 组：字体设置 / 对齐与间距 */}
+      {/* 主 Tab 组：字体设置 / 对齐与间距 / 画布背景 */}
       <Tabs value={activeMainTab} onValueChange={(value) => setActiveMainTab(value as any)} className="space-y-0">
-        <TabsList className="w-full grid grid-cols-2">
+        <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="font">字体设置</TabsTrigger>
           <TabsTrigger value="spacing">对齐与间距</TabsTrigger>
+          <TabsTrigger value="canvas">画布背景</TabsTrigger>
         </TabsList>
 
         {/* 字体设置 Tab */}
@@ -585,6 +593,85 @@ export default function FontPanel({
                 <AlignRight className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+        </TabsContent>
+
+        {/* 画布背景 Tab */}
+        <TabsContent value="canvas" className="px-8 py-6 space-y-6">
+          {/* 纯色背景选择器 */}
+          <div>
+            <label className="text-sm font-semibold mb-3 block">纯色背景</label>
+            <div className="grid grid-cols-6 gap-2">
+              {['#FFFFFF', '#F5F5F5', '#E8E8E8', '#FFE5E5', '#FFF4E5', '#FFFBE5',
+                '#E5F9FF', '#E5F0FF', '#F0E5FF', '#FFE5F5', '#E5FFE5', '#1A1A1A'].map((color) => (
+                <button
+                  key={color}
+                  onClick={() => onCanvasBackgroundChange?.('solid', color)}
+                  className={`w-full aspect-square rounded-md border-2 hover:border-primary transition-colors ${
+                    canvasBackgroundColor === color && canvasBackgroundType === 'solid'
+                      ? 'border-primary ring-2 ring-primary/20'
+                      : 'border-border'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* 渐变背景 */}
+          <div>
+            <label className="text-sm font-semibold mb-3 block">渐变背景</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+                'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+                'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+              ].map((gradient, index) => (
+                <button
+                  key={index}
+                  onClick={() => onCanvasBackgroundChange?.('gradient', gradient)}
+                  className="h-16 rounded-md border-2 border-border hover:border-primary transition-colors"
+                  style={{ background: gradient }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* 图片背景上传 */}
+          <div>
+            <label className="text-sm font-semibold mb-3 block">图片背景</label>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              id="canvas-bg-upload"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const imageUrl = event.target?.result as string;
+                    onCanvasBackgroundChange?.('image', imageUrl);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            />
+            <label
+              htmlFor="canvas-bg-upload"
+              className="w-full h-24 rounded-md border-2 border-dashed border-border hover:border-primary transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer"
+            >
+              <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm text-muted-foreground">点击上传背景图片</span>
+            </label>
           </div>
         </TabsContent>
       </Tabs>
