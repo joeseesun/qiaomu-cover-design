@@ -97,8 +97,7 @@ export default function Home() {
           // 只有在非编辑状态下才删除整个对象
           if (!isEditing) {
             e.preventDefault(); // 阻止默认行为
-            managerRef.current.canvas.remove(activeObject);
-            managerRef.current.canvas.renderAll();
+            managerRef.current.deleteActive(); // 使用 deleteActive 方法支持多选删除
           }
           // 如果处于编辑状态，让浏览器处理默认的删除行为（删除选中的文字）
         }

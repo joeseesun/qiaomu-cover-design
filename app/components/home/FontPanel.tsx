@@ -63,8 +63,11 @@ export default function FontPanel({
   const [lineHeightInput, setLineHeightInput] = useState('');
   const [letterSpacingInput, setLetterSpacingInput] = useState('');
 
-  // Tab 状态
-  const [activeTab, setActiveTab] = useState<'background' | 'underline' | 'border'>('background');
+  // 装饰 Tab 状态
+  const [activeDecorationTab, setActiveDecorationTab] = useState<'background' | 'underline' | 'border'>('background');
+
+  // 间距 Tab 状态
+  const [activeSpacingTab, setActiveSpacingTab] = useState<'letterSpacing' | 'lineHeight'>('letterSpacing');
 
   // 背景状态
   const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
@@ -289,129 +292,6 @@ export default function FontPanel({
           />
         </div>
 
-        {/* 行间距 */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">行间距</label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (!selectedObject) return;
-                const current = selectedObject.lineHeight || lineHeight;
-                const newValue = Math.max(0.5, Number((current - 0.1).toFixed(1)));
-                onLineHeightChange?.(newValue);
-              }}
-              disabled={!selectedObject}
-              className="p-1.5 rounded border border-input hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-            <Input
-              type="text"
-              value={lineHeightInput}
-              onChange={(e) => {
-                const input = e.target.value;
-                setLineHeightInput(input);
-
-                // 只有在输入有效数字时才更新
-                const value = parseFloat(input);
-                if (!isNaN(value) && value >= 0.5 && value <= 5) {
-                  onLineHeightChange?.(value);
-                }
-              }}
-              onBlur={() => {
-                // 失焦时验证并修正值
-                const value = parseFloat(lineHeightInput);
-                if (isNaN(value) || value < 0.5) {
-                  const corrected = 0.5;
-                  setLineHeightInput(corrected.toFixed(1));
-                  onLineHeightChange?.(corrected);
-                } else if (value > 5) {
-                  const corrected = 5;
-                  setLineHeightInput(corrected.toFixed(1));
-                  onLineHeightChange?.(corrected);
-                } else {
-                  setLineHeightInput(value.toFixed(1));
-                }
-              }}
-              disabled={!selectedObject}
-              className="h-9 text-center"
-            />
-            <button
-              onClick={() => {
-                if (!selectedObject) return;
-                const current = selectedObject.lineHeight || lineHeight;
-                const newValue = Math.min(5, Number((current + 0.1).toFixed(1)));
-                onLineHeightChange?.(newValue);
-              }}
-              disabled={!selectedObject}
-              className="p-1.5 rounded border border-input hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* 字间距 */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">字间距</label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (!selectedObject) return;
-                const current = selectedObject.charSpacing || letterSpacing;
-                const newValue = Math.max(-500, current - 10);
-                onLetterSpacingChange?.(newValue);
-              }}
-              disabled={!selectedObject}
-              className="p-1.5 rounded border border-input hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-            <Input
-              type="text"
-              value={letterSpacingInput}
-              onChange={(e) => {
-                const input = e.target.value;
-                setLetterSpacingInput(input);
-
-                // 只有在输入有效数字时才更新
-                const value = parseInt(input);
-                if (!isNaN(value) && value >= -500 && value <= 1000) {
-                  onLetterSpacingChange?.(value);
-                }
-              }}
-              onBlur={() => {
-                // 失焦时验证并修正值
-                const value = parseInt(letterSpacingInput);
-                if (isNaN(value) || value < -500) {
-                  const corrected = -500;
-                  setLetterSpacingInput(String(corrected));
-                  onLetterSpacingChange?.(corrected);
-                } else if (value > 1000) {
-                  const corrected = 1000;
-                  setLetterSpacingInput(String(corrected));
-                  onLetterSpacingChange?.(corrected);
-                } else {
-                  setLetterSpacingInput(String(value));
-                }
-              }}
-              disabled={!selectedObject}
-              className="h-9 text-center"
-            />
-            <button
-              onClick={() => {
-                if (!selectedObject) return;
-                const current = selectedObject.charSpacing || letterSpacing;
-                const newValue = Math.min(1000, current + 10);
-                onLetterSpacingChange?.(newValue);
-              }}
-              disabled={!selectedObject}
-              className="p-1.5 rounded border border-input hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
       </div>
 
       <Separator />
@@ -419,43 +299,43 @@ export default function FontPanel({
       {/* 装饰 Tab 组 */}
       <div className="space-y-0">
         {/* Tab 头部 */}
-        <div className="flex border-b border-border-medium">
+        <div className="flex border-b-2 border-border">
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-              activeTab === 'background'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
+              activeDecorationTab === 'background'
+                ? 'text-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
             }`}
-            onClick={() => setActiveTab('background')}
+            onClick={() => setActiveDecorationTab('background')}
           >
             背景
-            {activeTab === 'background' && (
+            {activeDecorationTab === 'background' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
             )}
           </button>
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-              activeTab === 'underline'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
+              activeDecorationTab === 'underline'
+                ? 'text-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
             }`}
-            onClick={() => setActiveTab('underline')}
+            onClick={() => setActiveDecorationTab('underline')}
           >
             下划线
-            {activeTab === 'underline' && (
+            {activeDecorationTab === 'underline' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
             )}
           </button>
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-              activeTab === 'border'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
+              activeDecorationTab === 'border'
+                ? 'text-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
             }`}
-            onClick={() => setActiveTab('border')}
+            onClick={() => setActiveDecorationTab('border')}
           >
             边框
-            {activeTab === 'border' && (
+            {activeDecorationTab === 'border' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
             )}
           </button>
@@ -465,7 +345,7 @@ export default function FontPanel({
         <div className="px-8 py-6">
 
         {/* 背景 Tab 内容 */}
-        {activeTab === 'background' && (
+        {activeDecorationTab === 'background' && (
           <div className="space-y-4">
 
         {/* 样式选择 */}
@@ -541,7 +421,7 @@ export default function FontPanel({
         )}
 
         {/* 下划线 Tab 内容 */}
-        {activeTab === 'underline' && (
+        {activeDecorationTab === 'underline' && (
           <div className="space-y-4">
 
         {/* 样式选择 */}
@@ -699,7 +579,7 @@ export default function FontPanel({
         )}
 
         {/* 边框 Tab 内容 */}
-        {activeTab === 'border' && (
+        {activeDecorationTab === 'border' && (
           <div className="space-y-4">
 
         {/* 样式选择 */}
@@ -839,6 +719,124 @@ export default function FontPanel({
         )}
           </div>
         )}
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* 间距 Tab 组 */}
+      <div className="space-y-0">
+        {/* Tab 头部 */}
+        <div className="flex border-b-2 border-border">
+          <button
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
+              activeSpacingTab === 'letterSpacing'
+                ? 'text-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            }`}
+            onClick={() => setActiveSpacingTab('letterSpacing')}
+          >
+            字间距
+            {activeSpacingTab === 'letterSpacing' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+          <button
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
+              activeSpacingTab === 'lineHeight'
+                ? 'text-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            }`}
+            onClick={() => setActiveSpacingTab('lineHeight')}
+          >
+            行间距
+            {activeSpacingTab === 'lineHeight' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+        </div>
+
+        {/* Tab 内容区域 */}
+        <div className="px-8 py-6">
+          {/* 字间距 Tab 内容 */}
+          {activeSpacingTab === 'letterSpacing' && (
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.charSpacing || letterSpacing;
+                  const newValue = Math.max(-500, current - 10);
+                  onLetterSpacingChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <div className="text-center min-w-[80px]">
+                <div className="text-2xl font-semibold">
+                  {selectedObject ? Math.round(selectedObject.charSpacing || letterSpacing) : letterSpacing}
+                </div>
+                <div className="text-xs text-muted-foreground">像素</div>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.charSpacing || letterSpacing;
+                  const newValue = Math.min(1000, current + 10);
+                  onLetterSpacingChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* 行间距 Tab 内容 */}
+          {activeSpacingTab === 'lineHeight' && (
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.lineHeight || lineHeight;
+                  const newValue = Math.max(0.5, Number((current - 0.1).toFixed(1)));
+                  onLineHeightChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <div className="text-center min-w-[80px]">
+                <div className="text-2xl font-semibold">
+                  {selectedObject ? (selectedObject.lineHeight || lineHeight).toFixed(1) : lineHeight.toFixed(1)}
+                </div>
+                <div className="text-xs text-muted-foreground">倍数</div>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.lineHeight || lineHeight;
+                  const newValue = Math.min(5, Number((current + 0.1).toFixed(1)));
+                  onLineHeightChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </aside>
