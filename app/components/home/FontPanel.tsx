@@ -229,7 +229,7 @@ export default function FontPanel({
 
     // 如果是 Group，从内部文本对象获取
     if (selectedObject.type === 'group') {
-      const textObj = (selectedObject as any)._objects?.find((o: any) => o.type === 'i-text');
+      const textObj = (selectedObject as any)._objects?.find((o: any) => o.type === 'i-text' || o.type === 'textbox');
       return textObj?.[property] || defaultValue;
     }
 
@@ -238,6 +238,7 @@ export default function FontPanel({
 
   const currentFont = getCurrentProperty('fontFamily', selectedFont);
   const currentColor = getCurrentProperty('fill', textColor);
+  const currentFontSize = getCurrentProperty('fontSize', fontSize);
 
   // 判断字体是否是最近使用的
   const isRecentFont = (fontFamily: string) => {
@@ -346,8 +347,13 @@ export default function FontPanel({
             <label className="text-sm font-semibold mb-3 block">字号</label>
             <Input
               type="number"
-              value={fontSize}
-              onChange={(e) => onFontSizeChange(Number(e.target.value))}
+              value={currentFontSize}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 12 && value <= 200) {
+                  onFontSizeChange(value);
+                }
+              }}
               disabled={!selectedObject}
               className="w-full"
               min={12}
