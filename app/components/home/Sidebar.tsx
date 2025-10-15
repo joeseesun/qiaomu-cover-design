@@ -66,7 +66,7 @@ export default function Sidebar({
                   <Icon className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8} align="center">
+              <TooltipContent side="right" sideOffset={2} align="center">
                 <p>{tool.label}</p>
               </TooltipContent>
             </Tooltip>
@@ -88,7 +88,7 @@ export default function Sidebar({
               <Undo2 className="h-5 w-5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8} align="center">
+          <TooltipContent side="right" sideOffset={2} align="center">
             <p>撤销</p>
           </TooltipContent>
         </Tooltip>
@@ -105,7 +105,7 @@ export default function Sidebar({
               <Redo2 className="h-5 w-5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8} align="center">
+          <TooltipContent side="right" sideOffset={2} align="center">
             <p>重做</p>
           </TooltipContent>
         </Tooltip>
