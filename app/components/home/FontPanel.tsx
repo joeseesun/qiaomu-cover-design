@@ -86,6 +86,29 @@ export default function FontPanel({
     if (selectedObject) {
       setLocalLetterSpacing(selectedObject.charSpacing ?? letterSpacing);
       setLocalLineHeight(selectedObject.lineHeight ?? lineHeight);
+
+      // 同步背景颜色和透明度(从Group中提取)
+      if (selectedObject.type === 'group') {
+        const objects = (selectedObject as any)._objects || [];
+        const bgRect = objects.find((obj: any) =>
+          obj.type === 'rect' && obj.fill && obj.fill !== 'transparent'
+        );
+
+        if (bgRect) {
+          setBackgroundStyle('solid');
+          setBackgroundColor(bgRect.fill || '#FFE066');
+          setBackgroundOpacity(bgRect.opacity ?? 1.0);
+          console.log('📋 读取背景:', {
+            color: bgRect.fill,
+            opacity: bgRect.opacity,
+            displayOpacity: Math.round((bgRect.opacity ?? 1.0) * 100) + '%'
+          });
+        } else {
+          setBackgroundStyle('none');
+        }
+      } else {
+        setBackgroundStyle('none');
+      }
     } else {
       setLocalLetterSpacing(letterSpacing);
       setLocalLineHeight(lineHeight);
@@ -95,7 +118,7 @@ export default function FontPanel({
   // 背景状态
   const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
   const [backgroundColor, setBackgroundColor] = useState('#FFE066');
-  const [backgroundOpacity, setBackgroundOpacity] = useState(0.5);
+  const [backgroundOpacity, setBackgroundOpacity] = useState(1.0); // 默认不透明
   const [recentBackgroundColors, setRecentBackgroundColors] = useState<string[]>([]);
 
   // 下划线状态

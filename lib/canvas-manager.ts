@@ -1150,9 +1150,9 @@ export class CanvasManager {
     // 更新透明度
     if (opacity !== undefined) {
       currentConfig.backgroundOpacity = opacity;
-    } else if (!currentConfig.backgroundOpacity) {
-      // 如果之前没有背景，设置默认透明度
-      currentConfig.backgroundOpacity = 0.5;
+    } else if (currentConfig.backgroundOpacity === undefined) {
+      // 如果之前没有背景，设置默认透明度为1.0(不透明)
+      currentConfig.backgroundOpacity = 1.0;
     }
 
     // 删除旧对象
@@ -1299,7 +1299,7 @@ export class CanvasManager {
             // 有填充色 = 背景
             config.backgroundStyle = 'solid';
             config.backgroundColor = item.fill;
-            config.backgroundOpacity = item.opacity ?? 0.5;  // ✅ 保存透明度，默认 0.5
+            config.backgroundOpacity = item.opacity ?? 1.0;  // ✅ 保存透明度，默认 1.0(不透明)
           } else if (item.fill === 'transparent' || item.stroke) {
             // 透明填充或有描边 = 边框
             config.borderStyle = item.strokeDashArray ? 'dashed' : 'solid';
@@ -1396,7 +1396,7 @@ export class CanvasManager {
         width: textWidth + paddingX * 2,
         height: textHeight + paddingY * 2,
         fill: config.backgroundColor || '#FFE066',
-        opacity: config.backgroundOpacity ?? 0.5,  // ✅ 使用保存的透明度
+        opacity: config.backgroundOpacity ?? 1.0,  // ✅ 使用保存的透明度，默认1.0(不透明)
         rx: 6,
         ry: 6,
         originX: 'center',
