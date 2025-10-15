@@ -373,9 +373,10 @@ export default function Home() {
 
   const handleBackgroundChange = (
     style: 'none' | 'solid',
-    color?: string
+    color?: string,
+    opacity?: number
   ) => {
-    managerRef.current?.updateBackground(style, color);
+    managerRef.current?.updateBackground(style, color, opacity);
   };
 
   const handleUnderlineChange = (

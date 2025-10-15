@@ -28,7 +28,7 @@ interface FontPanelProps {
   onLineHeightChange?: (lineHeight: number) => void;
   onLetterSpacingChange?: (letterSpacing: number) => void;
   // 背景
-  onBackgroundChange?: (style: 'none' | 'solid', color?: string) => void;
+  onBackgroundChange?: (style: 'none' | 'solid', color?: string, opacity?: number) => void;
   // 下划线
   onUnderlineChange?: (style: 'none' | 'solid' | 'wavy' | 'dotted', width?: number, color?: string) => void;
   // 边框
@@ -82,6 +82,7 @@ export default function FontPanel({
   // 背景状态
   const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
   const [backgroundColor, setBackgroundColor] = useState('#FFE066');
+  const [backgroundOpacity, setBackgroundOpacity] = useState(0.5);
   const [recentBackgroundColors, setRecentBackgroundColors] = useState<string[]>([]);
 
   // 下划线状态
@@ -466,7 +467,7 @@ export default function FontPanel({
             {/* 推荐颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">推荐颜色</label>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-10 gap-1.5">
                 {/* 第一个：无背景 */}
                 <button
                   onClick={() => {
@@ -474,14 +475,14 @@ export default function FontPanel({
                     onBackgroundChange?.('none');
                   }}
                   disabled={!selectedObject}
-                  className={`w-full aspect-square rounded border-2 transition-all hover:scale-110 flex items-center justify-center ${
+                  className={`w-6 h-6 rounded border transition-all hover:scale-110 flex items-center justify-center ${
                     backgroundStyle === 'none'
                       ? 'border-primary ring-2 ring-primary/20 bg-gray-50'
-                      : 'border-border bg-white'
+                      : 'border-border/30 bg-white'
                   }`}
                   title="无背景"
                 >
-                  <X className="h-4 w-4 text-muted-foreground" />
+                  <X className="h-3 w-3 text-muted-foreground" />
                 </button>
 
                 {/* 推荐颜色 */}
@@ -491,14 +492,14 @@ export default function FontPanel({
                     onClick={() => {
                       setBackgroundStyle('solid');
                       setBackgroundColor(color);
-                      onBackgroundChange?.('solid', color);
+                      onBackgroundChange?.('solid', color, backgroundOpacity);
                       addToRecentBackgroundColors(color);
                     }}
                     disabled={!selectedObject}
-                    className={`w-full aspect-square rounded border-2 transition-all hover:scale-110 ${
+                    className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
                       backgroundStyle === 'solid' && backgroundColor === color
                         ? 'border-primary ring-2 ring-primary/20'
-                        : 'border-border'
+                        : 'border-border/30'
                     }`}
                     style={{ backgroundColor: color }}
                     title={color}
@@ -511,21 +512,21 @@ export default function FontPanel({
             {recentBackgroundColors.length > 0 && (
               <div className="space-y-3">
                 <label className="text-xs text-muted-foreground">最近使用</label>
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-10 gap-1.5">
                   {recentBackgroundColors.map((color) => (
                     <button
                       key={color}
                       onClick={() => {
                         setBackgroundStyle('solid');
                         setBackgroundColor(color);
-                        onBackgroundChange?.('solid', color);
+                        onBackgroundChange?.('solid', color, backgroundOpacity);
                         addToRecentBackgroundColors(color);
                       }}
                       disabled={!selectedObject}
-                      className={`w-full aspect-square rounded border-2 transition-all hover:scale-110 ${
+                      className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
                         backgroundStyle === 'solid' && backgroundColor === color
                           ? 'border-primary ring-2 ring-primary/20'
-                          : 'border-border'
+                          : 'border-border/30'
                       }`}
                       style={{ backgroundColor: color }}
                       title={color}
@@ -543,12 +544,65 @@ export default function FontPanel({
                 onChange={(color) => {
                   setBackgroundStyle('solid');
                   setBackgroundColor(color);
-                  onBackgroundChange?.('solid', color);
+                  onBackgroundChange?.('solid', color, backgroundOpacity);
                   addToRecentBackgroundColors(color);
                 }}
                 disabled={!selectedObject}
               />
             </div>
+
+            {/* 透明度 */}
+            {backgroundStyle !== 'none' && (
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">透明度</label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const newOpacity = Math.max(0.1, backgroundOpacity - 0.1);
+                      setBackgroundOpacity(newOpacity);
+                      onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                    }}
+                    disabled={!selectedObject || backgroundOpacity <= 0.1}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <Input
+                    type="number"
+                    value={Math.round(backgroundOpacity * 100)}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      if (value >= 10 && value <= 100) {
+                        const newOpacity = value / 100;
+                        setBackgroundOpacity(newOpacity);
+                        onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                      }
+                    }}
+                    min={10}
+                    max={100}
+                    step={10}
+                    disabled={!selectedObject}
+                    className="w-16 h-8 text-center text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground shrink-0">%</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const newOpacity = Math.min(1, backgroundOpacity + 0.1);
+                      setBackgroundOpacity(newOpacity);
+                      onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                    }}
+                    disabled={!selectedObject || backgroundOpacity >= 1}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -677,7 +731,7 @@ export default function FontPanel({
             {/* 颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">颜色</label>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-10 gap-1.5">
                 {PRESET_COLORS.map((color) => (
                   <button
                     key={color}
@@ -686,7 +740,7 @@ export default function FontPanel({
                       onUnderlineChange?.(underlineStyle, underlineWidth, color);
                     }}
                     disabled={!selectedObject}
-                    className={`w-full aspect-square rounded border transition-all hover:scale-110 ${
+                    className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
                       underlineColor === color
                         ? 'border-primary ring-2 ring-primary/20'
                         : 'border-border/30'
@@ -819,7 +873,7 @@ export default function FontPanel({
             {/* 颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">颜色</label>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-10 gap-1.5">
                 {PRESET_COLORS.map((color) => (
                   <button
                     key={color}
@@ -828,7 +882,7 @@ export default function FontPanel({
                       onBorderChange?.(borderStyle, borderWidth, color);
                     }}
                     disabled={!selectedObject}
-                    className={`w-full aspect-square rounded border transition-all hover:scale-110 ${
+                    className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
                       borderColor === color
                         ? 'border-primary ring-2 ring-primary/20'
                         : 'border-border/30'

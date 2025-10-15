@@ -503,7 +503,7 @@ export class CanvasManager {
   }
 
   // 添加/更新背景
-  updateBackground(style: 'none' | 'solid', color?: string) {
+  updateBackground(style: 'none' | 'solid', color?: string, opacity?: number) {
     const activeObj = this.canvas.getActiveObject();
     if (!activeObj) return;
 
@@ -517,7 +517,7 @@ export class CanvasManager {
 
       // 批量更新
       objects.forEach((obj: any) => {
-        this.updateSingleObjectBackground(obj, style, color);
+        this.updateSingleObjectBackground(obj, style, color, opacity);
       });
 
       this.canvas.renderAll();
@@ -525,14 +525,15 @@ export class CanvasManager {
     }
 
     // 处理单个对象
-    this.updateSingleObjectBackground(activeObj, style, color);
+    this.updateSingleObjectBackground(activeObj, style, color, opacity);
   }
 
   // 更新单个对象的背景
   private updateSingleObjectBackground(
     obj: any,
     style: 'none' | 'solid',
-    color?: string
+    color?: string,
+    opacity?: number
   ) {
     const currentConfig = this.extractTextConfig(obj);
     if (!currentConfig) return;
@@ -540,8 +541,11 @@ export class CanvasManager {
     // 更新背景配置
     currentConfig.backgroundStyle = style;
     currentConfig.backgroundColor = color || currentConfig.backgroundColor || '#FFE066';
-    // 如果之前没有背景，设置默认透明度
-    if (!currentConfig.backgroundOpacity) {
+    // 更新透明度
+    if (opacity !== undefined) {
+      currentConfig.backgroundOpacity = opacity;
+    } else if (!currentConfig.backgroundOpacity) {
+      // 如果之前没有背景，设置默认透明度
       currentConfig.backgroundOpacity = 0.5;
     }
 
