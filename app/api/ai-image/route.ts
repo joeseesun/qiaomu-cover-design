@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
         prompt: prompt,
         sequential_image_generation: 'disabled',
         response_format: 'url',
-        size: '2K',
+        size: '1K',
         stream: false,
-        watermark: true,
+        watermark: false,
       }),
     });
 
