@@ -340,76 +340,80 @@ export default function FontPanel({
             )}
           </div>
 
-          {/* 字体颜色 */}
-          <div>
-            <label className="text-sm font-semibold mb-3 block">字体颜色</label>
-            <ColorPicker
-              color={currentColor}
-              onChange={onColorChange}
-              disabled={!selectedObject}
-            />
-          </div>
-
-          {/* 字号 */}
-          <div>
-            <label className="text-sm font-semibold mb-3 block">字号</label>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  if (!selectedObject) return;
-                  const newValue = Math.max(12, currentFontSize - 2);
-                  setFontSizeInput(String(newValue));
-                  onFontSizeChange(newValue);
-                }}
+          {/* 字体颜色 + 字号 */}
+          <div className="flex items-start gap-4">
+            {/* 字体颜色 - 小方块 */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">颜色</label>
+              <ColorPicker
+                color={currentColor}
+                onChange={onColorChange}
+                compact
                 disabled={!selectedObject}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <Input
-                type="number"
-                value={fontSizeInput}
-                onChange={(e) => {
-                  // 允许任意输入,包括空字符串
-                  setFontSizeInput(e.target.value);
-                }}
-                onBlur={() => {
-                  // 失焦时验证并应用
-                  const value = Number(fontSizeInput);
-                  if (!isNaN(value) && value >= 12 && value <= 200) {
-                    onFontSizeChange(value);
-                  } else {
-                    // 如果无效,恢复到当前值
-                    setFontSizeInput(String(currentFontSize));
-                  }
-                }}
-                onKeyDown={(e) => {
-                  // 按Enter时也触发验证
-                  if (e.key === 'Enter') {
-                    e.currentTarget.blur();
-                  }
-                }}
-                disabled={!selectedObject}
-                className="flex-1 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                min={12}
-                max={200}
               />
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  if (!selectedObject) return;
-                  const newValue = Math.min(200, currentFontSize + 2);
-                  setFontSizeInput(String(newValue));
-                  onFontSizeChange(newValue);
-                }}
-                disabled={!selectedObject}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+            </div>
+
+            {/* 字号 */}
+            <div className="flex-1 flex flex-col gap-2">
+              <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">字号</label>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                  onClick={() => {
+                    if (!selectedObject) return;
+                    const newValue = Math.max(12, currentFontSize - 2);
+                    setFontSizeInput(String(newValue));
+                    onFontSizeChange(newValue);
+                  }}
+                  disabled={!selectedObject}
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <Input
+                  type="number"
+                  value={fontSizeInput}
+                  onChange={(e) => {
+                    // 允许任意输入,包括空字符串
+                    setFontSizeInput(e.target.value);
+                  }}
+                  onBlur={() => {
+                    // 失焦时验证并应用
+                    const value = Number(fontSizeInput);
+                    if (!isNaN(value) && value >= 12 && value <= 200) {
+                      onFontSizeChange(value);
+                    } else {
+                      // 如果无效,恢复到当前值
+                      setFontSizeInput(String(currentFontSize));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // 按Enter时也触发验证
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  disabled={!selectedObject}
+                  className="flex-1 text-center h-8 text-base font-semibold tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min={12}
+                  max={200}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                  onClick={() => {
+                    if (!selectedObject) return;
+                    const newValue = Math.min(200, currentFontSize + 2);
+                    setFontSizeInput(String(newValue));
+                    onFontSizeChange(newValue);
+                  }}
+                  disabled={!selectedObject}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
         </TabsContent>
