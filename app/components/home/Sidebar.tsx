@@ -11,6 +11,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import {
   Type,
+  AlignLeft,
   Image,
   Smile,
   Undo2,
@@ -35,7 +36,8 @@ export default function Sidebar({
   onRedo,
 }: SidebarProps) {
   const tools = [
-    { id: 'text', label: '文本', icon: Type },
+    { id: 'text', label: '单行文本', icon: Type },
+    { id: 'textbox', label: '多行文本', icon: AlignLeft },
     { id: 'image', label: '图片', icon: Image },
     { id: 'emoji', label: 'Emoji', icon: Smile },
   ];

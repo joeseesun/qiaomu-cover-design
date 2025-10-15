@@ -30,9 +30,29 @@ export class CanvasManager {
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
   }
 
-  // 添加普通文本
+  // 添加单行文本（IText）
   addText(text = '双击编辑') {
-    // 使用 Textbox 而不是 IText，支持固定宽度和自动换行
+    const obj = new fabric.IText(text, {
+      left: this.width / 2,
+      top: this.height / 2,
+      fontSize: 60,
+      fontFamily: 'Noto Sans SC',
+      fill: '#333333',
+      originX: 'center',
+      originY: 'center',
+      editable: true,
+      selectable: true,
+      textBaseline: 'middle',
+    });
+
+    this.canvas.add(obj);
+    this.canvas.setActiveObject(obj);
+    this.canvas.renderAll();
+    return obj;
+  }
+
+  // 添加多行文本（Textbox，支持自动换行）
+  addTextbox(text = '双击编辑') {
     const obj = new fabric.Textbox(text, {
       left: this.width / 2,
       top: this.height / 2,

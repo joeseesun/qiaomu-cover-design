@@ -238,7 +238,9 @@ export default function Home() {
   const handleToolChange = (tool: string) => {
     setActiveTool(tool);
     if (tool === 'text' && managerRef.current) {
-      managerRef.current.addText();
+      managerRef.current.addText(); // 单行文本
+    } else if (tool === 'textbox' && managerRef.current) {
+      managerRef.current.addTextbox(); // 多行文本
     } else if (tool === 'image' && managerRef.current) {
       // 触发文件选择
       const input = document.createElement('input');
