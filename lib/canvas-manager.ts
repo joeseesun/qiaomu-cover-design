@@ -1085,29 +1085,56 @@ export class CanvasManager {
         const lineHeight = text.lineHeight || 1.2;
         const charSpacing = text.charSpacing || 0;
         const scaledFontSize = originalFontSize * savedScaleX;
+        const textType = text.type; // 保存原始文本类型
 
         // 移除 Group
         this.canvas.remove(group);
 
-        // 创建新的文本对象用于编辑
-        const editText = new fabric.IText(textContent, {
-          left: savedLeft,
-          top: savedTop,
-          angle: savedAngle,
-          fontSize: scaledFontSize,
-          fontFamily: fontFamily,
-          fill: fill,
-          lineHeight: lineHeight,
-          charSpacing: charSpacing,
-          scaleX: 1,
-          scaleY: 1,
-          originX: 'center',
-          originY: 'center',
-          editable: true,
-          selectable: true,
-          textAlign: 'center',
-          textBaseline: 'middle',
-        });
+        // 根据原始类型创建编辑文本对象
+        let editText: fabric.IText | fabric.Textbox;
+
+        if (textType === 'textbox') {
+          // 多行文本
+          const maxTextWidth = this.width - 40;
+          editText = new fabric.Textbox(textContent, {
+            width: maxTextWidth,
+            left: savedLeft,
+            top: savedTop,
+            angle: savedAngle,
+            fontSize: scaledFontSize,
+            fontFamily: fontFamily,
+            fill: fill,
+            lineHeight: lineHeight,
+            charSpacing: charSpacing,
+            scaleX: 1,
+            scaleY: 1,
+            originX: 'center',
+            originY: 'center',
+            editable: true,
+            selectable: true,
+            textBaseline: 'middle',
+            splitByGrapheme: true,
+          });
+        } else {
+          // 单行文本
+          editText = new fabric.IText(textContent, {
+            left: savedLeft,
+            top: savedTop,
+            angle: savedAngle,
+            fontSize: scaledFontSize,
+            fontFamily: fontFamily,
+            fill: fill,
+            lineHeight: lineHeight,
+            charSpacing: charSpacing,
+            scaleX: 1,
+            scaleY: 1,
+            originX: 'center',
+            originY: 'center',
+            editable: true,
+            selectable: true,
+            textBaseline: 'middle',
+          });
+        }
 
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
@@ -1128,6 +1155,7 @@ export class CanvasManager {
             angle: editText.angle,
             scaleX: savedScaleX,
             scaleY: savedScaleY,
+            textType: textType, // 保持原始类型
           };
           this.canvas.remove(editText);
           this.createDecoratedText(newConfig);
@@ -1194,32 +1222,56 @@ export class CanvasManager {
           const lineHeight = textObj.lineHeight || 1.2;
           const charSpacing = textObj.charSpacing || 0;
           const scaledFontSize = originalFontSize * savedScaleX;
+          const textType = textObj.type; // 保存原始文本类型
 
           // 移除 Group
           this.canvas.remove(obj);
 
-          // 创建新的文本对象用于编辑（使用 Textbox 支持自动换行）
-          const maxTextWidth = this.width - 40;
-          const editText = new fabric.Textbox(textContent, {
-            width: maxTextWidth,
-            left: savedLeft,
-            top: savedTop,
-            angle: savedAngle,
-            fontSize: scaledFontSize,
-            fontFamily: fontFamily,
-            fill: fill,
-            lineHeight: lineHeight,
-            charSpacing: charSpacing,
-            scaleX: 1,
-            scaleY: 1,
-            originX: 'center',
-            originY: 'center',
-            editable: true,
-            selectable: true,
-            textAlign: 'center',
-            textBaseline: 'middle',
-            splitByGrapheme: true,
-          });
+          // 根据原始类型创建编辑文本对象
+          let editText: fabric.IText | fabric.Textbox;
+
+          if (textType === 'textbox') {
+            // 多行文本
+            const maxTextWidth = this.width - 40;
+            editText = new fabric.Textbox(textContent, {
+              width: maxTextWidth,
+              left: savedLeft,
+              top: savedTop,
+              angle: savedAngle,
+              fontSize: scaledFontSize,
+              fontFamily: fontFamily,
+              fill: fill,
+              lineHeight: lineHeight,
+              charSpacing: charSpacing,
+              scaleX: 1,
+              scaleY: 1,
+              originX: 'center',
+              originY: 'center',
+              editable: true,
+              selectable: true,
+              textBaseline: 'middle',
+              splitByGrapheme: true,
+            });
+          } else {
+            // 单行文本
+            editText = new fabric.IText(textContent, {
+              left: savedLeft,
+              top: savedTop,
+              angle: savedAngle,
+              fontSize: scaledFontSize,
+              fontFamily: fontFamily,
+              fill: fill,
+              lineHeight: lineHeight,
+              charSpacing: charSpacing,
+              scaleX: 1,
+              scaleY: 1,
+              originX: 'center',
+              originY: 'center',
+              editable: true,
+              selectable: true,
+              textBaseline: 'middle',
+            });
+          }
 
           this.canvas.add(editText);
           this.canvas.setActiveObject(editText);
@@ -1240,6 +1292,7 @@ export class CanvasManager {
               angle: editText.angle,
               scaleX: savedScaleX,
               scaleY: savedScaleY,
+              textType: textType, // 保持原始类型
             };
             this.canvas.remove(editText);
 
