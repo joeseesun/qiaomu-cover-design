@@ -200,9 +200,9 @@ export class CanvasManager {
         break;
     }
 
-    // 确保背景和文本的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
-    background!.set({ left: 0, top: 0 });
-    text.set({ left: 0, top: 0 });
+    // 确保背景和文本的位置都是 (0, 0)，缩放都是 1，这样它们在 Group 内部就是居中的
+    background!.set({ left: 0, top: 0, scaleX: 1, scaleY: 1 });
+    text.set({ left: 0, top: 0, scaleX: 1, scaleY: 1 });
 
     const group = new fabric.Group([background!, text], {
       left: finalLeft,
@@ -611,6 +611,9 @@ export class CanvasManager {
       textBaseline: 'middle', // 修复 'alphabetical' 错误
     });
 
+    // 强制计算文本尺寸
+    text.setCoords();
+
     const objects: fabric.Object[] = [];
     const paddingX = 20;
     const paddingY = 12;
@@ -704,11 +707,13 @@ export class CanvasManager {
 
     // 如果有装饰，创建 Group；否则只添加文本
     if (objects.length > 1) {
-      // 确保所有对象的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
+      // 确保所有对象的位置都是 (0, 0)，缩放都是 1，这样它们在 Group 内部就是居中的
       objects.forEach(obj => {
         obj.set({
           left: 0,
           top: 0,
+          scaleX: 1,
+          scaleY: 1,
         });
       });
 
