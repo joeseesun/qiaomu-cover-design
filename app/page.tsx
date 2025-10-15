@@ -354,6 +354,15 @@ export default function Home() {
     }
   };
 
+  // 清理 localStorage
+  const handleClearStorage = () => {
+    if (confirm('确定要清理所有缓存吗？这将删除所有版本数据，此操作不可恢复！')) {
+      localStorage.clear();
+      alert('缓存已清理，页面即将刷新');
+      window.location.reload();
+    }
+  };
+
   // 导出
   const handleDownload = async () => {
     if (!managerRef.current) return;
@@ -520,6 +529,7 @@ export default function Home() {
         onZoomReset={handleZoomReset}
         onDownload={handleDownload}
         onShare={handleShare}
+        onClearStorage={handleClearStorage}
       />
 
       {/* 主内容区 */}

@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -30,6 +30,7 @@ interface TopbarProps {
   onZoomReset: () => void;
   onDownload: () => void;
   onShare: () => void;
+  onClearStorage?: () => void;
 }
 
 export default function Topbar({
@@ -48,6 +49,7 @@ export default function Topbar({
   onZoomReset,
   onDownload,
   onShare,
+  onClearStorage,
 }: TopbarProps) {
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3'>('3:4');
@@ -266,6 +268,23 @@ export default function Topbar({
           <Download className="h-4 w-4" />
           下载
         </Button>
+
+        {/* 更多菜单 */}
+        {onClearStorage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={onClearStorage} className="text-destructive">
+                <Database className="h-4 w-4 mr-2" />
+                清理缓存
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </header>
   );
