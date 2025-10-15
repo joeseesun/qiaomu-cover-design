@@ -276,7 +276,7 @@ export class CanvasManager {
       left: this.width / 2,
       top: this.height / 2,
       fontSize: 60,
-      fontFamily: 'Noto Sans SC',
+      fontFamily: 'LXGW WenKai',
       fill: '#333333',
       originX: 'center',
       originY: 'center',
@@ -298,7 +298,7 @@ export class CanvasManager {
       top: this.height / 2,
       width: this.width * 0.8, // 画布宽度的80%
       fontSize: 60,
-      fontFamily: 'Noto Sans SC',
+      fontFamily: 'LXGW WenKai',
       fill: '#333333',
       originX: 'center',
       originY: 'center',
@@ -722,7 +722,7 @@ export class CanvasManager {
 
     const text = new fabric.IText(config.text, {
       fontSize: config.fontSize || 60,
-      fontFamily: config.fontFamily || 'Noto Sans SC',
+      fontFamily: config.fontFamily || 'LXGW WenKai',
       fill: '#333333',
       editable: true,
       selectable: true,
@@ -1431,7 +1431,7 @@ export class CanvasManager {
       text = new fabric.Textbox(config.text || '文字', {
         width: maxTextWidth,
         fontSize: config.fontSize || 60,
-        fontFamily: config.fontFamily || 'Noto Sans SC',
+        fontFamily: config.fontFamily || 'LXGW WenKai',
         fill: config.fill || '#333333',
         lineHeight: config.lineHeight || 1.2,
         charSpacing: config.charSpacing || 0,
@@ -1447,7 +1447,7 @@ export class CanvasManager {
       // 单行文本：使用 IText，不自动换行
       text = new fabric.IText(config.text || '文字', {
         fontSize: config.fontSize || 60,
-        fontFamily: config.fontFamily || 'Noto Sans SC',
+        fontFamily: config.fontFamily || 'LXGW WenKai',
         fill: config.fill || '#333333',
         lineHeight: config.lineHeight || 1.2,
         charSpacing: config.charSpacing || 0,

@@ -191,9 +191,23 @@ export default function FontPanel({
   };
 
   // 懒加载字体
-  const loadFont = async (font: FontConfig) => {
-    if (loadedFonts.has(font.family) || loadingFonts.has(font.family)) {
-      return;
+  const loadFont = async (font: FontConfig): Promise<void> => {
+    // 如果已经加载完成,直接返回
+    if (loadedFonts.has(font.family)) {
+      return Promise.resolve();
+    }
+
+    // 如果正在加载,等待加载完成
+    if (loadingFonts.has(font.family)) {
+      // 等待字体加载完成
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (loadedFonts.has(font.family)) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+      });
     }
 
     setLoadingFonts((prev) => new Set(prev).add(font.family));
@@ -221,8 +235,9 @@ export default function FontPanel({
     }
   };
 
-  const handleFontClick = (font: FontConfig) => {
-    loadFont(font);
+  const handleFontClick = async (font: FontConfig) => {
+    // 先加载字体,等待完成后再应用
+    await loadFont(font);
     onFontChange(font.family);
     addToRecent(font);
   };

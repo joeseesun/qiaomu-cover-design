@@ -181,11 +181,25 @@ export default function Home() {
         }
       }
 
-      // 图层调整快捷键和复制快捷键
-      if (managerRef.current && managerRef.current.canvas.getActiveObject()) {
-        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+      // 全局快捷键（不需要选中对象）
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
+      // 撤销/重做快捷键
+      if (cmdOrCtrl && e.key === 'z' && managerRef.current) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Cmd/Ctrl + Shift + Z = 重做
+          managerRef.current.redo();
+        } else {
+          // Cmd/Ctrl + Z = 撤销
+          managerRef.current.undo();
+        }
+        return;
+      }
+
+      // 图层调整快捷键和复制快捷键（需要选中对象）
+      if (managerRef.current && managerRef.current.canvas.getActiveObject()) {
         // 复制快捷键 Cmd/Ctrl + D
         if (cmdOrCtrl && e.key === 'd') {
           e.preventDefault();
@@ -773,7 +787,7 @@ export default function Home() {
 
         {/* 右侧字体面板 */}
         <FontPanel
-          selectedFont={getSelectedObjectProperty('fontFamily', 'Noto Sans SC')}
+          selectedFont={getSelectedObjectProperty('fontFamily', 'LXGW WenKai')}
           fontSize={getSelectedObjectProperty('fontSize', 60)}
           textColor={getSelectedObjectProperty('fill', '#333333')}
           lineHeight={getSelectedObjectProperty('lineHeight', 1.2)}
