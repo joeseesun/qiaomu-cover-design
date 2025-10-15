@@ -521,9 +521,10 @@ export class CanvasManager {
 
     // 监听双击事件，进入文本编辑模式
     group.on('mousedblclick', () => {
-      // 保存 Group 的所有变换属性
-      const savedLeft = group.left || 0;
-      const savedTop = group.top || 0;
+      // 获取 Group 的实际中心点坐标（考虑所有变换）
+      const centerPoint = group.getCenterPoint();
+      const savedLeft = centerPoint.x;
+      const savedTop = centerPoint.y;
       const savedAngle = group.angle || 0;
       const savedScaleX = group.scaleX || 1;
       const savedScaleY = group.scaleY || 1;
@@ -1071,8 +1072,10 @@ export class CanvasManager {
 
       // 双击编辑
       group.on('mousedblclick', () => {
-        const savedLeft = group.left || 0;
-        const savedTop = group.top || 0;
+        // 获取 Group 的实际中心点坐标（考虑所有变换）
+        const centerPoint = group.getCenterPoint();
+        const savedLeft = centerPoint.x;
+        const savedTop = centerPoint.y;
         const savedAngle = group.angle || 0;
         const savedScaleX = group.scaleX || 1;
         const savedScaleY = group.scaleY || 1;
@@ -1208,8 +1211,10 @@ export class CanvasManager {
 
         // 绑定双击事件
         obj.on('mousedblclick', () => {
-          const savedLeft = obj.left || 0;
-          const savedTop = obj.top || 0;
+          // 获取 Group 的实际中心点坐标（考虑所有变换）
+          const centerPoint = obj.getCenterPoint();
+          const savedLeft = centerPoint.x;
+          const savedTop = centerPoint.y;
           const savedAngle = obj.angle || 0;
           const savedScaleX = obj.scaleX || 1;
           const savedScaleY = obj.scaleY || 1;
