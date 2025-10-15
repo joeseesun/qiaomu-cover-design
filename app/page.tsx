@@ -73,29 +73,7 @@ export default function Home() {
       setSelectedObject(null);
     });
 
-    // 监听右键菜单 - 使用原生contextmenu事件
-    const canvasElement = managerRef.current.canvas.getElement();
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault(); // 阻止默认右键菜单
 
-      // 获取点击位置的对象
-      const pointer = managerRef.current!.canvas.getPointer(e);
-      const target = managerRef.current!.canvas.findTarget(e as any, false);
-
-      console.log('🖱️ 右键点击:', { target: target?.type, pointer });
-
-      if (target) {
-        // 如果点击了对象,选中它并显示菜单
-        managerRef.current!.canvas.setActiveObject(target);
-        managerRef.current!.canvas.renderAll();
-        setContextMenu({ x: e.clientX, y: e.clientY });
-      } else {
-        // 点击空白区域,关闭菜单
-        setContextMenu(null);
-      }
-    };
-
-    canvasElement.addEventListener('contextmenu', handleContextMenu);
 
     // 点击画布空白区域取消选中
     managerRef.current.canvas.on('mouse:down', (e) => {
@@ -225,7 +203,6 @@ export default function Home() {
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
-      canvasElement.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []); // 空依赖数组，只在组件挂载时执行一次
 
@@ -339,6 +316,29 @@ export default function Home() {
     if (managerRef.current) {
       managerRef.current.addText(emoji);
       setShowEmojiPicker(false);
+    }
+  };
+
+  // 处理右键菜单
+  const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault(); // 阻止默认右键菜单
+
+    if (!managerRef.current) return;
+
+    // 获取点击位置的对象
+    const pointer = managerRef.current.canvas.getPointer(e.nativeEvent);
+    const target = managerRef.current.canvas.findTarget(e.nativeEvent as any, false);
+
+    console.log('🖱️ 右键点击:', { target: target?.type, pointer });
+
+    if (target) {
+      // 如果点击了对象,选中它并显示菜单
+      managerRef.current.canvas.setActiveObject(target);
+      managerRef.current.canvas.renderAll();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    } else {
+      // 点击空白区域,关闭菜单
+      setContextMenu(null);
     }
   };
 
@@ -697,6 +697,7 @@ export default function Home() {
           isPanMode={isPanMode}
           onScaleChange={setCanvasScale}
           onUserZoomChange={setUserZoom}
+          onContextMenu={handleContextMenu}
         />
 
         {/* 右侧字体面板 */}

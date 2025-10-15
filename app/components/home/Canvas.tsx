@@ -12,6 +12,7 @@ interface CanvasProps {
   isPanMode?: boolean; // 是否锁定拖拽模式
   onScaleChange?: (scale: number) => void;
   onUserZoomChange?: (zoom: number) => void; // 新增：通知父组件用户缩放变化
+  onContextMenu?: (e: React.MouseEvent<HTMLCanvasElement>) => void; // 右键菜单
 }
 
 export default function Canvas({
@@ -21,6 +22,7 @@ export default function Canvas({
   isPanMode = false,
   onScaleChange,
   onUserZoomChange,
+  onContextMenu,
 }: CanvasProps) {
   const [autoScale, setAutoScale] = useState(1);
 
@@ -225,6 +227,7 @@ export default function Canvas({
         >
           <canvas
             ref={canvasRef}
+            onContextMenu={onContextMenu}
             style={{
               display: 'block',
               width: `${canvasSize.width}px`,
