@@ -332,10 +332,17 @@ export default function Home() {
       到: id,
       版本名称: version?.name,
       更新时间: version ? new Date(version.updatedAt).toLocaleString() : null,
+      数据是否为空: !version?.data,
     });
 
     if (version) {
-      managerRef.current.loadFromJSON(version.data);
+      // 如果版本数据为空，清空画布；否则加载数据
+      if (!version.data || version.data === '') {
+        console.log('📄 新建空白画布');
+        managerRef.current.clear();
+      } else {
+        managerRef.current.loadFromJSON(version.data);
+      }
     }
 
     setActiveId(id);
