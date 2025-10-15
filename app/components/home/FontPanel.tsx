@@ -74,6 +74,9 @@ export default function FontPanel({
   // 文本对齐状态
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
+  // 字号输入框的本地状态
+  const [fontSizeInput, setFontSizeInput] = useState<string>('');
+
   // 本地状态用于实时显示
   const [localLetterSpacing, setLocalLetterSpacing] = useState(letterSpacing);
   const [localLineHeight, setLocalLineHeight] = useState(lineHeight);
@@ -240,6 +243,11 @@ export default function FontPanel({
   const currentColor = getCurrentProperty('fill', textColor);
   const currentFontSize = getCurrentProperty('fontSize', fontSize);
 
+  // 同步字号到输入框
+  useEffect(() => {
+    setFontSizeInput(String(currentFontSize));
+  }, [currentFontSize]);
+
   // 判断字体是否是最近使用的
   const isRecentFont = (fontFamily: string) => {
     return recentFontFamilies.includes(fontFamily);
@@ -353,6 +361,7 @@ export default function FontPanel({
                 onClick={() => {
                   if (!selectedObject) return;
                   const newValue = Math.max(12, currentFontSize - 2);
+                  setFontSizeInput(String(newValue));
                   onFontSizeChange(newValue);
                 }}
                 disabled={!selectedObject}
@@ -361,11 +370,25 @@ export default function FontPanel({
               </Button>
               <Input
                 type="number"
-                value={currentFontSize}
+                value={fontSizeInput}
                 onChange={(e) => {
-                  const value = Number(e.target.value);
-                  if (value >= 12 && value <= 200) {
+                  // 允许任意输入,包括空字符串
+                  setFontSizeInput(e.target.value);
+                }}
+                onBlur={() => {
+                  // 失焦时验证并应用
+                  const value = Number(fontSizeInput);
+                  if (!isNaN(value) && value >= 12 && value <= 200) {
                     onFontSizeChange(value);
+                  } else {
+                    // 如果无效,恢复到当前值
+                    setFontSizeInput(String(currentFontSize));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // 按Enter时也触发验证
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
                   }
                 }}
                 disabled={!selectedObject}
@@ -380,6 +403,7 @@ export default function FontPanel({
                 onClick={() => {
                   if (!selectedObject) return;
                   const newValue = Math.min(200, currentFontSize + 2);
+                  setFontSizeInput(String(newValue));
                   onFontSizeChange(newValue);
                 }}
                 disabled={!selectedObject}
