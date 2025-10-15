@@ -1,47 +1,82 @@
-// 七牛云上传工具（使用 S3 兼容接口）
+// 七牛云上传工具（表单上传）
 import CryptoJS from 'crypto-js';
 
 export class QiniuUploader {
   private accessKey = 'p5en81L6k53PkgCQywYK9vX9BJLnJqrtmvBXkFaW';
   private secretKey = 'qV4m6r47s9okI7PEjCyrG6xMKtr9hmJMz1z4ZHEk';
   private bucket = 'joemarkdown';
-  private region = 'cn-east-1';
-  private endpoint = `https://${this.bucket}.s3.${this.region}.qiniucs.com`;
-  private domain = 'https://img.t5t6.com'; // 访问域名
+  private uploadUrl = 'https://upload.qiniup.com'; // 使用 upload.qiniup.com
+  private domain = 'https://newimg.t5t6.com'; // 访问域名
+  private storagePath = 'xhs-cover'; // 存储路径
 
   // 生成唯一文件名
   private generateFileName(file: File): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 15);
     const ext = file.name.split('.').pop() || 'jpg';
-    return `xhs-cover/${timestamp}-${random}.${ext}`;
+    return `${this.storagePath}/${timestamp}-${random}.${ext}`;
   }
 
-  // 使用 S3 兼容接口上传文件
+  // 生成上传 Token
+  private generateUploadToken(key: string, expires = 3600): string {
+    const deadline = Math.floor(Date.now() / 1000) + expires;
+
+    const putPolicy = {
+      scope: `${this.bucket}:${key}`,
+      deadline: deadline,
+      returnBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}'
+    };
+
+    // 1. JSON 序列化并 Base64 编码
+    const policyStr = JSON.stringify(putPolicy);
+    const encodedPutPolicy = this.base64urlEscape(
+      CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(policyStr))
+    );
+
+    // 2. HMAC-SHA1 签名
+    const sign = CryptoJS.HmacSHA1(encodedPutPolicy, this.secretKey);
+    const encodedSign = this.base64urlEscape(CryptoJS.enc.Base64.stringify(sign));
+
+    // 3. 拼接 Token
+    const token = `${this.accessKey}:${encodedSign}:${encodedPutPolicy}`;
+
+    console.log('🔑 生成上传 Token:', {
+      putPolicy,
+      deadline: new Date(deadline * 1000).toISOString(),
+      token: token.substring(0, 50) + '...',
+    });
+
+    return token;
+  }
+
+  // Base64 URL 安全编码
+  private base64urlEscape(str: string): string {
+    return str.replace(/\+/g, '-').replace(/\//g, '_');
+  }
+
+  // 表单上传文件
   async uploadFile(file: File): Promise<string> {
     try {
       const key = this.generateFileName(file);
-      const url = `${this.endpoint}/${key}`;
-      const date = new Date().toUTCString();
+      const token = this.generateUploadToken(key);
 
-      console.log('📤 上传参数 (S3):', {
+      console.log('📤 上传参数:', {
         key,
         fileName: file.name,
         fileSize: `${(file.size / 1024).toFixed(2)} KB`,
-        url,
+        uploadUrl: this.uploadUrl,
       });
 
-      // 生成 S3 签名
-      const authorization = this.generateS3Authorization('PUT', key, file.type, date);
+      // 构建 FormData
+      const formData = new FormData();
+      formData.append('token', token);
+      formData.append('key', key);
+      formData.append('x:name', file.name);
+      formData.append('file', file);
 
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-          'Date': date,
-          'Authorization': authorization,
-        },
-        body: file,
+      const response = await fetch(this.uploadUrl, {
+        method: 'POST',
+        body: formData,
       });
 
       if (!response.ok) {
@@ -54,7 +89,8 @@ export class QiniuUploader {
         throw new Error(`上传失败 (${response.status}): ${errorText || response.statusText}`);
       }
 
-      const fileUrl = `${this.domain}/${key}`;
+      const result = await response.json();
+      const fileUrl = `${this.domain}/${result.key}`;
 
       console.log('✅ 图片上传成功:', fileUrl);
       return fileUrl;
@@ -62,36 +98,6 @@ export class QiniuUploader {
       console.error('❌ 图片上传失败:', error);
       throw error;
     }
-  }
-
-  // 生成 S3 Authorization 头
-  private generateS3Authorization(method: string, key: string, contentType: string, date: string): string {
-    // S3 签名字符串格式：
-    // HTTP-Verb + "\n" +
-    // Content-MD5 + "\n" +
-    // Content-Type + "\n" +
-    // Date + "\n" +
-    // CanonicalizedAmzHeaders +
-    // CanonicalizedResource
-
-    const stringToSign = [
-      method,
-      '', // Content-MD5 (可选)
-      contentType || '',
-      date,
-      `/${this.bucket}/${key}`,
-    ].join('\n');
-
-    console.log('🔑 S3 签名字符串:', stringToSign);
-
-    // HMAC-SHA1 签名
-    const sign = CryptoJS.HmacSHA1(stringToSign, this.secretKey);
-    const signBase64 = CryptoJS.enc.Base64.stringify(sign);
-
-    const authorization = `QBox ${this.accessKey}:${signBase64}`;
-    console.log('🔑 Authorization:', authorization);
-
-    return authorization;
   }
 
   // 上传 Blob（用于剪贴板图片）
