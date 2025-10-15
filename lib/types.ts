@@ -115,6 +115,7 @@ export const COLORS = {
     default: '#6B7280',
     hover: '#1F2937',
     active: '#FF2442',
+    disabled: '#9CA3AF',
   }
 };
 
