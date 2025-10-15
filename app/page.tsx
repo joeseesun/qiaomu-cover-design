@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { CanvasManager } from '@/lib/canvas-manager';
 import { VersionManager } from '@/lib/version-manager';
+import { AIImageGenerator } from '@/lib/ai-image-generator';
 import { CanvasVersion, CanvasSize, DEFAULT_CANVAS_SIZE } from '@/lib/types';
 import Topbar from './components/home/Topbar';
 import Sidebar from './components/home/Sidebar';
 import Canvas from './components/home/Canvas';
 import FontPanel from './components/home/FontPanel';
+import { AIImageDialog } from './components/home/AIImageDialog';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,8 +25,10 @@ export default function Home() {
   const [userZoom, setUserZoom] = useState(100); // 用户手动缩放（50-200%）
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showAIImageDialog, setShowAIImageDialog] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
 
   // 初始化
   useEffect(() => {
@@ -36,6 +40,7 @@ export default function Home() {
       canvasSize.height
     );
     versionRef.current = new VersionManager();
+    aiImageGeneratorRef.current = new AIImageGenerator();
 
     const allVersions = versionRef.current.getAll();
     const activeVersion = versionRef.current.getActive();
@@ -256,9 +261,30 @@ export default function Home() {
         }
       };
       input.click();
+    } else if (tool === 'ai-image') {
+      // 打开 AI 生图对话框
+      setShowAIImageDialog(true);
     } else if (tool === 'emoji') {
       // 切换 Emoji 选择器
       setShowEmojiPicker(!showEmojiPicker);
+    }
+  };
+
+  // AI 生成图片
+  const handleAIImageGenerate = async (prompt: string) => {
+    if (!aiImageGeneratorRef.current || !managerRef.current) return;
+
+    try {
+      // 生成图片
+      const imageUrl = await aiImageGeneratorRef.current.generateImage(prompt);
+
+      // 从 URL 加载图片到画布
+      await managerRef.current.addImageFromURL(imageUrl);
+
+      console.log('✅ AI 生成的图片已添加到画布');
+    } catch (error) {
+      console.error('❌ AI 生图失败:', error);
+      throw error;
     }
   };
 
@@ -674,6 +700,13 @@ export default function Home() {
           </div>
         </>
       )}
+
+      {/* AI 生图对话框 */}
+      <AIImageDialog
+        open={showAIImageDialog}
+        onOpenChange={setShowAIImageDialog}
+        onGenerate={handleAIImageGenerate}
+      />
     </div>
   );
 }

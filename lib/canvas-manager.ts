@@ -219,6 +219,43 @@ export class CanvasManager {
     });
   }
 
+  // 从 URL 添加图片（用于 AI 生图）
+  addImageFromURL(imageUrl: string): Promise<fabric.Image> {
+    return new Promise((resolve, reject) => {
+      console.log('📥 从 URL 加载图片:', imageUrl);
+
+      fabric.Image.fromURL(imageUrl, (img) => {
+        if (!img) {
+          reject(new Error('Failed to load image from URL'));
+          return;
+        }
+
+        // 计算缩放比例
+        const maxWidth = this.width * 0.8;
+        const maxHeight = this.height * 0.8;
+        const scale = Math.min(
+          maxWidth / (img.width || 1),
+          maxHeight / (img.height || 1),
+          1
+        );
+
+        img.set({
+          left: this.width / 2,
+          top: this.height / 2,
+          originX: 'center',
+          originY: 'center',
+          scaleX: scale,
+          scaleY: scale,
+        });
+
+        this.canvas.add(img);
+        this.canvas.setActiveObject(img);
+        this.canvas.renderAll();
+        resolve(img);
+      }, { crossOrigin: 'anonymous' }); // 允许跨域
+    });
+  }
+
   // 调整图层顺序
   bringToFront() {
     const activeObject = this.canvas.getActiveObject();
