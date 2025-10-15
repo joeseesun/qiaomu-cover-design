@@ -24,13 +24,10 @@ export default function ImageToImageDialog({
 
   // 对话框打开时自动聚焦输入框
   useEffect(() => {
-    console.log('🎨 ImageToImageDialog open状态变化:', open);
     if (open && inputRef.current) {
       inputRef.current.focus();
     }
   }, [open]);
-
-  console.log('🎨 ImageToImageDialog 渲染, open:', open, 'imageCount:', imageCount);
 
   if (!open) return null;
 

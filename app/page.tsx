@@ -218,7 +218,6 @@ export default function Home() {
 
         if (activeObjects.length > 0 && !isEditing) {
           e.preventDefault();
-          console.log('🎯 Tab键触发,打开图片转换对话框,选中对象数:', activeObjects.length);
           setShowImageToImageDialog(true);
           return;
         }

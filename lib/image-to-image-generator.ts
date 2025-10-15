@@ -1,13 +1,10 @@
-// 图片转图片生成器 - 使用火山引擎 ARK API
+// 图片转图片生成器 - 通过Next.js API路由调用
 export class ImageToImageGenerator {
-  private apiKey: string;
   private endpoint: string;
-  private model: string;
 
   constructor() {
-    this.apiKey = 'b2310e59-c88f-4ea1-866c-5af25a1316df';
-    this.endpoint = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
-    this.model = 'ep-20250916145609-9bqzl';
+    // 使用Next.js API路由,避免CORS问题
+    this.endpoint = '/api/image-to-image';
   }
 
   /**
@@ -27,27 +24,21 @@ export class ImageToImageGenerator {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: this.model,
           prompt,
           image: imageUrl,
-          sequential_image_generation: 'disabled',
-          response_format: 'url',
           size,
-          stream: false,
-          watermark: false,
         }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API请求失败: ${response.status} ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API请求失败: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       // 检查返回数据格式
       if (!data.data || !data.data[0] || !data.data[0].url) {
         throw new Error('API返回数据格式错误');
@@ -77,27 +68,21 @@ export class ImageToImageGenerator {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: this.model,
           prompt,
           image: imageUrls,
-          sequential_image_generation: 'disabled',
-          response_format: 'url',
           size,
-          stream: false,
-          watermark: false,
         }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API请求失败: ${response.status} ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API请求失败: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       // 检查返回数据格式
       if (!data.data || !data.data[0] || !data.data[0].url) {
         throw new Error('API返回数据格式错误');
