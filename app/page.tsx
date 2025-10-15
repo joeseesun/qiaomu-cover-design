@@ -10,6 +10,7 @@ import Sidebar from './components/home/Sidebar';
 import Canvas from './components/home/Canvas';
 import FontPanel from './components/home/FontPanel';
 import { AIImageDialog } from './components/home/AIImageDialog';
+import ImageLibrary from './components/home/ImageLibrary';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,6 +28,7 @@ export default function Home() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAIImageDialog, setShowAIImageDialog] = useState(false);
+  const [showImageLibrary, setShowImageLibrary] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
@@ -295,21 +297,29 @@ export default function Home() {
     } else if (tool === 'textbox' && managerRef.current) {
       managerRef.current.addTextbox(); // 多行文本
     } else if (tool === 'image' && managerRef.current) {
-      // 触发文件选择
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file && managerRef.current) {
-          try {
-            await managerRef.current.addImage(file);
-          } catch (error) {
-            console.error('Failed to add image:', error);
+      // 显示选择对话框: 本地上传 or 图库选择
+      const choice = confirm('点击"确定"从本地上传图片\n点击"取消"从图库选择图片');
+
+      if (choice) {
+        // 本地上传
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (file && managerRef.current) {
+            try {
+              await managerRef.current.addImage(file);
+            } catch (error) {
+              console.error('Failed to add image:', error);
+            }
           }
-        }
-      };
-      input.click();
+        };
+        input.click();
+      } else {
+        // 图库选择
+        setShowImageLibrary(true);
+      }
     } else if (tool === 'ai-image') {
       // 打开 AI 生图对话框
       setShowAIImageDialog(true);
@@ -334,6 +344,18 @@ export default function Home() {
     } catch (error) {
       console.error('❌ AI 生图失败:', error);
       throw error;
+    }
+  };
+
+  // 从图库选择图片
+  const handleSelectImageFromLibrary = async (url: string) => {
+    if (!managerRef.current) return;
+
+    try {
+      await managerRef.current.addImageFromURL(url);
+      console.log('✅ 图库图片已添加到画布');
+    } catch (error) {
+      console.error('❌ 添加图库图片失败:', error);
     }
   };
 
@@ -815,6 +837,14 @@ export default function Home() {
         onOpenChange={setShowAIImageDialog}
         onGenerate={handleAIImageGenerate}
       />
+
+      {/* 图片库 */}
+      {showImageLibrary && (
+        <ImageLibrary
+          onClose={() => setShowImageLibrary(false)}
+          onSelectImage={handleSelectImageFromLibrary}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import { fabric } from 'fabric';
 import { HighlightConfig, CANVAS_WIDTH, CANVAS_HEIGHT } from './types';
 import { QiniuUploader } from './qiniu-uploader';
+import { getImageLibrary } from './image-library';
 
 export class CanvasManager {
   canvas: fabric.Canvas;
@@ -370,6 +371,10 @@ export class CanvasManager {
 
         console.log('✅ 图片上传成功，URL:', imageUrl);
 
+        // 添加到图片库
+        const library = getImageLibrary();
+        library.addImage(imageUrl, file.name);
+
         // 从七牛云 URL 加载图片
         fabric.Image.fromURL(imageUrl, (img) => {
           if (!img) {
@@ -417,6 +422,10 @@ export class CanvasManager {
         const imageUrl = await this.qiniuUploader.uploadBlob(blob);
 
         console.log('✅ 剪贴板图片上传成功，URL:', imageUrl);
+
+        // 添加到图片库
+        const library = getImageLibrary();
+        library.addImage(imageUrl, `clipboard-${Date.now()}.png`);
 
         // 从七牛云 URL 加载图片
         fabric.Image.fromURL(imageUrl, (img) => {
