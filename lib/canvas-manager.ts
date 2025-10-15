@@ -32,27 +32,82 @@ export class CanvasManager {
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
 
-    // 监听原生双击事件,在Fabric.js处理之前就开始防滚动
-    const canvasElement = this.canvas.getElement();
-    canvasElement.addEventListener('dblclick', (e: MouseEvent) => {
-      console.log('🖱️ [防滚动] 检测到原生双击事件');
-      // 获取点击位置的对象
-      const pointer = this.canvas.getPointer(e);
-      const target = this.canvas.findTarget(e as any, false);
-      console.log('🎯 [防滚动] 双击目标:', target?.type);
+    // 全局监听滚动,在任何时候都立即恢复
+    let savedScrollPosition = { x: 0, y: 0 };
+    let isEditingText = false;
 
-      // 只处理文本对象的双击
-      if (target && (target.type === 'i-text' || target.type === 'textbox')) {
-        console.log('✅ [防滚动] 确认是文本对象,开始防滚动');
-        this.preventScrollOnEdit();
-      }
-    }, { capture: true }); // 使用capture确保在Fabric.js之前执行
+    // 在进入编辑前保存滚动位置
+    this.canvas.on('mouse:down', () => {
+      savedScrollPosition = { x: window.scrollX, y: window.scrollY };
+      console.log('💾 [防滚动] 鼠标按下,保存滚动位置:', savedScrollPosition);
+    });
 
     // 监听所有文本对象进入编辑模式
     this.canvas.on('text:editing:entered', (e: any) => {
-      console.log('📝 Text editing entered');
+      console.log('📝 [防滚动] Text editing entered');
+      isEditingText = true;
+
+      // 立即恢复滚动位置
+      console.log('🔍 [防滚动] 当前滚动位置:', { x: window.scrollX, y: window.scrollY });
+
+      // 设置overflow: hidden
+      const bodyOverflow = document.body.style.overflow;
+      const htmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      console.log('🚫 [防滚动] 已设置overflow: hidden');
+
+      // 立即恢复滚动位置
+      const restoreScroll = () => {
+        const currentX = window.scrollX;
+        const currentY = window.scrollY;
+
+        if (currentX !== savedScrollPosition.x || currentY !== savedScrollPosition.y) {
+          console.log('🔄 [防滚动] 恢复滚动位置:', {
+            from: { x: currentX, y: currentY },
+            to: savedScrollPosition,
+          });
+          window.scrollTo(savedScrollPosition.x, savedScrollPosition.y);
+          document.documentElement.scrollTop = savedScrollPosition.y;
+          document.documentElement.scrollLeft = savedScrollPosition.x;
+          document.body.scrollTop = savedScrollPosition.y;
+          document.body.scrollLeft = savedScrollPosition.x;
+        }
+      };
+
+      // 多次尝试恢复
+      restoreScroll();
+      setTimeout(restoreScroll, 0);
+      setTimeout(restoreScroll, 10);
+      setTimeout(restoreScroll, 50);
+      setTimeout(restoreScroll, 100);
+
+      // 监听退出编辑
+      const handleEditingExited = () => {
+        console.log('🚪 [防滚动] 退出编辑模式');
+        isEditingText = false;
+        document.body.style.overflow = bodyOverflow;
+        document.documentElement.style.overflow = htmlOverflow;
+        console.log('✅ [防滚动] 已恢复overflow样式');
+        e.target.off('editing:exited', handleEditingExited);
+      };
+      e.target.on('editing:exited', handleEditingExited);
+
       this.setupTextEditingListeners(e.target);
     });
+
+    // 全局滚动监听器,在编辑期间强制恢复滚动位置
+    const globalScrollHandler = (e: Event) => {
+      if (isEditingText) {
+        console.log('⚠️ [防滚动] 编辑期间检测到滚动!');
+        e.preventDefault();
+        e.stopPropagation();
+        window.scrollTo(savedScrollPosition.x, savedScrollPosition.y);
+        return false;
+      }
+    };
+    window.addEventListener('scroll', globalScrollHandler, { passive: false, capture: true });
+    document.addEventListener('scroll', globalScrollHandler, { passive: false, capture: true });
   }
 
   // 防止编辑时滚动
