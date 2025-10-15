@@ -88,12 +88,12 @@ export default function FontPanel({
 
   // 下划线状态
   const [underlineStyle, setUnderlineStyle] = useState<'none' | 'solid' | 'wavy' | 'dotted'>('none');
-  const [underlineWidth, setUnderlineWidth] = useState(2);
+  const [underlineWidth, setUnderlineWidth] = useState(5);
   const [underlineColor, setUnderlineColor] = useState('#FF2442');
 
   // 边框状态
   const [borderStyle, setBorderStyle] = useState<'none' | 'solid' | 'dashed'>('none');
-  const [borderWidth, setBorderWidth] = useState(2);
+  const [borderWidth, setBorderWidth] = useState(5);
   const [borderColor, setBorderColor] = useState('#FF2442');
 
   // 加载最近使用的字体（只存储 family 列表）
