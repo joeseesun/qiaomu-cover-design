@@ -568,33 +568,68 @@ export class CanvasManager {
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
 
-        // 使用 requestAnimationFrame 确保在下一帧进入编辑模式，避免抖动
-        requestAnimationFrame(() => {
-          // 保存滚动位置
-          const scrollX = window.scrollX;
-          const scrollY = window.scrollY;
+        // 强制阻止滚动的函数
+        const preventScroll = (e: Event) => {
+          e.preventDefault();
+          window.scrollTo(savedScrollX, savedScrollY);
+        };
 
+        // 在多个事件上阻止滚动
+        window.addEventListener('scroll', preventScroll, { passive: false });
+        document.addEventListener('scroll', preventScroll, { passive: false });
+
+        // 延迟进入编辑模式，并立即恢复滚动
+        setTimeout(() => {
           editText.enterEditing();
           editText.selectAll();
 
-          // 立即恢复滚动位置
-          window.scrollTo(scrollX, scrollY);
-        });
+          // 强制恢复滚动位置
+          window.scrollTo(savedScrollX, savedScrollY);
+          document.documentElement.scrollTop = savedScrollY;
+          document.body.scrollTop = savedScrollY;
+
+          // 延迟移除滚动监听，确保编辑模式完全稳定
+          setTimeout(() => {
+            window.removeEventListener('scroll', preventScroll);
+            document.removeEventListener('scroll', preventScroll);
+          }, 100);
+        }, 0);
 
         this.canvas.renderAll();
 
         // 监听ESC键退出编辑
         const handleEscape = (e: KeyboardEvent) => {
           if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
             editText.exitEditing();
           }
         };
-        window.addEventListener('keydown', handleEscape);
+        window.addEventListener('keydown', handleEscape, { capture: true });
+
+        // 监听画布外点击退出编辑
+        const handleClickOutside = (e: MouseEvent) => {
+          const target = e.target as HTMLElement;
+          const canvasElement = this.canvas.getElement();
+
+          // 如果点击的不是画布，退出编辑
+          if (!canvasElement.contains(target) && target !== canvasElement) {
+            editText.exitEditing();
+          }
+        };
+
+        // 延迟添加点击监听，避免立即触发
+        setTimeout(() => {
+          document.addEventListener('click', handleClickOutside);
+        }, 100);
 
         // 监听文本编辑完成，重新创建 Group
         editText.on('editing:exited', () => {
-          // 移除ESC监听器
-          window.removeEventListener('keydown', handleEscape);
+          // 移除所有监听器
+          window.removeEventListener('keydown', handleEscape, { capture: true } as any);
+          document.removeEventListener('click', handleClickOutside);
+          window.removeEventListener('scroll', preventScroll);
+          document.removeEventListener('scroll', preventScroll);
 
           const newConfig = {
             ...config,
@@ -1173,30 +1208,65 @@ export class CanvasManager {
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
 
-        // 使用 requestAnimationFrame 确保在下一帧进入编辑模式，避免抖动
-        requestAnimationFrame(() => {
-          // 保存滚动位置
-          const scrollX = window.scrollX;
-          const scrollY = window.scrollY;
+        // 强制阻止滚动的函数
+        const preventScroll = (e: Event) => {
+          e.preventDefault();
+          window.scrollTo(savedScrollX, savedScrollY);
+        };
 
+        // 在多个事件上阻止滚动
+        window.addEventListener('scroll', preventScroll, { passive: false });
+        document.addEventListener('scroll', preventScroll, { passive: false });
+
+        // 延迟进入编辑模式，并立即恢复滚动
+        setTimeout(() => {
           editText.enterEditing();
           editText.selectAll();
 
-          // 立即恢复滚动位置
-          window.scrollTo(scrollX, scrollY);
-        });
+          // 强制恢复滚动位置
+          window.scrollTo(savedScrollX, savedScrollY);
+          document.documentElement.scrollTop = savedScrollY;
+          document.body.scrollTop = savedScrollY;
+
+          // 延迟移除滚动监听，确保编辑模式完全稳定
+          setTimeout(() => {
+            window.removeEventListener('scroll', preventScroll);
+            document.removeEventListener('scroll', preventScroll);
+          }, 100);
+        }, 0);
 
         // 监听ESC键退出编辑
         const handleEscape = (e: KeyboardEvent) => {
           if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
             editText.exitEditing();
           }
         };
-        window.addEventListener('keydown', handleEscape);
+        window.addEventListener('keydown', handleEscape, { capture: true });
+
+        // 监听画布外点击退出编辑
+        const handleClickOutside = (e: MouseEvent) => {
+          const target = e.target as HTMLElement;
+          const canvasElement = this.canvas.getElement();
+
+          // 如果点击的不是画布，退出编辑
+          if (!canvasElement.contains(target) && target !== canvasElement) {
+            editText.exitEditing();
+          }
+        };
+
+        // 延迟添加点击监听，避免立即触发
+        setTimeout(() => {
+          document.addEventListener('click', handleClickOutside);
+        }, 100);
 
         editText.on('editing:exited', () => {
-          // 移除ESC监听器
-          window.removeEventListener('keydown', handleEscape);
+          // 移除所有监听器
+          window.removeEventListener('keydown', handleEscape, { capture: true } as any);
+          document.removeEventListener('click', handleClickOutside);
+          window.removeEventListener('scroll', preventScroll);
+          document.removeEventListener('scroll', preventScroll);
 
           const newConfig = {
             ...config,
@@ -1338,30 +1408,65 @@ export class CanvasManager {
           const savedScrollX = window.scrollX;
           const savedScrollY = window.scrollY;
 
-          // 使用 requestAnimationFrame 确保在下一帧进入编辑模式，避免抖动
-          requestAnimationFrame(() => {
-            // 保存滚动位置
-            const scrollX = window.scrollX;
-            const scrollY = window.scrollY;
+          // 强制阻止滚动的函数
+          const preventScroll = (e: Event) => {
+            e.preventDefault();
+            window.scrollTo(savedScrollX, savedScrollY);
+          };
 
+          // 在多个事件上阻止滚动
+          window.addEventListener('scroll', preventScroll, { passive: false });
+          document.addEventListener('scroll', preventScroll, { passive: false });
+
+          // 延迟进入编辑模式，并立即恢复滚动
+          setTimeout(() => {
             editText.enterEditing();
             editText.selectAll();
 
-            // 立即恢复滚动位置
-            window.scrollTo(scrollX, scrollY);
-          });
+            // 强制恢复滚动位置
+            window.scrollTo(savedScrollX, savedScrollY);
+            document.documentElement.scrollTop = savedScrollY;
+            document.body.scrollTop = savedScrollY;
+
+            // 延迟移除滚动监听，确保编辑模式完全稳定
+            setTimeout(() => {
+              window.removeEventListener('scroll', preventScroll);
+              document.removeEventListener('scroll', preventScroll);
+            }, 100);
+          }, 0);
 
           // 监听ESC键退出编辑
           const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
               editText.exitEditing();
             }
           };
-          window.addEventListener('keydown', handleEscape);
+          window.addEventListener('keydown', handleEscape, { capture: true });
+
+          // 监听画布外点击退出编辑
+          const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const canvasElement = this.canvas.getElement();
+
+            // 如果点击的不是画布，退出编辑
+            if (!canvasElement.contains(target) && target !== canvasElement) {
+              editText.exitEditing();
+            }
+          };
+
+          // 延迟添加点击监听，避免立即触发
+          setTimeout(() => {
+            document.addEventListener('click', handleClickOutside);
+          }, 100);
 
           editText.on('editing:exited', () => {
-            // 移除ESC监听器
-            window.removeEventListener('keydown', handleEscape);
+            // 移除所有监听器
+            window.removeEventListener('keydown', handleEscape, { capture: true } as any);
+            document.removeEventListener('click', handleClickOutside);
+            window.removeEventListener('scroll', preventScroll);
+            document.removeEventListener('scroll', preventScroll);
 
             const newConfig = {
               ...config,
