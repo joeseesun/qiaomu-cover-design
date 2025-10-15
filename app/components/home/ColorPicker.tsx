@@ -14,6 +14,8 @@ interface ColorPickerProps {
   color: string;
   onChange: (color: string) => void;
   label?: string;
+  compact?: boolean; // 紧凑模式：只显示色块，不显示数值
+  disabled?: boolean;
 }
 
 // 预设颜色
@@ -24,7 +26,7 @@ const PRESET_COLORS = [
   '#FFEB3B', '#FFC107', '#FF9800', '#795548', '#9E9E9E',
 ];
 
-export default function ColorPicker({ color, onChange, label }: ColorPickerProps) {
+export default function ColorPicker({ color, onChange, label, compact = false, disabled = false }: ColorPickerProps) {
   const [inputValue, setInputValue] = useState(color);
 
   const handleInputChange = (value: string) => {
@@ -41,13 +43,23 @@ export default function ColorPicker({ color, onChange, label }: ColorPickerProps
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="w-full justify-start gap-3 h-12"
+            className={compact ? "w-full h-10 p-0" : "w-full justify-start gap-3 h-12"}
+            disabled={disabled}
           >
-            <div
-              className="w-8 h-8 rounded border border-border/40"
-              style={{ backgroundColor: color }}
-            />
-            <span className="text-sm font-mono">{color.toUpperCase()}</span>
+            {compact ? (
+              <div
+                className="w-full h-full rounded border border-border/40"
+                style={{ backgroundColor: color }}
+              />
+            ) : (
+              <>
+                <div
+                  className="w-8 h-8 rounded border border-border/40"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-sm font-mono">{color.toUpperCase()}</span>
+              </>
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-72 p-5" align="start">

@@ -60,14 +60,9 @@ export default function FontPanel({
   );
   const [recentFontFamilies, setRecentFontFamilies] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [lineHeightInput, setLineHeightInput] = useState('');
-  const [letterSpacingInput, setLetterSpacingInput] = useState('');
 
   // 装饰 Tab 状态
   const [activeDecorationTab, setActiveDecorationTab] = useState<'background' | 'underline' | 'border'>('background');
-
-  // 间距 Tab 状态
-  const [activeSpacingTab, setActiveSpacingTab] = useState<'letterSpacing' | 'lineHeight'>('letterSpacing');
 
   // 背景状态
   const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
@@ -95,17 +90,6 @@ export default function FontPanel({
       }
     }
   }, []);
-
-  // 同步输入框的值
-  useEffect(() => {
-    if (selectedObject) {
-      setLineHeightInput((selectedObject.lineHeight || lineHeight).toFixed(1));
-      setLetterSpacingInput(String(Math.round(selectedObject.charSpacing || letterSpacing)));
-    } else {
-      setLineHeightInput(lineHeight.toFixed(1));
-      setLetterSpacingInput(String(letterSpacing));
-    }
-  }, [selectedObject, lineHeight, letterSpacing]);
 
   // 预加载第一页的字体
   useEffect(() => {
@@ -281,17 +265,100 @@ export default function FontPanel({
 
       <Separator />
 
-      {/* 文字属性 */}
-      <div className="px-8 py-6 space-y-6">
-        {/* 颜色 */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium">文字颜色</label>
-          <ColorPicker
-            color={currentColor}
-            onChange={onColorChange}
-          />
-        </div>
+      {/* 文字属性：颜色 + 字间距 + 行间距 */}
+      <div className="px-8 py-6">
+        <div className="grid grid-cols-3 gap-3">
+          {/* 文字颜色 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">文字颜色</label>
+            <ColorPicker
+              color={currentColor}
+              onChange={onColorChange}
+              compact
+              disabled={!selectedObject}
+            />
+          </div>
 
+          {/* 字间距 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">字间距</label>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-8 shrink-0"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.charSpacing || letterSpacing;
+                  const newValue = Math.max(-500, current - 10);
+                  onLetterSpacingChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <div className="flex-1 text-center min-w-0">
+                <div className="text-sm font-semibold tabular-nums">
+                  {Math.round((selectedObject?.charSpacing ?? letterSpacing) || 0)}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-8 shrink-0"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.charSpacing || letterSpacing;
+                  const newValue = Math.min(1000, current + 10);
+                  onLetterSpacingChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+
+          {/* 行间距 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">行间距</label>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-8 shrink-0"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.lineHeight || lineHeight;
+                  const newValue = Math.max(0.5, Number((current - 0.1).toFixed(1)));
+                  onLineHeightChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <div className="flex-1 text-center min-w-0">
+                <div className="text-sm font-semibold tabular-nums">
+                  {((selectedObject?.lineHeight ?? lineHeight) || 1.5).toFixed(1)}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-8 shrink-0"
+                onClick={() => {
+                  if (!selectedObject) return;
+                  const current = selectedObject.lineHeight || lineHeight;
+                  const newValue = Math.min(5, Number((current + 0.1).toFixed(1)));
+                  onLineHeightChange?.(newValue);
+                }}
+                disabled={!selectedObject}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Separator />
@@ -719,124 +786,6 @@ export default function FontPanel({
         )}
           </div>
         )}
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* 间距 Tab 组 */}
-      <div className="space-y-0">
-        {/* Tab 头部 */}
-        <div className="flex border-b-2 border-border">
-          <button
-            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
-              activeSpacingTab === 'letterSpacing'
-                ? 'text-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveSpacingTab('letterSpacing')}
-          >
-            字间距
-            {activeSpacingTab === 'letterSpacing' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-          <button
-            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
-              activeSpacingTab === 'lineHeight'
-                ? 'text-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveSpacingTab('lineHeight')}
-          >
-            行间距
-            {activeSpacingTab === 'lineHeight' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-        </div>
-
-        {/* Tab 内容区域 */}
-        <div className="px-8 py-6">
-          {/* 字间距 Tab 内容 */}
-          {activeSpacingTab === 'letterSpacing' && (
-            <div className="flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => {
-                  if (!selectedObject) return;
-                  const current = selectedObject.charSpacing || letterSpacing;
-                  const newValue = Math.max(-500, current - 10);
-                  onLetterSpacingChange?.(newValue);
-                }}
-                disabled={!selectedObject}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <div className="text-center min-w-[80px]">
-                <div className="text-2xl font-semibold">
-                  {selectedObject ? Math.round(selectedObject.charSpacing || letterSpacing) : letterSpacing}
-                </div>
-                <div className="text-xs text-muted-foreground">像素</div>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => {
-                  if (!selectedObject) return;
-                  const current = selectedObject.charSpacing || letterSpacing;
-                  const newValue = Math.min(1000, current + 10);
-                  onLetterSpacingChange?.(newValue);
-                }}
-                disabled={!selectedObject}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* 行间距 Tab 内容 */}
-          {activeSpacingTab === 'lineHeight' && (
-            <div className="flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => {
-                  if (!selectedObject) return;
-                  const current = selectedObject.lineHeight || lineHeight;
-                  const newValue = Math.max(0.5, Number((current - 0.1).toFixed(1)));
-                  onLineHeightChange?.(newValue);
-                }}
-                disabled={!selectedObject}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <div className="text-center min-w-[80px]">
-                <div className="text-2xl font-semibold">
-                  {selectedObject ? (selectedObject.lineHeight || lineHeight).toFixed(1) : lineHeight.toFixed(1)}
-                </div>
-                <div className="text-xs text-muted-foreground">倍数</div>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => {
-                  if (!selectedObject) return;
-                  const current = selectedObject.lineHeight || lineHeight;
-                  const newValue = Math.min(5, Number((current + 0.1).toFixed(1)));
-                  onLineHeightChange?.(newValue);
-                }}
-                disabled={!selectedObject}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
         </div>
       </div>
     </aside>
