@@ -37,12 +37,20 @@ export default function Home() {
     );
     versionRef.current = new VersionManager();
 
-    setVersions(versionRef.current.getAll());
-    setActiveId(versionRef.current.getActive()!.id);
+    const allVersions = versionRef.current.getAll();
+    const activeVersion = versionRef.current.getActive();
 
-    const active = versionRef.current.getActive();
-    if (active?.data) {
-      managerRef.current.loadFromJSON(active.data);
+    console.log('🔍 初始化加载:', {
+      版本数量: allVersions.length,
+      所有版本: allVersions.map(v => ({ id: v.id, name: v.name, updatedAt: new Date(v.updatedAt).toLocaleString() })),
+      当前激活版本: activeVersion ? { id: activeVersion.id, name: activeVersion.name, updatedAt: new Date(activeVersion.updatedAt).toLocaleString() } : null,
+    });
+
+    setVersions(allVersions);
+    setActiveId(activeVersion!.id);
+
+    if (activeVersion?.data) {
+      managerRef.current.loadFromJSON(activeVersion.data);
       // ✅ 不再需要 migrateOldGroups，因为 rebindGroupEvents 已经处理了双击编辑
     }
 
@@ -203,13 +211,20 @@ export default function Home() {
         // 只有数据变化时才保存，避免重复写入
         if (data !== lastSavedData) {
           try {
-            versionRef.current.update(activeId, data);
+            const thumbnail = managerRef.current.toThumbnail();
+            versionRef.current.update(activeId, data, thumbnail);
+            setVersions(versionRef.current.getAll()); // 更新版本列表以显示新缩略图
             lastSavedData = data;
+            console.log('💾 自动保存成功:', {
+              版本ID: activeId,
+              数据大小: data.length,
+              时间: new Date().toLocaleTimeString()
+            });
           } catch (error) {
-            console.error('自动保存失败:', error);
+            console.error('❌ 自动保存失败:', error);
             // 如果 localStorage 满了，清理旧版本
             if (error instanceof Error && error.name === 'QuotaExceededError') {
-              console.warn('localStorage 已满，请考虑删除一些版本');
+              console.warn('⚠️ localStorage 已满，请考虑删除一些版本');
             }
           }
         }
@@ -278,10 +293,20 @@ export default function Home() {
 
     // 保存当前版本
     const currentData = managerRef.current.toJSON();
-    versionRef.current.update(activeId, currentData);
+    const currentThumbnail = managerRef.current.toThumbnail();
+    versionRef.current.update(activeId, currentData, currentThumbnail);
 
     // 切换版本
+    versionRef.current.setActive(id); // ✅ 更新 VersionManager 的 activeId
     const version = versionRef.current.getById(id);
+
+    console.log('🔄 切换版本:', {
+      从: activeId,
+      到: id,
+      版本名称: version?.name,
+      更新时间: version ? new Date(version.updatedAt).toLocaleString() : null,
+    });
+
     if (version) {
       managerRef.current.loadFromJSON(version.data);
     }
