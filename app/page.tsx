@@ -211,9 +211,8 @@ export default function Home() {
         // 只有数据变化时才保存，避免重复写入
         if (data !== lastSavedData) {
           try {
-            const thumbnail = managerRef.current.toThumbnail();
-            versionRef.current.update(activeId, data, thumbnail);
-            setVersions(versionRef.current.getAll()); // 更新版本列表以显示新缩略图
+            // 自动保存时不保存缩略图，减少 localStorage 占用
+            versionRef.current.update(activeId, data);
             lastSavedData = data;
             console.log('💾 自动保存成功:', {
               版本ID: activeId,
@@ -229,7 +228,7 @@ export default function Home() {
           }
         }
       }
-    }, 5000); // 从 2 秒改为 5 秒
+    }, 10000); // 10 秒自动保存一次，减少 localStorage 写入
 
     return () => clearInterval(timer);
   }, [activeId]);

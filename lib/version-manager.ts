@@ -112,8 +112,34 @@ export class VersionManager {
         );
       } catch (error) {
         if (error instanceof Error && error.name === 'QuotaExceededError') {
-          console.error('localStorage 已满，无法保存版本');
-          // 尝试清理：删除最旧的版本（除了当前激活的）
+          console.error('localStorage 已满，尝试清理...');
+
+          // 策略 1: 删除所有缩略图
+          let cleaned = false;
+          this.versions.forEach(v => {
+            if (v.thumbnail) {
+              delete v.thumbnail;
+              cleaned = true;
+            }
+          });
+
+          if (cleaned) {
+            console.warn('已删除所有缩略图以释放空间');
+            try {
+              localStorage.setItem(
+                this.storageKey,
+                JSON.stringify({
+                  versions: this.versions,
+                  activeId: this.activeId,
+                })
+              );
+              return; // 保存成功，返回
+            } catch (e) {
+              // 继续尝试策略 2
+            }
+          }
+
+          // 策略 2: 删除最旧的版本（除了当前激活的）
           const oldestVersion = this.versions
             .filter(v => v.id !== this.activeId)
             .sort((a, b) => a.updatedAt - b.updatedAt)[0];

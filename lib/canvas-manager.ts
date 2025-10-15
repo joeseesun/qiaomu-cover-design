@@ -1159,9 +1159,9 @@ export class CanvasManager {
   // 生成缩略图
   toThumbnail() {
     return this.canvas.toDataURL({
-      format: 'png',
-      quality: 0.3,
-      multiplier: 0.2,
+      format: 'jpeg', // 使用 JPEG 格式，比 PNG 小很多
+      quality: 0.2,   // 降低质量到 0.2
+      multiplier: 0.15, // 降低尺寸到 0.15
     });
   }
 
