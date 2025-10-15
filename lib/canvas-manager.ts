@@ -74,15 +74,60 @@ export class CanvasManager {
     return obj;
   }
 
-  // 添加图片
-  addImage(file: File): Promise<fabric.Image> {
+  // 压缩图片
+  private compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
       reader.onload = (e) => {
-        const imgUrl = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
 
-        fabric.Image.fromURL(imgUrl, (img) => {
+          // 如果图片宽度超过最大宽度，按比例缩小
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // 转换为 JPEG 格式，质量 0.8
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedDataUrl);
+        };
+
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+
+      reader.onerror = () => {
+        reject(new Error('Failed to read file'));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // 添加图片
+  addImage(file: File): Promise<fabric.Image> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // 压缩图片
+        const compressedUrl = await this.compressImage(file, 1200, 0.8);
+
+        fabric.Image.fromURL(compressedUrl, (img) => {
           if (!img) {
             reject(new Error('Failed to load image'));
             return;
@@ -111,25 +156,23 @@ export class CanvasManager {
           this.canvas.renderAll();
           resolve(img);
         });
-      };
-
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-
-      reader.readAsDataURL(file);
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
   // 从剪贴板添加图片
   addImageFromClipboard(blob: Blob): Promise<fabric.Image> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+    return new Promise(async (resolve, reject) => {
+      try {
+        // 将 Blob 转换为 File 以便使用压缩函数
+        const file = new File([blob], 'clipboard-image.png', { type: blob.type });
 
-      reader.onload = (e) => {
-        const imgUrl = e.target?.result as string;
+        // 压缩图片
+        const compressedUrl = await this.compressImage(file, 1200, 0.8);
 
-        fabric.Image.fromURL(imgUrl, (img) => {
+        fabric.Image.fromURL(compressedUrl, (img) => {
           if (!img) {
             reject(new Error('Failed to load image'));
             return;
@@ -158,13 +201,9 @@ export class CanvasManager {
           this.canvas.renderAll();
           resolve(img);
         });
-      };
-
-      reader.onerror = () => {
-        reject(new Error('Failed to read blob'));
-      };
-
-      reader.readAsDataURL(blob);
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
