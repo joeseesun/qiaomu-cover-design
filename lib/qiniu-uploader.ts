@@ -15,10 +15,23 @@ export class QiniuUploader {
       deadline: Math.floor(Date.now() / 1000) + 3600, // 1小时后过期
     };
 
-    const encodedPutPolicy = this.urlSafeBase64Encode(JSON.stringify(putPolicy));
-    const sign = this.hmacSha1(encodedPutPolicy, this.secretKey);
-    const encodedSign = this.urlSafeBase64Encode(sign);
+    // 1. 将 putPolicy 转为 JSON 字符串，然后 Base64 编码（URL 安全）
+    const policyStr = JSON.stringify(putPolicy);
+    const encodedPutPolicy = this.urlSafeBase64Encode(policyStr);
+
+    // 2. 使用 HMAC-SHA1 对 encodedPutPolicy 签名，然后 Base64 编码（URL 安全）
+    const sign = CryptoJS.HmacSHA1(encodedPutPolicy, this.secretKey);
+    const signBase64 = CryptoJS.enc.Base64.stringify(sign);
+    const encodedSign = signBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    // 3. 拼接 token: AccessKey:EncodedSign:EncodedPutPolicy
     const uploadToken = `${this.accessKey}:${encodedSign}:${encodedPutPolicy}`;
+
+    console.log('🔑 生成上传 Token:', {
+      putPolicy,
+      encodedPutPolicy: encodedPutPolicy.substring(0, 30) + '...',
+      encodedSign: encodedSign.substring(0, 20) + '...',
+    });
 
     return uploadToken;
   }
@@ -28,12 +41,6 @@ export class QiniuUploader {
     const wordArray = CryptoJS.enc.Utf8.parse(str);
     const base64 = CryptoJS.enc.Base64.stringify(wordArray);
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-
-  // HMAC-SHA1 签名
-  private hmacSha1(data: string, key: string): string {
-    const hash = CryptoJS.HmacSHA1(data, key);
-    return CryptoJS.enc.Base64.stringify(hash);
   }
 
   // 生成唯一文件名
@@ -50,6 +57,13 @@ export class QiniuUploader {
       const key = this.generateFileName(file);
       const token = this.generateUploadToken(key);
 
+      console.log('📤 上传参数:', {
+        key,
+        fileName: file.name,
+        fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+        uploadUrl: this.uploadUrl,
+      });
+
       const formData = new FormData();
       formData.append('token', token);
       formData.append('key', key);
@@ -61,12 +75,18 @@ export class QiniuUploader {
       });
 
       if (!response.ok) {
-        throw new Error(`上传失败: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ 上传失败响应:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        });
+        throw new Error(`上传失败 (${response.status}): ${errorText || response.statusText}`);
       }
 
       const result = await response.json();
       const fileUrl = `${this.domain}/${result.key}`;
-      
+
       console.log('✅ 图片上传成功:', fileUrl);
       return fileUrl;
     } catch (error) {
