@@ -31,6 +31,71 @@ export class CanvasManager {
     this.canvas.on('object:added', () => this.scheduleHistorySave());
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
+
+    // 监听所有文本对象进入编辑模式
+    this.canvas.on('text:editing:entered', (e: any) => {
+      console.log('📝 Text editing entered');
+      this.setupTextEditingListeners(e.target);
+    });
+  }
+
+  // 设置文本编辑监听器(用于普通IText和Textbox)
+  private setupTextEditingListeners(editText: any) {
+    console.log('📌 Setting up editing listeners for text object');
+
+    // ESC键退出编辑
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('⌨️ ESC pressed, exiting editing');
+        editText.exitEditing();
+      }
+    };
+    window.addEventListener('keydown', handleEscape, { capture: true });
+
+    // 监听画布容器点击(灰色区域)
+    const handleContainerClick = (e: Event) => {
+      console.log('🎯 Canvas container clicked (custom event received), exiting editing', e);
+      editText.exitEditing();
+    };
+
+    // 监听canvas元素点击
+    const handleCanvasClick = () => {
+      console.log('🖱️ Canvas clicked, checking activeObject');
+      // 延迟检查,等待Fabric.js处理完点击事件
+      setTimeout(() => {
+        const activeObj = this.canvas.getActiveObject();
+        console.log('🔍 ActiveObject:', activeObj === editText ? 'still editText' : 'changed');
+        // 如果activeObject不再是editText,说明点击了其他地方,退出编辑
+        if (activeObj !== editText) {
+          console.log('✅ ActiveObject changed, exiting editing');
+          editText.exitEditing();
+        }
+      }, 10);
+    };
+
+    // 立即添加监听器
+    console.log('📌 Adding click listeners for editing mode');
+    // 监听画布容器点击(灰色区域)
+    document.addEventListener('canvas-container-click', handleContainerClick);
+    console.log('📌 Container click listener added');
+    // 监听canvas元素点击 - 需要延迟避免立即触发
+    const canvasElement = this.canvas.getElement();
+    setTimeout(() => {
+      canvasElement.addEventListener('click', handleCanvasClick);
+      console.log('📌 Canvas click listener added');
+    }, 200);
+
+    // 监听编辑退出,移除所有监听器
+    const handleEditingExited = () => {
+      console.log('🚪 Exited editing, removing listeners');
+      window.removeEventListener('keydown', handleEscape, { capture: true } as any);
+      document.removeEventListener('canvas-container-click', handleContainerClick);
+      canvasElement.removeEventListener('click', handleCanvasClick);
+      editText.off('editing:exited', handleEditingExited);
+    };
+    editText.on('editing:exited', handleEditingExited);
   }
 
   // 添加单行文本（IText）
@@ -607,27 +672,48 @@ export class CanvasManager {
         };
         window.addEventListener('keydown', handleEscape, { capture: true });
 
-        // 监听画布外点击退出编辑
-        const handleClickOutside = (e: MouseEvent) => {
-          const target = e.target as HTMLElement;
-          const canvasElement = this.canvas.getElement();
+        // 监听画布容器点击(灰色区域)
+        const handleContainerClick = (e: Event) => {
+          console.log('🎯 Canvas container clicked (custom event received), exiting editing', e);
+          editText.exitEditing();
+        };
 
-          // 如果点击的不是画布，退出编辑
-          if (!canvasElement.contains(target) && target !== canvasElement) {
-            editText.exitEditing();
-          }
+        // 监听canvas元素点击
+        const handleCanvasClick = () => {
+          console.log('🖱️ Canvas clicked, checking activeObject');
+          // 延迟检查,等待Fabric.js处理完点击事件
+          setTimeout(() => {
+            const activeObj = this.canvas.getActiveObject();
+            console.log('🔍 ActiveObject:', activeObj === editText ? 'still editText' : 'changed');
+            // 如果activeObject不再是editText,说明点击了其他地方,退出编辑
+            if (activeObj !== editText) {
+              console.log('✅ ActiveObject changed, exiting editing');
+              editText.exitEditing();
+            }
+          }, 10);
         };
 
         // 延迟添加点击监听，避免立即触发
         setTimeout(() => {
-          document.addEventListener('click', handleClickOutside);
-        }, 100);
+          console.log('📌 Click listeners added for editing mode');
+          console.log('   - Adding canvas-container-click listener');
+          console.log('   - Adding canvas click listener');
+          // 监听画布容器点击(灰色区域)
+          document.addEventListener('canvas-container-click', handleContainerClick);
+          // 监听canvas元素点击
+          const canvasElement = this.canvas.getElement();
+          canvasElement.addEventListener('click', handleCanvasClick);
+          console.log('✅ All listeners added successfully');
+        }, 200);
 
         // 监听文本编辑完成，重新创建 Group
         editText.on('editing:exited', () => {
+          console.log('🚪 Exited editing, removing listeners');
           // 移除所有监听器
           window.removeEventListener('keydown', handleEscape, { capture: true } as any);
-          document.removeEventListener('click', handleClickOutside);
+          document.removeEventListener('canvas-container-click', handleContainerClick);
+          const canvasElement = this.canvas.getElement();
+          canvasElement.removeEventListener('click', handleCanvasClick);
           window.removeEventListener('scroll', preventScroll);
           document.removeEventListener('scroll', preventScroll);
 
@@ -1245,26 +1331,46 @@ export class CanvasManager {
         };
         window.addEventListener('keydown', handleEscape, { capture: true });
 
-        // 监听画布外点击退出编辑
-        const handleClickOutside = (e: MouseEvent) => {
-          const target = e.target as HTMLElement;
-          const canvasElement = this.canvas.getElement();
-
-          // 如果点击的不是画布，退出编辑
-          if (!canvasElement.contains(target) && target !== canvasElement) {
-            editText.exitEditing();
-          }
+        // 监听画布容器点击(灰色区域)
+        const handleContainerClick = (e: Event) => {
+          console.log('🎯 Canvas container clicked, exiting editing');
+          editText.exitEditing();
         };
 
-        // 延迟添加点击监听，避免立即触发
+        // 监听canvas元素点击
+        const handleCanvasClick = () => {
+          console.log('🖱️ Canvas clicked, checking activeObject');
+          // 延迟检查,等待Fabric.js处理完点击事件
+          setTimeout(() => {
+            const activeObj = this.canvas.getActiveObject();
+            console.log('🔍 ActiveObject:', activeObj === editText ? 'still editText' : 'changed');
+            // 如果activeObject不再是editText,说明点击了其他地方,退出编辑
+            if (activeObj !== editText) {
+              console.log('✅ ActiveObject changed, exiting editing');
+              editText.exitEditing();
+            }
+          }, 10);
+        };
+
+        // 立即添加监听器
+        console.log('📌 Adding click listeners for editing mode');
+        // 监听画布容器点击(灰色区域)
+        document.addEventListener('canvas-container-click', handleContainerClick);
+        console.log('📌 Container click listener added');
+        // 监听canvas元素点击 - 需要延迟避免立即触发
+        const canvasElement = this.canvas.getElement();
         setTimeout(() => {
-          document.addEventListener('click', handleClickOutside);
-        }, 100);
+          canvasElement.addEventListener('click', handleCanvasClick);
+          console.log('📌 Canvas click listener added');
+        }, 200);
 
         editText.on('editing:exited', () => {
+          console.log('🚪 Exited editing, removing listeners');
           // 移除所有监听器
           window.removeEventListener('keydown', handleEscape, { capture: true } as any);
-          document.removeEventListener('click', handleClickOutside);
+          document.removeEventListener('canvas-container-click', handleContainerClick);
+          const canvasElement = this.canvas.getElement();
+          canvasElement.removeEventListener('click', handleCanvasClick);
           window.removeEventListener('scroll', preventScroll);
           document.removeEventListener('scroll', preventScroll);
 
@@ -1445,26 +1551,46 @@ export class CanvasManager {
           };
           window.addEventListener('keydown', handleEscape, { capture: true });
 
-          // 监听画布外点击退出编辑
-          const handleClickOutside = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            const canvasElement = this.canvas.getElement();
-
-            // 如果点击的不是画布，退出编辑
-            if (!canvasElement.contains(target) && target !== canvasElement) {
-              editText.exitEditing();
-            }
+          // 监听画布容器点击(灰色区域)
+          const handleContainerClick = (e: Event) => {
+            console.log('🎯 Canvas container clicked, exiting editing');
+            editText.exitEditing();
           };
 
-          // 延迟添加点击监听，避免立即触发
+          // 监听canvas元素点击
+          const handleCanvasClick = () => {
+            console.log('🖱️ Canvas clicked, checking activeObject');
+            // 延迟检查,等待Fabric.js处理完点击事件
+            setTimeout(() => {
+              const activeObj = this.canvas.getActiveObject();
+              console.log('🔍 ActiveObject:', activeObj === editText ? 'still editText' : 'changed');
+              // 如果activeObject不再是editText,说明点击了其他地方,退出编辑
+              if (activeObj !== editText) {
+                console.log('✅ ActiveObject changed, exiting editing');
+                editText.exitEditing();
+              }
+            }, 10);
+          };
+
+          // 立即添加监听器
+          console.log('📌 Adding click listeners for editing mode');
+          // 监听画布容器点击(灰色区域)
+          document.addEventListener('canvas-container-click', handleContainerClick);
+          console.log('📌 Container click listener added');
+          // 监听canvas元素点击 - 需要延迟避免立即触发
+          const canvasElement = this.canvas.getElement();
           setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-          }, 100);
+            canvasElement.addEventListener('click', handleCanvasClick);
+            console.log('📌 Canvas click listener added');
+          }, 200);
 
           editText.on('editing:exited', () => {
+            console.log('🚪 Exited editing, removing listeners');
             // 移除所有监听器
             window.removeEventListener('keydown', handleEscape, { capture: true } as any);
-            document.removeEventListener('click', handleClickOutside);
+            document.removeEventListener('canvas-container-click', handleContainerClick);
+            const canvasElement = this.canvas.getElement();
+            canvasElement.removeEventListener('click', handleCanvasClick);
             window.removeEventListener('scroll', preventScroll);
             document.removeEventListener('scroll', preventScroll);
 

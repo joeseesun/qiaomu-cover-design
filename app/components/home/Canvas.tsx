@@ -155,6 +155,34 @@ export default function Canvas({
     setIsPanning(false);
   };
 
+  // 处理容器点击,用于退出文本编辑模式
+  const handleContainerClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const canvasElement = canvasRef.current;
+
+    console.log('🖱️ Container clicked:', {
+      target: target.tagName,
+      targetId: target.id,
+      canvasElement: canvasElement?.tagName,
+      isCanvas: target === canvasElement,
+      targetIsCanvas: target.tagName === 'CANVAS',
+    });
+
+    // 如果点击的是CANVAS标签,说明点击了canvas元素,不触发退出
+    if (target.tagName === 'CANVAS') {
+      console.log('⏭️ Clicked on canvas element, skipping');
+      return;
+    }
+
+    // 点击的是灰色区域或其他元素,触发退出编辑
+    console.log('✅ Clicked outside canvas, dispatching custom event');
+    const customEvent = new CustomEvent('canvas-container-click', {
+      bubbles: true,
+      detail: { target }
+    });
+    document.dispatchEvent(customEvent);
+  };
+
   const finalScale = (autoScale * userZoom) / 100;
 
   return (
@@ -165,6 +193,7 @@ export default function Canvas({
         backgroundColor: '#F7F8FA',
         cursor: canPan ? (isPanning ? 'grabbing' : 'grab') : 'default',
       }}
+      onClick={handleContainerClick}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
