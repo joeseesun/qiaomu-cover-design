@@ -12,6 +12,7 @@ import FontPanel from './components/home/FontPanel';
 import { AIImageDialog } from './components/home/AIImageDialog';
 import ImageLibrary from './components/home/ImageLibrary';
 import ImageUploadDialog from './components/home/ImageUploadDialog';
+import ShapeDialog from './components/home/ShapeDialog';
 import ConfirmDialog from './components/ui/ConfirmDialog';
 import Toast, { ToastType } from './components/ui/Toast';
 
@@ -33,6 +34,7 @@ export default function Home() {
   const [showAIImageDialog, setShowAIImageDialog] = useState(false);
   const [showImageLibrary, setShowImageLibrary] = useState(false);
   const [showImageUploadDialog, setShowImageUploadDialog] = useState(false);
+  const [showShapeDialog, setShowShapeDialog] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     message: string;
@@ -333,6 +335,9 @@ export default function Home() {
     } else if (tool === 'emoji') {
       // 切换 Emoji 选择器
       setShowEmojiPicker(!showEmojiPicker);
+    } else if (tool === 'shape') {
+      // 显示形状选择对话框
+      setShowShapeDialog(true);
     }
   };
 
@@ -364,6 +369,12 @@ export default function Home() {
     } catch (error) {
       console.error('❌ 添加图库图片失败:', error);
     }
+  };
+
+  // 选择形状
+  const handleSelectShape = (shapeType: string) => {
+    if (!managerRef.current) return;
+    managerRef.current.addShape(shapeType);
   };
 
   // 本地上传图片
@@ -899,6 +910,13 @@ export default function Home() {
         onClose={() => setShowImageUploadDialog(false)}
         onLocalUpload={handleLocalUpload}
         onLibrarySelect={() => setShowImageLibrary(true)}
+      />
+
+      {/* 形状选择对话框 */}
+      <ShapeDialog
+        open={showShapeDialog}
+        onClose={() => setShowShapeDialog(false)}
+        onSelectShape={handleSelectShape}
       />
 
       {/* 通用确认对话框 */}

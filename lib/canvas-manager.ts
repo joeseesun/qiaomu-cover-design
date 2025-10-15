@@ -314,6 +314,135 @@ export class CanvasManager {
     return obj;
   }
 
+  // 添加形状
+  addShape(shapeType: string) {
+    let shape: fabric.Object;
+    const centerX = this.width / 2;
+    const centerY = this.height / 2;
+    const defaultFill = '#3b82f6'; // 蓝色填充
+    const defaultStroke = '#1e40af'; // 深蓝色边框
+
+    switch (shapeType) {
+      case 'rect':
+        shape = new fabric.Rect({
+          left: centerX - 75,
+          top: centerY - 50,
+          width: 150,
+          height: 100,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 2,
+        });
+        break;
+
+      case 'circle':
+        shape = new fabric.Circle({
+          left: centerX - 60,
+          top: centerY - 60,
+          radius: 60,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 2,
+        });
+        break;
+
+      case 'triangle':
+        shape = new fabric.Triangle({
+          left: centerX - 60,
+          top: centerY - 60,
+          width: 120,
+          height: 120,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 2,
+        });
+        break;
+
+      case 'star':
+        // 创建五角星路径
+        const starPath = this.createStarPath(5, 60, 30);
+        shape = new fabric.Path(starPath, {
+          left: centerX - 60,
+          top: centerY - 60,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 2,
+        });
+        break;
+
+      case 'heart':
+        // 创建爱心路径
+        const heartPath = 'M 50,30 C 50,20 40,10 30,10 C 20,10 10,20 10,30 C 10,45 25,60 50,80 C 75,60 90,45 90,30 C 90,20 80,10 70,10 C 60,10 50,20 50,30 Z';
+        shape = new fabric.Path(heartPath, {
+          left: centerX - 50,
+          top: centerY - 40,
+          fill: '#ef4444', // 红色爱心
+          stroke: '#dc2626',
+          strokeWidth: 2,
+          scaleX: 1.2,
+          scaleY: 1.2,
+        });
+        break;
+
+      case 'hexagon':
+        // 创建六边形路径
+        const hexPath = this.createPolygonPath(6, 60);
+        shape = new fabric.Path(hexPath, {
+          left: centerX - 60,
+          top: centerY - 60,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 2,
+        });
+        break;
+
+      default:
+        return;
+    }
+
+    // 添加自定义属性标记这是形状对象
+    (shape as any).isShape = true;
+    (shape as any).shapeType = shapeType;
+
+    this.canvas.add(shape);
+    this.canvas.setActiveObject(shape);
+    this.canvas.renderAll();
+    return shape;
+  }
+
+  // 创建五角星路径
+  private createStarPath(points: number, outerRadius: number, innerRadius: number): string {
+    const cx = outerRadius;
+    const cy = outerRadius;
+    let path = '';
+
+    for (let i = 0; i < points * 2; i++) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const angle = (Math.PI / points) * i - Math.PI / 2;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      path += (i === 0 ? 'M ' : 'L ') + x + ',' + y + ' ';
+    }
+    path += 'Z';
+    return path;
+  }
+
+  // 创建正多边形路径
+  private createPolygonPath(sides: number, radius: number): string {
+    const cx = radius;
+    const cy = radius;
+    let path = '';
+
+    for (let i = 0; i < sides; i++) {
+      const angle = (2 * Math.PI / sides) * i - Math.PI / 2;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      path += (i === 0 ? 'M ' : 'L ') + x + ',' + y + ' ';
+    }
+    path += 'Z';
+    return path;
+  }
+
   // 压缩图片
   private compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
     return new Promise((resolve, reject) => {

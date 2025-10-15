@@ -17,6 +17,7 @@ import {
   Undo2,
   Redo2,
   Sparkles,
+  Square,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,6 +43,7 @@ export default function Sidebar({
     { id: 'image', label: '图片', icon: Image },
     { id: 'ai-image', label: 'AI 生图', icon: Sparkles },
     { id: 'emoji', label: 'Emoji', icon: Smile },
+    { id: 'shape', label: '形状', icon: Square },
   ];
 
   return (
