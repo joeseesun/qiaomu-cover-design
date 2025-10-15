@@ -10,10 +10,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, ChevronLeft, ChevronRight, Minus, Plus, X } from 'lucide-react';
 import ColorPicker from './ColorPicker';
 
-// 预设颜色
+// 预设颜色 - 去掉最后两个颜色
 const PRESET_COLORS = [
   '#FFE066', '#FFB84D', '#FF9999', '#FF6B9D', '#C77DFF', '#9D84FF',
-  '#7DD3FC', '#67E8F9', '#6EE7B7', '#A7F3D0', '#FDE047', '#FCA5A5',
+  '#7DD3FC', '#67E8F9', '#6EE7B7', '#A7F3D0',
 ];
 
 interface FontPanelProps {
@@ -488,7 +488,7 @@ export default function FontPanel({
             {/* 推荐颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">推荐颜色</label>
-              <div className="grid grid-cols-12 gap-1.5">
+              <div className="grid grid-cols-11 gap-2">
                 {/* 第一个：无背景 */}
                 <button
                   onClick={() => {
@@ -690,7 +690,7 @@ export default function FontPanel({
             {/* 推荐颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">推荐颜色</label>
-              <div className="grid grid-cols-12 gap-1.5">
+              <div className="grid grid-cols-10 gap-2">
                 {PRESET_COLORS.map((color) => (
                   <button
                     key={color}
@@ -830,7 +830,7 @@ export default function FontPanel({
             {/* 推荐颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">推荐颜色</label>
-              <div className="grid grid-cols-12 gap-1.5">
+              <div className="grid grid-cols-10 gap-2">
                 {PRESET_COLORS.map((color) => (
                   <button
                     key={color}
