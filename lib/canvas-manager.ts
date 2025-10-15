@@ -25,6 +25,8 @@ export class CanvasManager {
       selection: true, // 允许框选
       selectionBorderColor: 'transparent', // 隐藏选择框边框
       selectionLineWidth: 0, // 选择框边框宽度为 0
+      fireRightClick: true, // 允许右键事件
+      stopContextMenu: false, // 不阻止contextmenu事件
     });
 
     // 监听画布变化，保存历史记录（使用防抖）

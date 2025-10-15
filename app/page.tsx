@@ -321,24 +321,31 @@ export default function Home() {
 
   // 处理右键菜单
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    console.log('🎯🎯🎯 handleContextMenu 被调用了!', e.type, e.button);
     e.preventDefault(); // 阻止默认右键菜单
+    e.stopPropagation(); // 阻止事件冒泡
 
-    if (!managerRef.current) return;
+    if (!managerRef.current) {
+      console.log('❌ managerRef.current 不存在');
+      return;
+    }
 
     // 获取点击位置的对象
     const pointer = managerRef.current.canvas.getPointer(e.nativeEvent);
     const target = managerRef.current.canvas.findTarget(e.nativeEvent as any, false);
 
-    console.log('🖱️ 右键点击:', { target: target?.type, pointer });
+    console.log('🖱️ 右键点击:', { target: target?.type, pointer, clientX: e.clientX, clientY: e.clientY });
 
     if (target) {
       // 如果点击了对象,选中它并显示菜单
       managerRef.current.canvas.setActiveObject(target);
       managerRef.current.canvas.renderAll();
       setContextMenu({ x: e.clientX, y: e.clientY });
+      console.log('✅ 菜单应该显示了');
     } else {
       // 点击空白区域,关闭菜单
       setContextMenu(null);
+      console.log('⚠️ 点击了空白区域,关闭菜单');
     }
   };
 
