@@ -126,6 +126,15 @@ export default function Home() {
     // 键盘事件：删除选中对象、图层调整
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && managerRef.current) {
+        // 检查是否有输入框获得焦点
+        const target = e.target as HTMLElement;
+        const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+        // 如果输入框获得焦点,不处理删除键,让浏览器处理
+        if (isInputFocused) {
+          return;
+        }
+
         const activeObject = managerRef.current.canvas.getActiveObject();
         if (activeObject) {
           // 检查是否处于编辑状态
