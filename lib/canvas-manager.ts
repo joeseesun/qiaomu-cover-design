@@ -633,31 +633,58 @@ export class CanvasManager {
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
 
+        // 保存body和html的overflow样式
+        const bodyOverflow = document.body.style.overflow;
+        const htmlOverflow = document.documentElement.style.overflow;
+
+        // 临时禁用滚动
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
         // 强制阻止滚动的函数
         const preventScroll = (e: Event) => {
           e.preventDefault();
+          e.stopPropagation();
           window.scrollTo(savedScrollX, savedScrollY);
+          return false;
         };
 
         // 在多个事件上阻止滚动
-        window.addEventListener('scroll', preventScroll, { passive: false });
-        document.addEventListener('scroll', preventScroll, { passive: false });
+        window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+        document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+        document.body.addEventListener('scroll', preventScroll, { passive: false, capture: true });
 
         // 延迟进入编辑模式，并立即恢复滚动
         setTimeout(() => {
           editText.enterEditing();
           editText.selectAll();
 
-          // 强制恢复滚动位置
-          window.scrollTo(savedScrollX, savedScrollY);
-          document.documentElement.scrollTop = savedScrollY;
-          document.body.scrollTop = savedScrollY;
+          // 强制恢复滚动位置(多次尝试)
+          const restoreScroll = () => {
+            window.scrollTo(savedScrollX, savedScrollY);
+            document.documentElement.scrollTop = savedScrollY;
+            document.documentElement.scrollLeft = savedScrollX;
+            document.body.scrollTop = savedScrollY;
+            document.body.scrollLeft = savedScrollX;
+          };
 
-          // 延迟移除滚动监听，确保编辑模式完全稳定
+          restoreScroll();
+          setTimeout(restoreScroll, 10);
+          setTimeout(restoreScroll, 50);
+
+          // 延迟移除滚动监听和恢复overflow，确保编辑模式完全稳定
           setTimeout(() => {
-            window.removeEventListener('scroll', preventScroll);
-            document.removeEventListener('scroll', preventScroll);
-          }, 100);
+            window.removeEventListener('scroll', preventScroll, { capture: true } as any);
+            document.removeEventListener('scroll', preventScroll, { capture: true } as any);
+            document.body.removeEventListener('scroll', preventScroll, { capture: true } as any);
+
+            // 恢复overflow样式
+            document.body.style.overflow = bodyOverflow;
+            document.documentElement.style.overflow = htmlOverflow;
+
+            // 最后一次恢复滚动位置
+            restoreScroll();
+          }, 200);
         }, 0);
 
         this.canvas.renderAll();
@@ -1294,31 +1321,58 @@ export class CanvasManager {
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
 
+        // 保存body和html的overflow样式
+        const bodyOverflow = document.body.style.overflow;
+        const htmlOverflow = document.documentElement.style.overflow;
+
+        // 临时禁用滚动
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
         // 强制阻止滚动的函数
         const preventScroll = (e: Event) => {
           e.preventDefault();
+          e.stopPropagation();
           window.scrollTo(savedScrollX, savedScrollY);
+          return false;
         };
 
         // 在多个事件上阻止滚动
-        window.addEventListener('scroll', preventScroll, { passive: false });
-        document.addEventListener('scroll', preventScroll, { passive: false });
+        window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+        document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+        document.body.addEventListener('scroll', preventScroll, { passive: false, capture: true });
 
         // 延迟进入编辑模式，并立即恢复滚动
         setTimeout(() => {
           editText.enterEditing();
           editText.selectAll();
 
-          // 强制恢复滚动位置
-          window.scrollTo(savedScrollX, savedScrollY);
-          document.documentElement.scrollTop = savedScrollY;
-          document.body.scrollTop = savedScrollY;
+          // 强制恢复滚动位置(多次尝试)
+          const restoreScroll = () => {
+            window.scrollTo(savedScrollX, savedScrollY);
+            document.documentElement.scrollTop = savedScrollY;
+            document.documentElement.scrollLeft = savedScrollX;
+            document.body.scrollTop = savedScrollY;
+            document.body.scrollLeft = savedScrollX;
+          };
 
-          // 延迟移除滚动监听，确保编辑模式完全稳定
+          restoreScroll();
+          setTimeout(restoreScroll, 10);
+          setTimeout(restoreScroll, 50);
+
+          // 延迟移除滚动监听和恢复overflow，确保编辑模式完全稳定
           setTimeout(() => {
-            window.removeEventListener('scroll', preventScroll);
-            document.removeEventListener('scroll', preventScroll);
-          }, 100);
+            window.removeEventListener('scroll', preventScroll, { capture: true } as any);
+            document.removeEventListener('scroll', preventScroll, { capture: true } as any);
+            document.body.removeEventListener('scroll', preventScroll, { capture: true } as any);
+
+            // 恢复overflow样式
+            document.body.style.overflow = bodyOverflow;
+            document.documentElement.style.overflow = htmlOverflow;
+
+            // 最后一次恢复滚动位置
+            restoreScroll();
+          }, 200);
         }, 0);
 
         // 监听ESC键退出编辑
@@ -1514,31 +1568,58 @@ export class CanvasManager {
           const savedScrollX = window.scrollX;
           const savedScrollY = window.scrollY;
 
+          // 保存body和html的overflow样式
+          const bodyOverflow = document.body.style.overflow;
+          const htmlOverflow = document.documentElement.style.overflow;
+
+          // 临时禁用滚动
+          document.body.style.overflow = 'hidden';
+          document.documentElement.style.overflow = 'hidden';
+
           // 强制阻止滚动的函数
           const preventScroll = (e: Event) => {
             e.preventDefault();
+            e.stopPropagation();
             window.scrollTo(savedScrollX, savedScrollY);
+            return false;
           };
 
           // 在多个事件上阻止滚动
-          window.addEventListener('scroll', preventScroll, { passive: false });
-          document.addEventListener('scroll', preventScroll, { passive: false });
+          window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+          document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+          document.body.addEventListener('scroll', preventScroll, { passive: false, capture: true });
 
           // 延迟进入编辑模式，并立即恢复滚动
           setTimeout(() => {
             editText.enterEditing();
             editText.selectAll();
 
-            // 强制恢复滚动位置
-            window.scrollTo(savedScrollX, savedScrollY);
-            document.documentElement.scrollTop = savedScrollY;
-            document.body.scrollTop = savedScrollY;
+            // 强制恢复滚动位置(多次尝试)
+            const restoreScroll = () => {
+              window.scrollTo(savedScrollX, savedScrollY);
+              document.documentElement.scrollTop = savedScrollY;
+              document.documentElement.scrollLeft = savedScrollX;
+              document.body.scrollTop = savedScrollY;
+              document.body.scrollLeft = savedScrollX;
+            };
 
-            // 延迟移除滚动监听，确保编辑模式完全稳定
+            restoreScroll();
+            setTimeout(restoreScroll, 10);
+            setTimeout(restoreScroll, 50);
+
+            // 延迟移除滚动监听和恢复overflow，确保编辑模式完全稳定
             setTimeout(() => {
-              window.removeEventListener('scroll', preventScroll);
-              document.removeEventListener('scroll', preventScroll);
-            }, 100);
+              window.removeEventListener('scroll', preventScroll, { capture: true } as any);
+              document.removeEventListener('scroll', preventScroll, { capture: true } as any);
+              document.body.removeEventListener('scroll', preventScroll, { capture: true } as any);
+
+              // 恢复overflow样式
+              document.body.style.overflow = bodyOverflow;
+              document.documentElement.style.overflow = htmlOverflow;
+
+              // 最后一次恢复滚动位置
+              restoreScroll();
+            }, 200);
           }, 0);
 
           // 监听ESC键退出编辑
