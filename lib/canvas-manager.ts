@@ -200,9 +200,9 @@ export class CanvasManager {
         break;
     }
 
-    // 确保背景和文本的位置都是 (0, 0)，缩放都是 1，这样它们在 Group 内部就是居中的
-    background!.set({ left: 0, top: 0, scaleX: 1, scaleY: 1 });
-    text.set({ left: 0, top: 0, scaleX: 1, scaleY: 1 });
+    // 确保背景和文本的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
+    background!.set({ left: 0, top: 0 });
+    text.set({ left: 0, top: 0 });
 
     const group = new fabric.Group([background!, text], {
       left: finalLeft,
@@ -554,11 +554,19 @@ export class CanvasManager {
 
       // 提取装饰配置
       items.forEach((item: any) => {
-        if (item.type === 'rect' && item.opacity !== undefined && item.opacity < 1) {
-          // 半透明矩形 = 背景
-          config.backgroundStyle = 'solid';
-          config.backgroundColor = item.fill;
-          config.backgroundOpacity = item.opacity;  // ✅ 保存透明度
+        if (item.type === 'rect') {
+          // 矩形可能是背景或边框
+          if (item.fill && item.fill !== 'transparent') {
+            // 有填充色 = 背景
+            config.backgroundStyle = 'solid';
+            config.backgroundColor = item.fill;
+            config.backgroundOpacity = item.opacity ?? 0.5;  // ✅ 保存透明度，默认 0.5
+          } else if (item.fill === 'transparent' || item.stroke) {
+            // 透明填充或有描边 = 边框
+            config.borderStyle = item.strokeDashArray ? 'dashed' : 'solid';
+            config.borderWidth = item.strokeWidth;
+            config.borderColor = item.stroke;
+          }
         } else if (item.type === 'line' || item.type === 'polyline') {
           if (item.type === 'polyline') {
             config.underlineStyle = 'wavy';
@@ -569,10 +577,6 @@ export class CanvasManager {
           }
           config.underlineWidth = item.strokeWidth;
           config.underlineColor = item.stroke;
-        } else if (item.type === 'rect' && item.fill === 'transparent') {
-          config.borderStyle = item.strokeDashArray ? 'dashed' : 'solid';
-          config.borderWidth = item.strokeWidth;
-          config.borderColor = item.stroke;
         }
       });
     } else if (obj.type === 'i-text' || obj.type === 'text') {
@@ -707,13 +711,11 @@ export class CanvasManager {
 
     // 如果有装饰，创建 Group；否则只添加文本
     if (objects.length > 1) {
-      // 确保所有对象的位置都是 (0, 0)，缩放都是 1，这样它们在 Group 内部就是居中的
+      // 确保所有对象的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
       objects.forEach(obj => {
         obj.set({
           left: 0,
           top: 0,
-          scaleX: 1,
-          scaleY: 1,
         });
       });
 
