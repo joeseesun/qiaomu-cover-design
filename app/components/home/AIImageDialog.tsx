@@ -12,13 +12,13 @@ interface AIImageDialogProps {
   onGenerate: (prompt: string, size: string) => Promise<void>;
 }
 
-// 尺寸选项
+// 尺寸选项（总像素数必须 ≥ 921600）
 const sizeOptions = [
-  { label: '1:1 (1024x1024)', value: '1024x1024', ratio: '1:1' },
-  { label: '4:3 (1024x768)', value: '1024x768', ratio: '4:3' },
-  { label: '3:4 (768x1024)', value: '768x1024', ratio: '3:4' },
-  { label: '16:9 (1024x576)', value: '1024x576', ratio: '16:9' },
-  { label: '9:16 (576x1024)', value: '576x1024', ratio: '9:16' },
+  { label: '1:1 (1024x1024)', value: '1024x1024', ratio: '1:1', pixels: 1048576 },
+  { label: '4:3 (1152x864)', value: '1152x864', ratio: '4:3', pixels: 995328 },
+  { label: '3:4 (864x1152)', value: '864x1152', ratio: '3:4', pixels: 995328 },
+  { label: '16:9 (1280x720)', value: '1280x720', ratio: '16:9', pixels: 921600 },
+  { label: '9:16 (720x1280)', value: '720x1280', ratio: '9:16', pixels: 921600 },
 ];
 
 export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogProps) {
