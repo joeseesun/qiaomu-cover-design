@@ -412,6 +412,10 @@ export class CanvasManager {
     // 更新背景配置
     currentConfig.backgroundStyle = style;
     currentConfig.backgroundColor = color || currentConfig.backgroundColor || '#FFE066';
+    // 如果之前没有背景，设置默认透明度
+    if (!currentConfig.backgroundOpacity) {
+      currentConfig.backgroundOpacity = 0.5;
+    }
 
     // 删除旧对象
     this.canvas.remove(obj);
@@ -550,9 +554,11 @@ export class CanvasManager {
 
       // 提取装饰配置
       items.forEach((item: any) => {
-        if (item.type === 'rect' && item.opacity === 0.5) {
+        if (item.type === 'rect' && item.opacity !== undefined && item.opacity < 1) {
+          // 半透明矩形 = 背景
           config.backgroundStyle = 'solid';
           config.backgroundColor = item.fill;
+          config.backgroundOpacity = item.opacity;  // ✅ 保存透明度
         } else if (item.type === 'line' || item.type === 'polyline') {
           if (item.type === 'polyline') {
             config.underlineStyle = 'wavy';
@@ -617,7 +623,7 @@ export class CanvasManager {
         width: textWidth + paddingX * 2,
         height: textHeight + paddingY * 2,
         fill: config.backgroundColor || '#FFE066',
-        opacity: 0.5,
+        opacity: config.backgroundOpacity ?? 0.5,  // ✅ 使用保存的透明度
         rx: 6,
         ry: 6,
         originX: 'center',
