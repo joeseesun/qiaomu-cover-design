@@ -37,20 +37,24 @@ export const HIGHLIGHT_COLORS = [
   '#FF5722', // 橙色
 ];
 
-// 12 个精选中文字体（第一页展示前 3 个）
+// 16 个精选中文字体（第一页展示前 3 个）
 export const FONTS: FontConfig[] = [
   { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
+  { name: '汇文明朝体', family: 'Huiwen-mincho', weight: [400], preview: '设计' },
+  { name: '抖音美好体', family: 'Douyin Sans', weight: [700], preview: '设计' },
   { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' },
   { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' },
   { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' },
-  { name: '站酷文艺体', family: 'ZCOOL QingKe HuangYou', weight: [400], preview: '设计' },
-  { name: '阿里普惠体', family: 'Alibaba PuHuiTi', weight: [400, 700], preview: '设计' },
+  { name: 'Maple Mono', family: 'Maple Mono CN Medium', weight: [600], preview: '设计' },
+  { name: '上图东观体', family: 'STDongGuanTi Bld', weight: [400], preview: '设计' },
+  { name: '全小素', family: 'QuanPixel 8px', weight: [600], preview: '设计' },
+  { name: '铁蒺藜体', family: 'Tiejili', weight: [400], preview: '设计' },
   { name: '优设标题黑', family: 'YouSheBiaoTiHei', weight: [400], preview: '设计' },
-  { name: '庞门正道标题', family: 'Pangmen Zhengdao', weight: [400], preview: '设计' },
-  { name: '江西拙楷', family: 'JiangXiZhuoKai', weight: [400], preview: '设计' },
-  { name: '得意黑', family: 'Smiley Sans', weight: [400], preview: '设计' },
-  { name: '小赖字体', family: 'XiaoLai', weight: [400], preview: '设计' },
-  { name: 'Arial', family: 'Arial, sans-serif', weight: [400, 700], preview: 'Aa' },
+  { name: '斗鱼追光体', family: 'DOUYU Font', weight: [400], preview: '设计' },
+  { name: '千图笔锋手写体', family: 'qiantubifengshouxieti', weight: [400], preview: '设计' },
+  { name: '得意黑', family: 'Smiley Sans Oblique', weight: [400], preview: '设计' },
+  { name: '鸿雷行书简体', family: 'hongleixingshu', weight: [400], preview: '设计' },
+  { name: '精品點陣體', family: 'BoutiqueBitmap7x7 1.6', weight: [400], preview: '设计' },
 ];
 
 // 画布尺寸配置

@@ -9,7 +9,7 @@ export class VersionManager {
   constructor() {
     this.load();
     if (this.versions.length === 0) {
-      this.create('版本 1');
+      this.create('画布 1');
     }
     this.activeId = this.versions[0].id;
   }
@@ -17,11 +17,11 @@ export class VersionManager {
   // 创建新版本
   create(name?: string) {
     if (this.versions.length >= 5) {
-      throw new Error('最多支持 5 个版本');
+      throw new Error('最多支持 5 个画布');
     }
     const version: CanvasVersion = {
       id: Date.now().toString(),
-      name: name || `版本 ${this.versions.length + 1}`,
+      name: name || `画布 ${this.versions.length + 1}`,
       data: '',
       createdAt: Date.now(),
       updatedAt: Date.now(),

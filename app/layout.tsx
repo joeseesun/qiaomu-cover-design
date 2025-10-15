@@ -26,6 +26,32 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        {/* 汇文明朝体字体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/hwmct/dist/汇文明朝体/result.css' />
+        {/* 抖音美好体字体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/dymh/dist/DouyinSansBold/result.css' />
+        {/* Maple Mono CN */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/maple-mono-cn/dist/MapleMono-CN-MediumItalic/result.css' />
+        {/* 上图东观体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/stdgt/dist/上图东观体-粗体/result.css' />
+        {/* 全小素 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/qxs/dist/quan/result.css' />
+        {/* 铁蒺藜体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/tjl/dist/Tiejili_Regular/result.css' />
+        {/* 优设标题黑 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/ysbth/dist/优设标题黑/result.css' />
+        {/* 斗鱼追光体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/dyzgt/dist/斗鱼追光体/result.css' />
+        {/* 千图笔锋手写体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/qtbfsxt/dist/千图笔锋手写体/result.css' />
+        {/* 得意黑 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/dyh/dist/SmileySans-Oblique/result.css' />
+        {/* 鸿雷行书简体 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/hlxsjt/dist/鸿雷行书简体/result.css' />
+        {/* 精品點陣體 */}
+        <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/jpdzt/dist/BoutiqueBitmap7x7_1_6/result.css' />
+      </head>
       <body className={`${notoSansSC.variable} ${notoSerifSC.variable}`} suppressHydrationWarning>
         {children}
       </body>

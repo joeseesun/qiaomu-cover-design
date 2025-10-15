@@ -6,6 +6,7 @@ import { FONTS, FontConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, ChevronLeft, ChevronRight, Minus, Plus, X } from 'lucide-react';
 import ColorPicker from './ColorPicker';
 
@@ -260,9 +261,9 @@ export default function FontPanel({
                     : 'border-border/40 bg-background hover:border-primary/50'
                 }`}
               >
-                {/* 最近使用标记（蓝色小点） */}
+                {/* 最近使用标记（小灰点） */}
                 {isRecent && (
-                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500" />
+                  <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-gray-400" />
                 )}
 
                 {isLoading ? (
@@ -414,60 +415,80 @@ export default function FontPanel({
       <Separator />
 
       {/* 装饰 Tab 组 */}
-      <div className="space-y-0">
-        {/* Tab 头部 */}
-        <div className="flex border-b-2 border-border">
-          <button
-            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
-              activeDecorationTab === 'background'
-                ? 'text-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveDecorationTab('background')}
-          >
-            字体背景
-            {activeDecorationTab === 'background' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-          <button
-            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
-              activeDecorationTab === 'underline'
-                ? 'text-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveDecorationTab('underline')}
-          >
-            下划线
-            {activeDecorationTab === 'underline' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-          <button
-            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all relative ${
-              activeDecorationTab === 'border'
-                ? 'text-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveDecorationTab('border')}
-          >
-            边框
-            {activeDecorationTab === 'border' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-        </div>
-
-        {/* Tab 内容区域 */}
-        <div className="px-8 py-6">
+      <Tabs value={activeDecorationTab} onValueChange={(value) => setActiveDecorationTab(value as any)} className="space-y-0">
+        <TabsList>
+          <TabsTrigger value="background">字体背景</TabsTrigger>
+          <TabsTrigger value="underline">下划线</TabsTrigger>
+          <TabsTrigger value="border">边框</TabsTrigger>
+        </TabsList>
 
         {/* 背景 Tab 内容 */}
-        {activeDecorationTab === 'background' && (
-          <div className="space-y-4">
+        <TabsContent value="background" className="px-8 py-6 space-y-4">
+            {/* 颜色选择 + 透明度控制 */}
+            <div className="flex items-start gap-4">
+              {/* 背景颜色 - 小方块 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">颜色</label>
+                <ColorPicker
+                  color={backgroundColor}
+                  onChange={(color) => {
+                    setBackgroundStyle('solid');
+                    setBackgroundColor(color);
+                    onBackgroundChange?.('solid', color, backgroundOpacity);
+                    addToRecentBackgroundColors(color);
+                  }}
+                  compact
+                  disabled={!selectedObject}
+                />
+              </div>
+
+              {/* 透明度 */}
+              <div className="flex-1 flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">透明度</label>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                    onClick={() => {
+                      const newOpacity = Math.max(0, Number((backgroundOpacity - 0.1).toFixed(1)));
+                      setBackgroundOpacity(newOpacity);
+                      if (backgroundStyle === 'solid') {
+                        onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                      }
+                    }}
+                    disabled={!selectedObject || backgroundOpacity <= 0}
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </Button>
+                  <div className="flex-1 text-center h-8 flex items-center justify-center">
+                    <div className="text-base font-semibold tabular-nums">
+                      {Math.round(backgroundOpacity * 100)}%
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                    onClick={() => {
+                      const newOpacity = Math.min(1, Number((backgroundOpacity + 0.1).toFixed(1)));
+                      setBackgroundOpacity(newOpacity);
+                      if (backgroundStyle === 'solid') {
+                        onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                      }
+                    }}
+                    disabled={!selectedObject || backgroundOpacity >= 1}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* 推荐颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">推荐颜色</label>
-              <div className="grid grid-cols-10 gap-1.5">
+              <div className="grid grid-cols-12 gap-1.5">
                 {/* 第一个：无背景 */}
                 <button
                   onClick={() => {
@@ -512,8 +533,8 @@ export default function FontPanel({
             {recentBackgroundColors.length > 0 && (
               <div className="space-y-3">
                 <label className="text-xs text-muted-foreground">最近使用</label>
-                <div className="grid grid-cols-10 gap-1.5">
-                  {recentBackgroundColors.map((color) => (
+                <div className="flex gap-1.5">
+                  {recentBackgroundColors.slice(0, 2).map((color) => (
                     <button
                       key={color}
                       onClick={() => {
@@ -535,80 +556,10 @@ export default function FontPanel({
                 </div>
               </div>
             )}
-
-            {/* 自定义颜色 */}
-            <div className="space-y-3">
-              <label className="text-xs text-muted-foreground">自定义颜色</label>
-              <ColorPicker
-                color={backgroundColor}
-                onChange={(color) => {
-                  setBackgroundStyle('solid');
-                  setBackgroundColor(color);
-                  onBackgroundChange?.('solid', color, backgroundOpacity);
-                  addToRecentBackgroundColors(color);
-                }}
-                disabled={!selectedObject}
-              />
-            </div>
-
-            {/* 透明度 */}
-            {backgroundStyle !== 'none' && (
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">透明度</label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => {
-                      const newOpacity = Math.max(0.1, backgroundOpacity - 0.1);
-                      setBackgroundOpacity(newOpacity);
-                      onBackgroundChange?.('solid', backgroundColor, newOpacity);
-                    }}
-                    disabled={!selectedObject || backgroundOpacity <= 0.1}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <Input
-                    type="number"
-                    value={Math.round(backgroundOpacity * 100)}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                      if (value >= 10 && value <= 100) {
-                        const newOpacity = value / 100;
-                        setBackgroundOpacity(newOpacity);
-                        onBackgroundChange?.('solid', backgroundColor, newOpacity);
-                      }
-                    }}
-                    min={10}
-                    max={100}
-                    step={10}
-                    disabled={!selectedObject}
-                    className="w-16 h-8 text-center text-sm"
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0">%</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => {
-                      const newOpacity = Math.min(1, backgroundOpacity + 0.1);
-                      setBackgroundOpacity(newOpacity);
-                      onBackgroundChange?.('solid', backgroundColor, newOpacity);
-                    }}
-                    disabled={!selectedObject || backgroundOpacity >= 1}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        </TabsContent>
 
         {/* 下划线 Tab 内容 */}
-        {activeDecorationTab === 'underline' && (
-          <div className="space-y-4">
+        <TabsContent value="underline" className="px-8 py-6 space-y-4">
 
         {/* 样式选择 */}
         <div className="grid grid-cols-4 gap-2">
@@ -678,60 +629,68 @@ export default function FontPanel({
           </Button>
         </div>
 
-        {/* 粗细和颜色 */}
+        {/* 颜色和粗细 */}
         {underlineStyle !== 'none' && (
           <div className="space-y-4">
-            {/* 粗细 */}
-            <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">粗细</label>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => {
-                    const newWidth = Math.max(1, underlineWidth - 1);
-                    setUnderlineWidth(newWidth);
-                    onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
+            {/* 颜色选择 + 粗细控制 */}
+            <div className="flex items-start gap-4">
+              {/* 下划线颜色 - 小方块 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">颜色</label>
+                <ColorPicker
+                  color={underlineColor}
+                  onChange={(color) => {
+                    setUnderlineColor(color);
+                    onUnderlineChange?.(underlineStyle, underlineWidth, color);
                   }}
-                  disabled={!selectedObject || underlineWidth <= 1}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Input
-                  type="number"
-                  value={underlineWidth}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value) || 1;
-                    const newWidth = Math.max(1, Math.min(20, value));
-                    setUnderlineWidth(newWidth);
-                    onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
-                  }}
-                  className="h-8 text-center"
+                  compact
                   disabled={!selectedObject}
-                  min={1}
-                  max={20}
                 />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => {
-                    const newWidth = Math.min(20, underlineWidth + 1);
-                    setUnderlineWidth(newWidth);
-                    onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
-                  }}
-                  disabled={!selectedObject || underlineWidth >= 20}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
+              </div>
+
+              {/* 粗细 */}
+              <div className="flex-1 flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">粗细</label>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                    onClick={() => {
+                      const newWidth = Math.max(1, underlineWidth - 1);
+                      setUnderlineWidth(newWidth);
+                      onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
+                    }}
+                    disabled={!selectedObject || underlineWidth <= 1}
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </Button>
+                  <div className="flex-1 text-center h-8 flex items-center justify-center">
+                    <div className="text-base font-semibold tabular-nums">
+                      {underlineWidth}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                    onClick={() => {
+                      const newWidth = Math.min(20, underlineWidth + 1);
+                      setUnderlineWidth(newWidth);
+                      onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
+                    }}
+                    disabled={!selectedObject || underlineWidth >= 20}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* 颜色 */}
+            {/* 推荐颜色 */}
             <div className="space-y-3">
-              <label className="text-xs text-muted-foreground">颜色</label>
-              <div className="grid grid-cols-10 gap-1.5">
+              <label className="text-xs text-muted-foreground">推荐颜色</label>
+              <div className="grid grid-cols-12 gap-1.5">
                 {PRESET_COLORS.map((color) => (
                   <button
                     key={color}
@@ -750,23 +709,13 @@ export default function FontPanel({
                   />
                 ))}
               </div>
-              <ColorPicker
-                color={underlineColor}
-                onChange={(color) => {
-                  setUnderlineColor(color);
-                  onUnderlineChange?.(underlineStyle, underlineWidth, color);
-                }}
-                disabled={!selectedObject}
-              />
             </div>
           </div>
         )}
-          </div>
-        )}
+        </TabsContent>
 
         {/* 边框 Tab 内容 */}
-        {activeDecorationTab === 'border' && (
-          <div className="space-y-4">
+        <TabsContent value="border" className="px-8 py-6 space-y-4">
 
         {/* 样式选择 */}
         <div className="flex gap-2">
@@ -820,60 +769,68 @@ export default function FontPanel({
           </Button>
         </div>
 
-        {/* 粗细和颜色 */}
+        {/* 颜色和粗细 */}
         {borderStyle !== 'none' && (
           <div className="space-y-4">
-            {/* 粗细 */}
-            <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">粗细</label>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => {
-                    const newWidth = Math.max(1, borderWidth - 1);
-                    setBorderWidth(newWidth);
-                    onBorderChange?.(borderStyle, newWidth, borderColor);
+            {/* 颜色选择 + 粗细控制 */}
+            <div className="flex items-start gap-4">
+              {/* 边框颜色 - 小方块 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">颜色</label>
+                <ColorPicker
+                  color={borderColor}
+                  onChange={(color) => {
+                    setBorderColor(color);
+                    onBorderChange?.(borderStyle, borderWidth, color);
                   }}
-                  disabled={!selectedObject || borderWidth <= 1}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Input
-                  type="number"
-                  value={borderWidth}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value) || 1;
-                    const newWidth = Math.max(1, Math.min(20, value));
-                    setBorderWidth(newWidth);
-                    onBorderChange?.(borderStyle, newWidth, borderColor);
-                  }}
-                  className="h-8 text-center"
+                  compact
                   disabled={!selectedObject}
-                  min={1}
-                  max={20}
                 />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => {
-                    const newWidth = Math.min(20, borderWidth + 1);
-                    setBorderWidth(newWidth);
-                    onBorderChange?.(borderStyle, newWidth, borderColor);
-                  }}
-                  disabled={!selectedObject || borderWidth >= 20}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
+              </div>
+
+              {/* 粗细 */}
+              <div className="flex-1 flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">粗细</label>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                    onClick={() => {
+                      const newWidth = Math.max(1, borderWidth - 1);
+                      setBorderWidth(newWidth);
+                      onBorderChange?.(borderStyle, newWidth, borderColor);
+                    }}
+                    disabled={!selectedObject || borderWidth <= 1}
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </Button>
+                  <div className="flex-1 text-center h-8 flex items-center justify-center">
+                    <div className="text-base font-semibold tabular-nums">
+                      {borderWidth}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                    onClick={() => {
+                      const newWidth = Math.min(20, borderWidth + 1);
+                      setBorderWidth(newWidth);
+                      onBorderChange?.(borderStyle, newWidth, borderColor);
+                    }}
+                    disabled={!selectedObject || borderWidth >= 20}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* 颜色 */}
+            {/* 推荐颜色 */}
             <div className="space-y-3">
-              <label className="text-xs text-muted-foreground">颜色</label>
-              <div className="grid grid-cols-10 gap-1.5">
+              <label className="text-xs text-muted-foreground">推荐颜色</label>
+              <div className="grid grid-cols-12 gap-1.5">
                 {PRESET_COLORS.map((color) => (
                   <button
                     key={color}
@@ -892,21 +849,11 @@ export default function FontPanel({
                   />
                 ))}
               </div>
-              <ColorPicker
-                color={borderColor}
-                onChange={(color) => {
-                  setBorderColor(color);
-                  onBorderChange?.(borderStyle, borderWidth, color);
-                }}
-                disabled={!selectedObject}
-              />
             </div>
           </div>
         )}
-          </div>
-        )}
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </aside>
   );
 }

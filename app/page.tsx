@@ -30,7 +30,7 @@ export default function Home() {
   const [canRedo, setCanRedo] = useState(false);
   const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
 
-  // 初始化
+  // 初始化 - 只在组件挂载时执行一次
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -135,7 +135,7 @@ export default function Home() {
             e.preventDefault(); // 阻止默认行为
             managerRef.current.deleteActive(); // 使用 deleteActive 方法支持多选删除
           }
-          // 如果处于编辑状态，让浏览器处理默认的删除行为（删除选中的文字）
+          // 如果处于编辑状态,让浏览器处理默认的删除行为（删除选中的文字）
         }
       }
 
@@ -193,7 +193,20 @@ export default function Home() {
       }
     };
 
-    // 页面卸载前保存数据
+    window.addEventListener('click', handleGlobalClick);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('paste', handlePaste);
+
+    return () => {
+      managerRef.current?.dispose();
+      window.removeEventListener('click', handleGlobalClick);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, []); // 空依赖数组，只在组件挂载时执行一次
+
+  // 页面卸载前保存数据
+  useEffect(() => {
     const handleBeforeUnload = () => {
       if (managerRef.current && versionRef.current && activeId) {
         const data = managerRef.current.toJSON();
@@ -205,19 +218,11 @@ export default function Home() {
       }
     };
 
-    window.addEventListener('click', handleGlobalClick);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('paste', handlePaste);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       // 组件卸载时也保存一次
       handleBeforeUnload();
-
-      managerRef.current?.dispose();
-      window.removeEventListener('click', handleGlobalClick);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('paste', handlePaste);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [activeId]);
