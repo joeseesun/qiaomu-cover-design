@@ -224,52 +224,59 @@ export class CanvasManager {
       const savedScaleX = group.scaleX || 1;
       const savedScaleY = group.scaleY || 1;
 
-      // 解散 Group，获取文本对象
+      // 获取文本对象的属性
       const items = (group as any)._objects || [];
       const textObj = items.find((obj: any) => obj.type === 'i-text');
 
       if (textObj) {
-        this.canvas.remove(group);
-
-        // 应用 Group 的缩放到文本的字体大小，这样视觉上大小不变
+        // 保存文本内容和样式
+        const textContent = textObj.text || '';
         const originalFontSize = textObj.fontSize || 60;
+        const fontFamily = textObj.fontFamily || 'Noto Sans SC';
+        const fill = textObj.fill || '#333333';
         const scaledFontSize = originalFontSize * savedScaleX;
 
-        textObj.set({
+        // 移除 Group
+        this.canvas.remove(group);
+
+        // 创建新的文本对象用于编辑
+        const editText = new fabric.IText(textContent, {
           left: savedLeft,
           top: savedTop,
           angle: savedAngle,
-          fontSize: scaledFontSize,  // 应用缩放后的字体大小
+          fontSize: scaledFontSize,
+          fontFamily: fontFamily,
+          fill: fill,
           scaleX: 1,
           scaleY: 1,
           originX: 'center',
           originY: 'center',
+          editable: true,
+          selectable: true,
+          textAlign: 'center',
         });
 
-        this.canvas.add(textObj);
-        this.canvas.setActiveObject(textObj);
-        textObj.enterEditing();
-        textObj.selectAll();
+        this.canvas.add(editText);
+        this.canvas.setActiveObject(editText);
+        editText.enterEditing();
+        editText.selectAll();
         this.canvas.renderAll();
 
         // 监听文本编辑完成，重新创建 Group
-        textObj.on('editing:exited', () => {
-          // 恢复原始字体大小
-          textObj.set({
-            fontSize: originalFontSize,
-          });
-
+        editText.on('editing:exited', () => {
           const newConfig = {
             ...config,
-            text: textObj.text || '',
+            text: editText.text || '',
             fontSize: originalFontSize,
-            left: textObj.left,
-            top: textObj.top,
-            angle: textObj.angle,
-            scaleX: savedScaleX,  // 恢复原始缩放
+            fontFamily: fontFamily,
+            fill: fill,
+            left: editText.left,
+            top: editText.top,
+            angle: editText.angle,
+            scaleX: savedScaleX,
             scaleY: savedScaleY,
           };
-          this.canvas.remove(textObj);
+          this.canvas.remove(editText);
           this.addHighlightText(newConfig);
         });
       }
@@ -717,43 +724,59 @@ export class CanvasManager {
         const savedScaleX = group.scaleX || 1;
         const savedScaleY = group.scaleY || 1;
 
-        // 保存原始字体大小
+        // 保存文本属性
+        const textContent = text.text || '';
         const originalFontSize = text.fontSize || 60;
+        const fontFamily = text.fontFamily || 'Noto Sans SC';
+        const fill = text.fill || '#333333';
+        const lineHeight = text.lineHeight || 1.2;
+        const charSpacing = text.charSpacing || 0;
         const scaledFontSize = originalFontSize * savedScaleX;
 
+        // 移除 Group
         this.canvas.remove(group);
-        text.set({
+
+        // 创建新的文本对象用于编辑
+        const editText = new fabric.IText(textContent, {
           left: savedLeft,
           top: savedTop,
           angle: savedAngle,
-          fontSize: scaledFontSize,  // 应用缩放后的字体大小
+          fontSize: scaledFontSize,
+          fontFamily: fontFamily,
+          fill: fill,
+          lineHeight: lineHeight,
+          charSpacing: charSpacing,
           scaleX: 1,
           scaleY: 1,
           originX: 'center',
           originY: 'center',
+          editable: true,
+          selectable: true,
+          textAlign: 'center',
+          textBaseline: 'middle',
         });
-        this.canvas.add(text);
-        this.canvas.setActiveObject(text);
-        text.enterEditing();
-        text.selectAll();
 
-        text.on('editing:exited', () => {
-          // 恢复原始字体大小
-          text.set({
-            fontSize: originalFontSize,
-          });
+        this.canvas.add(editText);
+        this.canvas.setActiveObject(editText);
+        editText.enterEditing();
+        editText.selectAll();
 
+        editText.on('editing:exited', () => {
           const newConfig = {
             ...config,
-            text: text.text || '',
+            text: editText.text || '',
             fontSize: originalFontSize,
-            left: text.left,
-            top: text.top,
-            angle: text.angle,
-            scaleX: savedScaleX,  // 恢复原始缩放
+            fontFamily: fontFamily,
+            fill: fill,
+            lineHeight: lineHeight,
+            charSpacing: charSpacing,
+            left: editText.left,
+            top: editText.top,
+            angle: editText.angle,
+            scaleX: savedScaleX,
             scaleY: savedScaleY,
           };
-          this.canvas.remove(text);
+          this.canvas.remove(editText);
           this.createDecoratedText(newConfig);
         });
       });
