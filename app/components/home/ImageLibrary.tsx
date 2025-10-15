@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Trash2, Image as ImageIcon } from 'lucide-react';
 import { getImageLibrary, ImageLibraryItem } from '@/lib/image-library';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 interface ImageLibraryProps {
   onClose: () => void;
@@ -12,6 +13,10 @@ interface ImageLibraryProps {
 export default function ImageLibrary({ onClose, onSelectImage }: ImageLibraryProps) {
   const [images, setImages] = useState<ImageLibraryItem[]>([]);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    url: string;
+  }>({ open: false, url: '' });
 
   // 加载图片库
   useEffect(() => {
@@ -29,12 +34,15 @@ export default function ImageLibrary({ onClose, onSelectImage }: ImageLibraryPro
   // 删除图片
   const handleDeleteImage = (url: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止触发选择
-    
-    if (confirm('确定要从图库中删除这张图片吗?')) {
-      const library = getImageLibrary();
-      library.removeImage(url);
-      setImages(library.getImages());
-    }
+    setDeleteConfirm({ open: true, url });
+  };
+
+  // 确认删除
+  const confirmDelete = () => {
+    const library = getImageLibrary();
+    library.removeImage(deleteConfirm.url);
+    setImages(library.getImages());
+    setDeleteConfirm({ open: false, url: '' });
   };
 
   return (
@@ -112,6 +120,17 @@ export default function ImageLibrary({ onClose, onSelectImage }: ImageLibraryPro
           </p>
         </div>
       </div>
+
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        title="删除图片"
+        message="确定要从图库中删除这张图片吗?"
+        confirmText="删除"
+        cancelText="取消"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ open: false, url: '' })}
+      />
     </div>
   );
 }

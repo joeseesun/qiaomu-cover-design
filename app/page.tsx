@@ -11,6 +11,8 @@ import Canvas from './components/home/Canvas';
 import FontPanel from './components/home/FontPanel';
 import { AIImageDialog } from './components/home/AIImageDialog';
 import ImageLibrary from './components/home/ImageLibrary';
+import ImageUploadDialog from './components/home/ImageUploadDialog';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -29,6 +31,12 @@ export default function Home() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAIImageDialog, setShowAIImageDialog] = useState(false);
   const [showImageLibrary, setShowImageLibrary] = useState(false);
+  const [showImageUploadDialog, setShowImageUploadDialog] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, message: '', onConfirm: () => {} });
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
@@ -297,29 +305,8 @@ export default function Home() {
     } else if (tool === 'textbox' && managerRef.current) {
       managerRef.current.addTextbox(); // 多行文本
     } else if (tool === 'image' && managerRef.current) {
-      // 显示选择对话框: 本地上传 or 图库选择
-      const choice = confirm('点击"确定"从本地上传图片\n点击"取消"从图库选择图片');
-
-      if (choice) {
-        // 本地上传
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = async (e) => {
-          const file = (e.target as HTMLInputElement).files?.[0];
-          if (file && managerRef.current) {
-            try {
-              await managerRef.current.addImage(file);
-            } catch (error) {
-              console.error('Failed to add image:', error);
-            }
-          }
-        };
-        input.click();
-      } else {
-        // 图库选择
-        setShowImageLibrary(true);
-      }
+      // 显示图片上传选择对话框
+      setShowImageUploadDialog(true);
     } else if (tool === 'ai-image') {
       // 打开 AI 生图对话框
       setShowAIImageDialog(true);
@@ -357,6 +344,24 @@ export default function Home() {
     } catch (error) {
       console.error('❌ 添加图库图片失败:', error);
     }
+  };
+
+  // 本地上传图片
+  const handleLocalUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && managerRef.current) {
+        try {
+          await managerRef.current.addImage(file);
+        } catch (error) {
+          console.error('Failed to add image:', error);
+        }
+      }
+    };
+    input.click();
   };
 
   // 添加 Emoji 到画布
@@ -845,6 +850,25 @@ export default function Home() {
           onSelectImage={handleSelectImageFromLibrary}
         />
       )}
+
+      {/* 图片上传选择对话框 */}
+      <ImageUploadDialog
+        open={showImageUploadDialog}
+        onClose={() => setShowImageUploadDialog(false)}
+        onLocalUpload={handleLocalUpload}
+        onLibrarySelect={() => setShowImageLibrary(true)}
+      />
+
+      {/* 通用确认对话框 */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        message={confirmDialog.message}
+        onConfirm={() => {
+          confirmDialog.onConfirm();
+          setConfirmDialog({ open: false, message: '', onConfirm: () => {} });
+        }}
+        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: () => {} })}
+      />
     </div>
   );
 }
