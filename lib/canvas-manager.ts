@@ -628,10 +628,12 @@ export class CanvasManager {
 
         // 保存到图片库
         if (saveToLibrary) {
+          console.log('📚 准备保存到图库:', imageUrl);
           const library = getImageLibrary();
           const fileName = imageUrl.split('/').pop() || 'ai-generated.jpg';
-          library.addImage(imageUrl, fileName);
-          console.log('✅ 图片已保存到图库:', fileName);
+          const isNew = library.addImage(imageUrl, fileName);
+          console.log('✅ 图片已保存到图库:', fileName, '是否新图片:', isNew);
+          console.log('📚 当前图库数量:', library.getCount());
         }
 
         resolve(img);

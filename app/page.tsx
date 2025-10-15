@@ -373,6 +373,7 @@ export default function Home() {
       const imageUrl = await aiImageGeneratorRef.current.generateImage(prompt, size);
 
       // 从 URL 加载图片到画布
+      console.log('📥 准备添加AI生成的图片到画布:', imageUrl);
       await managerRef.current.addImageFromURL(imageUrl);
 
       console.log('✅ AI 生成的图片已添加到画布');
@@ -387,7 +388,8 @@ export default function Home() {
     if (!managerRef.current) return;
 
     try {
-      await managerRef.current.addImageFromURL(url);
+      // 从图库选择时不需要再次保存到图库
+      await managerRef.current.addImageFromURL(url, false);
       console.log('✅ 图库图片已添加到画布');
     } catch (error) {
       console.error('❌ 添加图库图片失败:', error);
@@ -435,6 +437,7 @@ export default function Home() {
       console.log('✅ 新图片已生成:', generatedImageUrl);
 
       // 将生成的图片添加到画布
+      console.log('📥 准备添加图片转换结果到画布:', generatedImageUrl);
       await managerRef.current.addImageFromURL(generatedImageUrl);
 
       setToast({ show: true, message: '图片生成成功!', type: 'success' });
