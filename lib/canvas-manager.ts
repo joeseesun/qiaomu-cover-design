@@ -227,12 +227,19 @@ export class CanvasManager {
       const textObj = items.find((obj: any) => obj.type === 'i-text');
 
       if (textObj) {
+        // 计算文本在画布中的绝对位置
+        const matrix = group.calcTransformMatrix();
+        const textCenter = fabric.util.transformPoint(
+          { x: textObj.left || 0, y: textObj.top || 0 },
+          matrix
+        );
+
         this.canvas.remove(group);
 
-        // 设置文本到 Group 的位置，但不改变缩放（保持原始字体大小）
+        // 设置文本到正确的绝对位置
         textObj.set({
-          left: savedConfig.left,
-          top: savedConfig.top,
+          left: textCenter.x,
+          top: textCenter.y,
           angle: savedConfig.angle,
           scaleX: 1,  // 重置缩放，保持原始字体大小
           scaleY: 1,
@@ -699,13 +706,23 @@ export class CanvasManager {
           scaleY: group.scaleY || 1,
         };
 
+        // 计算文本在画布中的绝对位置
+        // 使用 fabric 的矩阵变换来获取准确位置
+        const matrix = group.calcTransformMatrix();
+        const textCenter = fabric.util.transformPoint(
+          { x: text.left || 0, y: text.top || 0 },
+          matrix
+        );
+
         this.canvas.remove(group);
         text.set({
-          left: savedConfig.left,
-          top: savedConfig.top,
+          left: textCenter.x,
+          top: textCenter.y,
           angle: savedConfig.angle,
           scaleX: 1,  // 重置缩放，保持原始字体大小
           scaleY: 1,
+          originX: 'center',
+          originY: 'center',
         });
         this.canvas.add(text);
         this.canvas.setActiveObject(text);
