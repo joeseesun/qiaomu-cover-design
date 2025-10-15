@@ -50,7 +50,7 @@ function generateUploadToken(key: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt } = await request.json();
+    const { prompt, size = '1024x1024' } = await request.json();
 
     if (!prompt) {
       return NextResponse.json(
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🎨 后端开始调用 AI 生图 API...', { prompt });
+    console.log('🎨 后端开始调用 AI 生图 API...', { prompt, size });
 
     // 1. 调用 AI 生图 API
     const response = await fetch(API_URL, {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         prompt: prompt,
         sequential_image_generation: 'disabled',
         response_format: 'url',
-        size: '1K',
+        size: size,
         stream: false,
         watermark: false,
       }),

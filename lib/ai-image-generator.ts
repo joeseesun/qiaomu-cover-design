@@ -3,9 +3,9 @@ export class AIImageGenerator {
   private apiUrl = '/api/ai-image'; // 使用本地 API 路由，避免 CORS 问题
 
   // 生成图片
-  async generateImage(prompt: string): Promise<string> {
+  async generateImage(prompt: string, size: string = '1024x1024'): Promise<string> {
     try {
-      console.log('🎨 开始生成图片...', { prompt });
+      console.log('🎨 开始生成图片...', { prompt, size });
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -14,6 +14,7 @@ export class AIImageGenerator {
         },
         body: JSON.stringify({
           prompt: prompt,
+          size: size,
         }),
       });
 

@@ -9,11 +9,21 @@ import { Loader2, Sparkles } from 'lucide-react';
 interface AIImageDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onGenerate: (prompt: string) => Promise<void>;
+  onGenerate: (prompt: string, size: string) => Promise<void>;
 }
+
+// 尺寸选项
+const sizeOptions = [
+  { label: '1:1 (1024x1024)', value: '1024x1024', ratio: '1:1' },
+  { label: '4:3 (1024x768)', value: '1024x768', ratio: '4:3' },
+  { label: '3:4 (768x1024)', value: '768x1024', ratio: '3:4' },
+  { label: '16:9 (1024x576)', value: '1024x576', ratio: '16:9' },
+  { label: '9:16 (576x1024)', value: '576x1024', ratio: '9:16' },
+];
 
 export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogProps) {
   const [prompt, setPrompt] = useState('');
+  const [size, setSize] = useState('1024x1024'); // 默认 1:1
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGenerate = async () => {
@@ -24,7 +34,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
 
     setIsGenerating(true);
     try {
-      await onGenerate(prompt);
+      await onGenerate(prompt, size);
       setPrompt(''); // 清空输入
       onOpenChange(false); // 关闭对话框
     } catch (error) {
@@ -62,6 +72,32 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* 尺寸选择 */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              图片尺寸
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {sizeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setSize(option.value)}
+                  disabled={isGenerating}
+                  className={`px-3 py-2 text-xs rounded border transition-colors ${
+                    size === option.value
+                      ? 'bg-purple-500 text-white border-purple-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-purple-500'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {option.ratio}
+                </button>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              当前选择：{sizeOptions.find(o => o.value === size)?.label}
+            </div>
+          </div>
+
           {/* 提示词输入 */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
@@ -75,7 +111,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              rows={6}
+              rows={5}
               className="resize-none"
               disabled={isGenerating}
             />

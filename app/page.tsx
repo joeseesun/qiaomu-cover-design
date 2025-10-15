@@ -271,12 +271,12 @@ export default function Home() {
   };
 
   // AI 生成图片
-  const handleAIImageGenerate = async (prompt: string) => {
+  const handleAIImageGenerate = async (prompt: string, size: string) => {
     if (!aiImageGeneratorRef.current || !managerRef.current) return;
 
     try {
       // 生成图片
-      const imageUrl = await aiImageGeneratorRef.current.generateImage(prompt);
+      const imageUrl = await aiImageGeneratorRef.current.generateImage(prompt, size);
 
       // 从 URL 加载图片到画布
       await managerRef.current.addImageFromURL(imageUrl);
