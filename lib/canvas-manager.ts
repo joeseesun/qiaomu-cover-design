@@ -497,7 +497,7 @@ export class CanvasManager {
     if (activeObject) {
       const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.bringToFront();
-      this.canvas.renderAll();
+      this.canvas.requestRenderAll();
       const afterIndex = this.canvas.getObjects().indexOf(activeObject);
       console.log('📌 置于顶层:', {
         type: activeObject.type,
@@ -513,7 +513,7 @@ export class CanvasManager {
     if (activeObject) {
       const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.sendToBack();
-      this.canvas.renderAll();
+      this.canvas.requestRenderAll();
       const afterIndex = this.canvas.getObjects().indexOf(activeObject);
       console.log('📌 置于底层:', {
         type: activeObject.type,
@@ -534,7 +534,7 @@ export class CanvasManager {
     if (activeObject) {
       const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.bringForward();
-      this.canvas.renderAll();
+      this.canvas.requestRenderAll();
       const afterIndex = this.canvas.getObjects().indexOf(activeObject);
       console.log('📌 上移一层:', {
         type: activeObject.type,
@@ -549,7 +549,7 @@ export class CanvasManager {
     if (activeObject) {
       const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.sendBackwards();
-      this.canvas.renderAll();
+      this.canvas.requestRenderAll();
       const afterIndex = this.canvas.getObjects().indexOf(activeObject);
       console.log('📌 下移一层:', {
         type: activeObject.type,
