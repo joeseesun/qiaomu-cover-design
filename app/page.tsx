@@ -173,7 +173,7 @@ export default function Home() {
           if (e.shiftKey) {
             managerRef.current.sendToBack(); // Cmd/Ctrl + Shift + [
           } else {
-            managerRef.current.sendBackward(); // Cmd/Ctrl + [
+            managerRef.current.sendBackwards(); // Cmd/Ctrl + [
           }
         }
       }
@@ -740,7 +740,7 @@ export default function Home() {
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
               onClick={() => {
-                managerRef.current?.sendBackward();
+                managerRef.current?.sendBackwards();
                 setContextMenu(null);
               }}
             >

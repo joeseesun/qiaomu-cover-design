@@ -493,7 +493,7 @@ export class CanvasManager {
   bringToFront() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
-      this.canvas.bringToFront(activeObject);
+      activeObject.bringToFront();
       this.canvas.renderAll();
     }
   }
@@ -501,7 +501,7 @@ export class CanvasManager {
   sendToBack() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
-      this.canvas.sendToBack(activeObject);
+      activeObject.sendToBack();
       this.canvas.renderAll();
     }
   }
@@ -509,15 +509,15 @@ export class CanvasManager {
   bringForward() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
-      this.canvas.bringForward(activeObject);
+      activeObject.bringForward();
       this.canvas.renderAll();
     }
   }
 
-  sendBackward() {
+  sendBackwards() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
-      this.canvas.sendBackward(activeObject);
+      activeObject.sendBackwards();
       this.canvas.renderAll();
     }
   }
