@@ -214,27 +214,33 @@ export class CanvasManager {
     // 监听双击事件，进入文本编辑模式
     group.on('mousedblclick', () => {
       // 保存 Group 的所有变换属性
-      const groupLeft = group.left;
-      const groupTop = group.top;
-      const groupAngle = group.angle;
-      const groupScaleX = group.scaleX;
-      const groupScaleY = group.scaleY;
+      const groupCenter = group.getCenterPoint();
+      const groupAngle = group.angle || 0;
+      const groupScaleX = group.scaleX || 1;
+      const groupScaleY = group.scaleY || 1;
 
-      // 解散 Group
+      // 解散 Group，获取文本对象
       const items = (group as any)._objects || [];
       const textObj = items.find((obj: any) => obj.type === 'i-text');
 
       if (textObj) {
+        // 保存原始文本的缩放（相对于 Group 的缩放）
+        const textScaleX = textObj.scaleX || 1;
+        const textScaleY = textObj.scaleY || 1;
+
         this.canvas.remove(group);
+
+        // 设置文本对象到 Group 的位置，并应用 Group 的变换
         textObj.set({
-          left: groupLeft,
-          top: groupTop,
+          left: groupCenter.x,
+          top: groupCenter.y,
           angle: groupAngle,
-          scaleX: groupScaleX,
-          scaleY: groupScaleY,
+          scaleX: groupScaleX * textScaleX,
+          scaleY: groupScaleY * textScaleY,
           originX: 'center',
           originY: 'center',
         });
+
         this.canvas.add(textObj);
         this.canvas.setActiveObject(textObj);
         textObj.enterEditing();
@@ -686,19 +692,22 @@ export class CanvasManager {
 
       // 双击编辑
       group.on('mousedblclick', () => {
-        const groupLeft = group.left;
-        const groupTop = group.top;
-        const groupAngle = group.angle;
-        const groupScaleX = group.scaleX;
-        const groupScaleY = group.scaleY;
+        const groupCenter = group.getCenterPoint();
+        const groupAngle = group.angle || 0;
+        const groupScaleX = group.scaleX || 1;
+        const groupScaleY = group.scaleY || 1;
+
+        // 保存文本在 Group 内的缩放
+        const textScaleX = text.scaleX || 1;
+        const textScaleY = text.scaleY || 1;
 
         this.canvas.remove(group);
         text.set({
-          left: groupLeft,
-          top: groupTop,
+          left: groupCenter.x,
+          top: groupCenter.y,
           angle: groupAngle,
-          scaleX: groupScaleX,
-          scaleY: groupScaleY,
+          scaleX: groupScaleX * textScaleX,
+          scaleY: groupScaleY * textScaleY,
         });
         this.canvas.add(text);
         this.canvas.setActiveObject(text);

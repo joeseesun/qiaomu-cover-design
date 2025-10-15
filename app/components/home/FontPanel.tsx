@@ -213,8 +213,20 @@ export default function FontPanel({
   };
 
   // 获取当前选中对象的字体和颜色
-  const currentFont = selectedObject?.fontFamily || selectedFont;
-  const currentColor = selectedObject?.fill || textColor;
+  const getCurrentProperty = (property: string, defaultValue: any) => {
+    if (!selectedObject) return defaultValue;
+
+    // 如果是 Group，从内部文本对象获取
+    if (selectedObject.type === 'group') {
+      const textObj = (selectedObject as any)._objects?.find((o: any) => o.type === 'i-text');
+      return textObj?.[property] || defaultValue;
+    }
+
+    return selectedObject[property] || defaultValue;
+  };
+
+  const currentFont = getCurrentProperty('fontFamily', selectedFont);
+  const currentColor = getCurrentProperty('fill', textColor);
 
   // 判断字体是否是最近使用的
   const isRecentFont = (fontFamily: string) => {
