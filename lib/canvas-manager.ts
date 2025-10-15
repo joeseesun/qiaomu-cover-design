@@ -214,29 +214,28 @@ export class CanvasManager {
     // 监听双击事件，进入文本编辑模式
     group.on('mousedblclick', () => {
       // 保存 Group 的所有变换属性
-      const groupCenter = group.getCenterPoint();
-      const groupAngle = group.angle || 0;
-      const groupScaleX = group.scaleX || 1;
-      const groupScaleY = group.scaleY || 1;
+      const savedConfig = {
+        left: group.left || 0,
+        top: group.top || 0,
+        angle: group.angle || 0,
+        scaleX: group.scaleX || 1,
+        scaleY: group.scaleY || 1,
+      };
 
       // 解散 Group，获取文本对象
       const items = (group as any)._objects || [];
       const textObj = items.find((obj: any) => obj.type === 'i-text');
 
       if (textObj) {
-        // 保存原始文本的缩放（相对于 Group 的缩放）
-        const textScaleX = textObj.scaleX || 1;
-        const textScaleY = textObj.scaleY || 1;
-
         this.canvas.remove(group);
 
-        // 设置文本对象到 Group 的位置，并应用 Group 的变换
+        // 设置文本到 Group 的位置，但不改变缩放（保持原始字体大小）
         textObj.set({
-          left: groupCenter.x,
-          top: groupCenter.y,
-          angle: groupAngle,
-          scaleX: groupScaleX * textScaleX,
-          scaleY: groupScaleY * textScaleY,
+          left: savedConfig.left,
+          top: savedConfig.top,
+          angle: savedConfig.angle,
+          scaleX: 1,  // 重置缩放，保持原始字体大小
+          scaleY: 1,
           originX: 'center',
           originY: 'center',
         });
@@ -255,8 +254,8 @@ export class CanvasManager {
             left: textObj.left,
             top: textObj.top,
             angle: textObj.angle,
-            scaleX: textObj.scaleX,
-            scaleY: textObj.scaleY,
+            scaleX: savedConfig.scaleX,  // 恢复原始缩放
+            scaleY: savedConfig.scaleY,
           };
           this.canvas.remove(textObj);
           this.addHighlightText(newConfig);
@@ -692,22 +691,21 @@ export class CanvasManager {
 
       // 双击编辑
       group.on('mousedblclick', () => {
-        const groupCenter = group.getCenterPoint();
-        const groupAngle = group.angle || 0;
-        const groupScaleX = group.scaleX || 1;
-        const groupScaleY = group.scaleY || 1;
-
-        // 保存文本在 Group 内的缩放
-        const textScaleX = text.scaleX || 1;
-        const textScaleY = text.scaleY || 1;
+        const savedConfig = {
+          left: group.left || 0,
+          top: group.top || 0,
+          angle: group.angle || 0,
+          scaleX: group.scaleX || 1,
+          scaleY: group.scaleY || 1,
+        };
 
         this.canvas.remove(group);
         text.set({
-          left: groupCenter.x,
-          top: groupCenter.y,
-          angle: groupAngle,
-          scaleX: groupScaleX * textScaleX,
-          scaleY: groupScaleY * textScaleY,
+          left: savedConfig.left,
+          top: savedConfig.top,
+          angle: savedConfig.angle,
+          scaleX: 1,  // 重置缩放，保持原始字体大小
+          scaleY: 1,
         });
         this.canvas.add(text);
         this.canvas.setActiveObject(text);
@@ -721,8 +719,8 @@ export class CanvasManager {
             left: text.left,
             top: text.top,
             angle: text.angle,
-            scaleX: text.scaleX,
-            scaleY: text.scaleY,
+            scaleX: savedConfig.scaleX,  // 恢复原始缩放
+            scaleY: savedConfig.scaleY,
           };
           this.canvas.remove(text);
           this.createDecoratedText(newConfig);
