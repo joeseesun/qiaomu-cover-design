@@ -19,10 +19,44 @@ export default function ImageLibrary({ onClose, onSelectImage }: ImageLibraryPro
   }>({ open: false, url: '' });
 
   // 加载图片库
-  useEffect(() => {
+  const loadImages = () => {
     const library = getImageLibrary();
-    setImages(library.getImages());
+    const loadedImages = library.getImages();
+    console.log('📚 图片库加载:', loadedImages.length, '张图片');
+    setImages(loadedImages);
+  };
+
+  // 初始加载
+  useEffect(() => {
+    loadImages();
   }, []);
+
+  // 监听storage事件,当其他标签页或组件更新图库时自动刷新
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'image-library') {
+        console.log('📚 检测到图库更新,重新加载');
+        loadImages();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // 定期刷新图库(每2秒检查一次)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const library = getImageLibrary();
+      const currentCount = library.getCount();
+      if (currentCount !== images.length) {
+        console.log('📚 图库数量变化,重新加载:', images.length, '→', currentCount);
+        loadImages();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [images.length]);
 
   // 选择图片
   const handleSelectImage = (url: string) => {
@@ -41,7 +75,7 @@ export default function ImageLibrary({ onClose, onSelectImage }: ImageLibraryPro
   const confirmDelete = () => {
     const library = getImageLibrary();
     library.removeImage(deleteConfirm.url);
-    setImages(library.getImages());
+    loadImages(); // 重新加载
     setDeleteConfirm({ open: false, url: '' });
   };
 
