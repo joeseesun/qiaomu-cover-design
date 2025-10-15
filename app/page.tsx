@@ -288,7 +288,7 @@ export default function Home() {
   };
 
   const handleBackgroundChange = (
-    style: 'none' | 'solid' | 'gradient',
+    style: 'none' | 'solid',
     color?: string
   ) => {
     managerRef.current?.updateBackground(style, color);

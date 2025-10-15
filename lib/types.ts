@@ -32,8 +32,9 @@ export const HIGHLIGHT_COLORS = [
   '#FF5722', // 橙色
 ];
 
-// 12 个精选中文字体
+// 12 个精选中文字体（第一页展示前 3 个）
 export const FONTS: FontConfig[] = [
+  { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
   { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' },
   { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' },
   { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' },
@@ -42,7 +43,6 @@ export const FONTS: FontConfig[] = [
   { name: '优设标题黑', family: 'YouSheBiaoTiHei', weight: [400], preview: '设计' },
   { name: '庞门正道标题', family: 'Pangmen Zhengdao', weight: [400], preview: '设计' },
   { name: '江西拙楷', family: 'JiangXiZhuoKai', weight: [400], preview: '设计' },
-  { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
   { name: '得意黑', family: 'Smiley Sans', weight: [400], preview: '设计' },
   { name: '小赖字体', family: 'XiaoLai', weight: [400], preview: '设计' },
   { name: 'Arial', family: 'Arial, sans-serif', weight: [400, 700], preview: 'Aa' },

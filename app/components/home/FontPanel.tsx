@@ -6,7 +6,6 @@ import { FONTS, FontConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { Loader2, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import ColorPicker from './ColorPicker';
 
@@ -29,7 +28,7 @@ interface FontPanelProps {
   onLineHeightChange?: (lineHeight: number) => void;
   onLetterSpacingChange?: (letterSpacing: number) => void;
   // 背景
-  onBackgroundChange?: (style: 'none' | 'solid' | 'gradient', color?: string) => void;
+  onBackgroundChange?: (style: 'none' | 'solid', color?: string) => void;
   // 下划线
   onUnderlineChange?: (style: 'none' | 'solid' | 'wavy' | 'dotted', width?: number, color?: string) => void;
   // 边框
@@ -64,8 +63,11 @@ export default function FontPanel({
   const [lineHeightInput, setLineHeightInput] = useState('');
   const [letterSpacingInput, setLetterSpacingInput] = useState('');
 
+  // Tab 状态
+  const [activeTab, setActiveTab] = useState<'background' | 'underline' | 'border'>('background');
+
   // 背景状态
-  const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid' | 'gradient'>('none');
+  const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
   const [backgroundColor, setBackgroundColor] = useState('#FFE066');
 
   // 下划线状态
@@ -101,6 +103,15 @@ export default function FontPanel({
       setLetterSpacingInput(String(letterSpacing));
     }
   }, [selectedObject, lineHeight, letterSpacing]);
+
+  // 预加载第一页的字体
+  useEffect(() => {
+    const fontsPerPage = 3;
+    const firstPageFonts = FONTS.slice(0, fontsPerPage);
+    firstPageFonts.forEach((font) => {
+      loadFont(font);
+    });
+  }, []);
 
   // 添加到最近使用
   const addToRecent = (font: FontConfig) => {
@@ -149,8 +160,8 @@ export default function FontPanel({
     addToRecent(font);
   };
 
-  // 计算分页
-  const fontsPerPage = 6;
+  // 计算分页（每页 3 个字体）
+  const fontsPerPage = 3;
   const totalPages = Math.ceil(FONTS.length / fontsPerPage);
   const displayFonts = FONTS.slice(
     currentPage * fontsPerPage,
@@ -158,11 +169,23 @@ export default function FontPanel({
   );
 
   const handlePrevPage = () => {
-    setCurrentPage((prev) => Math.max(0, prev - 1));
+    setCurrentPage((prev) => {
+      const newPage = Math.max(0, prev - 1);
+      // 预加载新页面的字体
+      const newPageFonts = FONTS.slice(newPage * fontsPerPage, (newPage + 1) * fontsPerPage);
+      newPageFonts.forEach((font) => loadFont(font));
+      return newPage;
+    });
   };
 
   const handleNextPage = () => {
-    setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1));
+    setCurrentPage((prev) => {
+      const newPage = Math.min(totalPages - 1, prev + 1);
+      // 预加载新页面的字体
+      const newPageFonts = FONTS.slice(newPage * fontsPerPage, (newPage + 1) * fontsPerPage);
+      newPageFonts.forEach((font) => loadFont(font));
+      return newPage;
+    });
   };
 
   // 获取当前选中对象的字体和颜色
@@ -393,16 +416,68 @@ export default function FontPanel({
 
       <Separator />
 
-      {/* 背景 */}
-      <div className="px-8 py-6 space-y-4">
-        <h3 className="text-sm font-semibold">背景</h3>
+      {/* 装饰 Tab 组 */}
+      <div className="space-y-0">
+        {/* Tab 头部 */}
+        <div className="flex border-b border-border-medium">
+          <button
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === 'background'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('background')}
+          >
+            背景
+            {activeTab === 'background' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+          <button
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === 'underline'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('underline')}
+          >
+            下划线
+            {activeTab === 'underline' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+          <button
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === 'border'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('border')}
+          >
+            边框
+            {activeTab === 'border' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+        </div>
+
+        {/* Tab 内容区域 */}
+        <div className="px-8 py-6">
+
+        {/* 背景 Tab 内容 */}
+        {activeTab === 'background' && (
+          <div className="space-y-4">
 
         {/* 样式选择 */}
         <div className="flex gap-2">
           <Button
-            variant={backgroundStyle === 'none' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 border-black ${
+              backgroundStyle === 'none'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setBackgroundStyle('none');
               onBackgroundChange?.('none');
@@ -412,9 +487,13 @@ export default function FontPanel({
             无
           </Button>
           <Button
-            variant={backgroundStyle === 'solid' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 border-black ${
+              backgroundStyle === 'solid'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setBackgroundStyle('solid');
               onBackgroundChange?.('solid', backgroundColor);
@@ -422,18 +501,6 @@ export default function FontPanel({
             disabled={!selectedObject}
           >
             纯色
-          </Button>
-          <Button
-            variant={backgroundStyle === 'gradient' ? 'default' : 'outline'}
-            size="sm"
-            className="flex-1"
-            onClick={() => {
-              setBackgroundStyle('gradient');
-              onBackgroundChange?.('gradient', backgroundColor);
-            }}
-            disabled={!selectedObject}
-          >
-            渐变
           </Button>
         </div>
 
@@ -470,19 +537,23 @@ export default function FontPanel({
             />
           </div>
         )}
-      </div>
+          </div>
+        )}
 
-      <Separator />
-
-      {/* 下划线 */}
-      <div className="px-8 py-6 space-y-4">
-        <h3 className="text-sm font-semibold">下划线</h3>
+        {/* 下划线 Tab 内容 */}
+        {activeTab === 'underline' && (
+          <div className="space-y-4">
 
         {/* 样式选择 */}
         <div className="grid grid-cols-4 gap-2">
           <Button
-            variant={underlineStyle === 'none' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
+            className={`border-black ${
+              underlineStyle === 'none'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setUnderlineStyle('none');
               onUnderlineChange?.('none');
@@ -492,8 +563,13 @@ export default function FontPanel({
             无
           </Button>
           <Button
-            variant={underlineStyle === 'solid' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
+            className={`border-black ${
+              underlineStyle === 'solid'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setUnderlineStyle('solid');
               onUnderlineChange?.('solid', underlineWidth, underlineColor);
@@ -503,8 +579,13 @@ export default function FontPanel({
             直线
           </Button>
           <Button
-            variant={underlineStyle === 'wavy' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
+            className={`border-black ${
+              underlineStyle === 'wavy'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setUnderlineStyle('wavy');
               onUnderlineChange?.('wavy', underlineWidth, underlineColor);
@@ -514,8 +595,13 @@ export default function FontPanel({
             波浪
           </Button>
           <Button
-            variant={underlineStyle === 'dotted' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
+            className={`border-black ${
+              underlineStyle === 'dotted'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setUnderlineStyle('dotted');
               onUnderlineChange?.('dotted', underlineWidth, underlineColor);
@@ -531,21 +617,49 @@ export default function FontPanel({
           <div className="space-y-4">
             {/* 粗细 */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-muted-foreground">粗细</label>
-                <span className="text-xs text-muted-foreground">{underlineWidth}px</span>
+              <label className="text-xs text-muted-foreground">粗细</label>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => {
+                    const newWidth = Math.max(1, underlineWidth - 1);
+                    setUnderlineWidth(newWidth);
+                    onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
+                  }}
+                  disabled={!selectedObject || underlineWidth <= 1}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <Input
+                  type="number"
+                  value={underlineWidth}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 1;
+                    const newWidth = Math.max(1, Math.min(20, value));
+                    setUnderlineWidth(newWidth);
+                    onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
+                  }}
+                  className="h-8 text-center"
+                  disabled={!selectedObject}
+                  min={1}
+                  max={20}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => {
+                    const newWidth = Math.min(20, underlineWidth + 1);
+                    setUnderlineWidth(newWidth);
+                    onUnderlineChange?.(underlineStyle, newWidth, underlineColor);
+                  }}
+                  disabled={!selectedObject || underlineWidth >= 20}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
               </div>
-              <Slider
-                value={[underlineWidth]}
-                onValueChange={(value) => {
-                  setUnderlineWidth(value[0]);
-                  onUnderlineChange?.(underlineStyle, value[0], underlineColor);
-                }}
-                min={1}
-                max={10}
-                step={1}
-                disabled={!selectedObject}
-              />
             </div>
 
             {/* 颜色 */}
@@ -581,20 +695,23 @@ export default function FontPanel({
             </div>
           </div>
         )}
-      </div>
+          </div>
+        )}
 
-      <Separator />
-
-      {/* 边框 */}
-      <div className="px-8 py-6 space-y-4">
-        <h3 className="text-sm font-semibold">边框</h3>
+        {/* 边框 Tab 内容 */}
+        {activeTab === 'border' && (
+          <div className="space-y-4">
 
         {/* 样式选择 */}
         <div className="flex gap-2">
           <Button
-            variant={borderStyle === 'none' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 border-black ${
+              borderStyle === 'none'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setBorderStyle('none');
               onBorderChange?.('none');
@@ -604,9 +721,13 @@ export default function FontPanel({
             无
           </Button>
           <Button
-            variant={borderStyle === 'solid' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 border-black ${
+              borderStyle === 'solid'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setBorderStyle('solid');
               onBorderChange?.('solid', borderWidth, borderColor);
@@ -616,9 +737,13 @@ export default function FontPanel({
             实线
           </Button>
           <Button
-            variant={borderStyle === 'dashed' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 border-black ${
+              borderStyle === 'dashed'
+                ? 'bg-black text-white hover:bg-black hover:text-white'
+                : 'bg-white text-black hover:bg-gray-50'
+            }`}
             onClick={() => {
               setBorderStyle('dashed');
               onBorderChange?.('dashed', borderWidth, borderColor);
@@ -634,21 +759,49 @@ export default function FontPanel({
           <div className="space-y-4">
             {/* 粗细 */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-muted-foreground">粗细</label>
-                <span className="text-xs text-muted-foreground">{borderWidth}px</span>
+              <label className="text-xs text-muted-foreground">粗细</label>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => {
+                    const newWidth = Math.max(1, borderWidth - 1);
+                    setBorderWidth(newWidth);
+                    onBorderChange?.(borderStyle, newWidth, borderColor);
+                  }}
+                  disabled={!selectedObject || borderWidth <= 1}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <Input
+                  type="number"
+                  value={borderWidth}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 1;
+                    const newWidth = Math.max(1, Math.min(20, value));
+                    setBorderWidth(newWidth);
+                    onBorderChange?.(borderStyle, newWidth, borderColor);
+                  }}
+                  className="h-8 text-center"
+                  disabled={!selectedObject}
+                  min={1}
+                  max={20}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => {
+                    const newWidth = Math.min(20, borderWidth + 1);
+                    setBorderWidth(newWidth);
+                    onBorderChange?.(borderStyle, newWidth, borderColor);
+                  }}
+                  disabled={!selectedObject || borderWidth >= 20}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
               </div>
-              <Slider
-                value={[borderWidth]}
-                onValueChange={(value) => {
-                  setBorderWidth(value[0]);
-                  onBorderChange?.(borderStyle, value[0], borderColor);
-                }}
-                min={1}
-                max={10}
-                step={1}
-                disabled={!selectedObject}
-              />
             </div>
 
             {/* 颜色 */}
@@ -684,6 +837,9 @@ export default function FontPanel({
             </div>
           </div>
         )}
+          </div>
+        )}
+        </div>
       </div>
     </aside>
   );

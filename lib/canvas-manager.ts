@@ -333,7 +333,7 @@ export class CanvasManager {
   }
 
   // 添加/更新背景
-  updateBackground(style: 'none' | 'solid' | 'gradient', color?: string) {
+  updateBackground(style: 'none' | 'solid', color?: string) {
     const activeObj = this.canvas.getActiveObject();
     if (!activeObj) return;
 
@@ -361,7 +361,7 @@ export class CanvasManager {
   // 更新单个对象的背景
   private updateSingleObjectBackground(
     obj: any,
-    style: 'none' | 'solid' | 'gradient',
+    style: 'none' | 'solid',
     color?: string
   ) {
     const currentConfig = this.extractTextConfig(obj);
@@ -509,8 +509,8 @@ export class CanvasManager {
       // 提取装饰配置
       items.forEach((item: any) => {
         if (item.type === 'rect' && item.opacity === 0.5) {
-          config.backgroundStyle = item.fill?.type === 'linear' ? 'gradient' : 'solid';
-          config.backgroundColor = item.fill?.colorStops?.[0]?.color || item.fill;
+          config.backgroundStyle = 'solid';
+          config.backgroundColor = item.fill;
         } else if (item.type === 'line' || item.type === 'polyline') {
           if (item.type === 'polyline') {
             config.underlineStyle = 'wavy';
@@ -571,37 +571,16 @@ export class CanvasManager {
 
     // 背景
     if (config.backgroundStyle && config.backgroundStyle !== 'none') {
-      let background: fabric.Rect;
-      if (config.backgroundStyle === 'solid') {
-        background = new fabric.Rect({
-          width: textWidth + paddingX * 2,
-          height: textHeight + paddingY * 2,
-          fill: config.backgroundColor || '#FFE066',
-          opacity: 0.5,
-          rx: 6,
-          ry: 6,
-          originX: 'center',
-          originY: 'center',
-        });
-      } else {
-        background = new fabric.Rect({
-          width: textWidth + paddingX * 2,
-          height: textHeight + paddingY * 2,
-          fill: new fabric.Gradient({
-            type: 'linear',
-            coords: { x1: 0, y1: 0, x2: textWidth + paddingX * 2, y2: 0 },
-            colorStops: [
-              { offset: 0, color: config.backgroundColor || '#FFE066' },
-              { offset: 1, color: this.adjustColorBrightness(config.backgroundColor || '#FFE066', -20) },
-            ],
-          }),
-          opacity: 0.5,
-          rx: 6,
-          ry: 6,
-          originX: 'center',
-          originY: 'center',
-        });
-      }
+      const background = new fabric.Rect({
+        width: textWidth + paddingX * 2,
+        height: textHeight + paddingY * 2,
+        fill: config.backgroundColor || '#FFE066',
+        opacity: 0.5,
+        rx: 6,
+        ry: 6,
+        originX: 'center',
+        originY: 'center',
+      });
       objects.push(background);
     }
 
@@ -738,15 +717,6 @@ export class CanvasManager {
       this.canvas.renderAll();
       this.canvas.setActiveObject(text);
     }
-  }
-
-  // 辅助函数：调整颜色亮度
-  private adjustColorBrightness(color: string, amount: number): string {
-    const hex = color.replace('#', '');
-    const r = Math.max(0, Math.min(255, parseInt(hex.substring(0, 2), 16) + amount));
-    const g = Math.max(0, Math.min(255, parseInt(hex.substring(2, 4), 16) + amount));
-    const b = Math.max(0, Math.min(255, parseInt(hex.substring(4, 6), 16) + amount));
-    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   }
 
   // 导出为 JSON
