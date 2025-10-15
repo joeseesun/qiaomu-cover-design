@@ -97,11 +97,15 @@ export default function FontPanel({
         if (bgRect) {
           setBackgroundStyle('solid');
           setBackgroundColor(bgRect.fill || '#FFE066');
-          setBackgroundOpacity(bgRect.opacity ?? 1.0);
+          // 转换: Fabric.js的opacity(1=不透明) → 透明度(0=不透明)
+          const fabricOpacity = bgRect.opacity ?? 1.0;
+          const transparency = 1 - fabricOpacity;
+          setBackgroundTransparency(transparency);
           console.log('📋 读取背景:', {
             color: bgRect.fill,
-            opacity: bgRect.opacity,
-            displayOpacity: Math.round((bgRect.opacity ?? 1.0) * 100) + '%'
+            fabricOpacity,
+            transparency,
+            displayTransparency: Math.round(transparency * 100) + '%'
           });
         } else {
           setBackgroundStyle('none');
@@ -118,7 +122,9 @@ export default function FontPanel({
   // 背景状态
   const [backgroundStyle, setBackgroundStyle] = useState<'none' | 'solid'>('none');
   const [backgroundColor, setBackgroundColor] = useState('#FFE066');
-  const [backgroundOpacity, setBackgroundOpacity] = useState(1.0); // 默认不透明
+  // 注意: 这里存储的是"透明度"(0=不透明, 1=完全透明)
+  // 需要转换为Fabric.js的opacity(0=透明, 1=不透明)
+  const [backgroundTransparency, setBackgroundTransparency] = useState(0); // 默认0%透明=不透明
   const [recentBackgroundColors, setRecentBackgroundColors] = useState<string[]>([]);
 
   // 下划线状态
@@ -590,7 +596,9 @@ export default function FontPanel({
                   onChange={(color) => {
                     setBackgroundStyle('solid');
                     setBackgroundColor(color);
-                    onBackgroundChange?.('solid', color, backgroundOpacity);
+                    // 转换: 透明度 → Fabric.js的opacity
+                    const fabricOpacity = 1 - backgroundTransparency;
+                    onBackgroundChange?.('solid', color, fabricOpacity);
                     addToRecentBackgroundColors(color);
                   }}
                   compact
@@ -607,19 +615,21 @@ export default function FontPanel({
                     size="icon"
                     className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
                     onClick={() => {
-                      const newOpacity = Math.max(0, Number((backgroundOpacity - 0.1).toFixed(1)));
-                      setBackgroundOpacity(newOpacity);
+                      // 减少透明度(更不透明)
+                      const newTransparency = Math.max(0, Number((backgroundTransparency - 0.1).toFixed(1)));
+                      setBackgroundTransparency(newTransparency);
                       if (backgroundStyle === 'solid') {
-                        onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                        const fabricOpacity = 1 - newTransparency;
+                        onBackgroundChange?.('solid', backgroundColor, fabricOpacity);
                       }
                     }}
-                    disabled={!selectedObject || backgroundOpacity <= 0}
+                    disabled={!selectedObject || backgroundTransparency <= 0}
                   >
                     <Minus className="h-3.5 w-3.5" />
                   </Button>
                   <div className="flex-1 text-center h-8 flex items-center justify-center">
                     <div className="text-base font-semibold tabular-nums">
-                      {Math.round(backgroundOpacity * 100)}%
+                      {Math.round(backgroundTransparency * 100)}%
                     </div>
                   </div>
                   <Button
@@ -627,13 +637,15 @@ export default function FontPanel({
                     size="icon"
                     className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
                     onClick={() => {
-                      const newOpacity = Math.min(1, Number((backgroundOpacity + 0.1).toFixed(1)));
-                      setBackgroundOpacity(newOpacity);
+                      // 增加透明度(更透明)
+                      const newTransparency = Math.min(1, Number((backgroundTransparency + 0.1).toFixed(1)));
+                      setBackgroundTransparency(newTransparency);
                       if (backgroundStyle === 'solid') {
-                        onBackgroundChange?.('solid', backgroundColor, newOpacity);
+                        const fabricOpacity = 1 - newTransparency;
+                        onBackgroundChange?.('solid', backgroundColor, fabricOpacity);
                       }
                     }}
-                    disabled={!selectedObject || backgroundOpacity >= 1}
+                    disabled={!selectedObject || backgroundTransparency >= 1}
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
@@ -669,7 +681,8 @@ export default function FontPanel({
                     onClick={() => {
                       setBackgroundStyle('solid');
                       setBackgroundColor(color);
-                      onBackgroundChange?.('solid', color, backgroundOpacity);
+                      const fabricOpacity = 1 - backgroundTransparency;
+                      onBackgroundChange?.('solid', color, fabricOpacity);
                       addToRecentBackgroundColors(color);
                     }}
                     disabled={!selectedObject}
@@ -696,7 +709,8 @@ export default function FontPanel({
                       onClick={() => {
                         setBackgroundStyle('solid');
                         setBackgroundColor(color);
-                        onBackgroundChange?.('solid', color, backgroundOpacity);
+                        const fabricOpacity = 1 - backgroundTransparency;
+                        onBackgroundChange?.('solid', color, fabricOpacity);
                         addToRecentBackgroundColors(color);
                       }}
                       disabled={!selectedObject}
