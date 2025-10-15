@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2, ChevronLeft, ChevronRight, Minus, Plus, X } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Minus, Plus, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import ColorPicker from './ColorPicker';
 
 // 预设颜色 - 去掉最后两个颜色
@@ -28,6 +28,8 @@ interface FontPanelProps {
   onColorChange: (color: string) => void;
   onLineHeightChange?: (lineHeight: number) => void;
   onLetterSpacingChange?: (letterSpacing: number) => void;
+  // 对齐
+  onTextAlignChange?: (align: 'left' | 'center' | 'right') => void;
   // 背景
   onBackgroundChange?: (style: 'none' | 'solid', color?: string, opacity?: number) => void;
   // 下划线
@@ -51,6 +53,7 @@ export default function FontPanel({
   onColorChange,
   onLineHeightChange,
   onLetterSpacingChange,
+  onTextAlignChange,
   onBackgroundChange,
   onUnderlineChange,
   onBorderChange,
@@ -62,8 +65,14 @@ export default function FontPanel({
   const [recentFontFamilies, setRecentFontFamilies] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
 
+  // 主 Tab 状态
+  const [activeMainTab, setActiveMainTab] = useState<'font' | 'spacing'>('font');
+
   // 装饰 Tab 状态
   const [activeDecorationTab, setActiveDecorationTab] = useState<'background' | 'underline' | 'border'>('background');
+
+  // 文本对齐状态
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
   // 本地状态用于实时显示
   const [localLetterSpacing, setLocalLetterSpacing] = useState(letterSpacing);
@@ -240,104 +249,123 @@ export default function FontPanel({
       className="flex flex-col overflow-y-auto bg-background"
       style={{ width: '360px', borderLeft: '1px solid hsl(var(--border))' }}
     >
-      {/* 字体网格 */}
-      <div className="px-8 py-6">
-        <h3 className="text-sm font-semibold mb-5">字体</h3>
+      {/* 主 Tab 组：字体设置 / 对齐与间距 */}
+      <Tabs value={activeMainTab} onValueChange={(value) => setActiveMainTab(value as any)} className="space-y-0">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="font">字体设置</TabsTrigger>
+          <TabsTrigger value="spacing">对齐与间距</TabsTrigger>
+        </TabsList>
 
-        <div className="grid grid-cols-3 gap-3">
-          {displayFonts.map((font) => {
-            const isSelected = currentFont === font.family;
-            const isLoading = loadingFonts.has(font.family);
-            const isLoaded = loadedFonts.has(font.family);
-            const isRecent = isRecentFont(font.family);
+        {/* 字体设置 Tab */}
+        <TabsContent value="font" className="px-8 py-6 space-y-6">
+          {/* 字体网格 */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">字体</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {displayFonts.map((font) => {
+                const isSelected = currentFont === font.family;
+                const isLoading = loadingFonts.has(font.family);
+                const isLoaded = loadedFonts.has(font.family);
+                const isRecent = isRecentFont(font.family);
 
-            return (
-              <button
-                key={font.family}
-                onClick={() => handleFontClick(font)}
-                className={`relative h-24 flex flex-col items-center justify-center p-3 rounded-md border transition-all ${
-                  isSelected
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-border/40 bg-background hover:border-primary/50'
-                }`}
-              >
-                {/* 最近使用标记（小灰点） */}
-                {isRecent && (
-                  <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-gray-400" />
-                )}
+                return (
+                  <button
+                    key={font.family}
+                    onClick={() => handleFontClick(font)}
+                    className={`relative h-24 flex flex-col items-center justify-center p-3 rounded-md border transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-border/40 bg-background hover:border-primary/50'
+                    }`}
+                  >
+                    {/* 最近使用标记（小灰点） */}
+                    {isRecent && (
+                      <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-gray-400" />
+                    )}
 
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <>
-                    <div
-                      className="text-2xl font-bold mb-1"
-                      style={{
-                        fontFamily: isLoaded ? font.family : 'inherit',
-                      }}
-                    >
-                      {font.preview}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {font.name}
-                    </div>
-                  </>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <div
+                          className="text-2xl font-bold mb-1"
+                          style={{
+                            fontFamily: isLoaded ? font.family : 'inherit',
+                          }}
+                        >
+                          {font.preview}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {font.name}
+                        </div>
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* 分页控制 */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-4 mt-5">
-            <button
-              onClick={handlePrevPage}
-              disabled={currentPage === 0}
-              className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
+            {/* 分页控制 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 0}
+                  className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
 
-            <span className="text-xs text-muted-foreground font-medium min-w-[32px] text-center">
-              {currentPage + 1} / {totalPages}
-            </span>
+                <span className="text-xs text-muted-foreground font-medium min-w-[32px] text-center">
+                  {currentPage + 1} / {totalPages}
+                </span>
 
-            <button
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages - 1}
-              className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages - 1}
+                  className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <Separator />
-
-      {/* 文字属性：颜色 + 字间距 + 行间距 */}
-      <div className="px-8 py-6">
-        <div className="flex items-start gap-4">
-          {/* 文字颜色 - 小方块 */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">颜色</label>
+          {/* 字体颜色 */}
+          <div>
+            <label className="text-sm font-semibold mb-3 block">字体颜色</label>
             <ColorPicker
               color={currentColor}
               onChange={onColorChange}
-              compact
               disabled={!selectedObject}
             />
           </div>
 
+          {/* 字号 */}
+          <div>
+            <label className="text-sm font-semibold mb-3 block">字号</label>
+            <Input
+              type="number"
+              value={fontSize}
+              onChange={(e) => onFontSizeChange(Number(e.target.value))}
+              disabled={!selectedObject}
+              className="w-full"
+              min={12}
+              max={200}
+            />
+          </div>
+        </TabsContent>
+
+        {/* 对齐与间距 Tab */}
+        <TabsContent value="spacing" className="px-8 py-6 space-y-6">
           {/* 字间距 */}
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">字间距</label>
-            <div className="flex items-center gap-1.5">
+          <div>
+            <label className="text-sm font-semibold mb-3 block">字间距</label>
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                className="h-9 w-9 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const newValue = Math.max(-500, localLetterSpacing - 10);
@@ -346,9 +374,9 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Minus className="h-3.5 w-3.5" />
+                <Minus className="h-4 w-4" />
               </Button>
-              <div className="flex-1 text-center h-8 flex items-center justify-center">
+              <div className="flex-1 text-center h-9 flex items-center justify-center border rounded-md">
                 <div className="text-base font-semibold tabular-nums">
                   {Math.round(localLetterSpacing)}
                 </div>
@@ -356,7 +384,7 @@ export default function FontPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                className="h-9 w-9 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const newValue = Math.min(1000, localLetterSpacing + 10);
@@ -365,19 +393,19 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
           {/* 行间距 */}
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-xs font-medium text-muted-foreground h-[18px] leading-[18px]">行间距</label>
-            <div className="flex items-center gap-1.5">
+          <div>
+            <label className="text-sm font-semibold mb-3 block">行间距</label>
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                className="h-9 w-9 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const newValue = Math.max(0.5, Number((localLineHeight - 0.1).toFixed(1)));
@@ -386,9 +414,9 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Minus className="h-3.5 w-3.5" />
+                <Minus className="h-4 w-4" />
               </Button>
-              <div className="flex-1 text-center h-8 flex items-center justify-center">
+              <div className="flex-1 text-center h-9 flex items-center justify-center border rounded-md">
                 <div className="text-base font-semibold tabular-nums">
                   {localLineHeight.toFixed(1)}
                 </div>
@@ -396,7 +424,7 @@ export default function FontPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 shrink-0 active:scale-95 transition-transform"
+                className="h-9 w-9 shrink-0"
                 onClick={() => {
                   if (!selectedObject) return;
                   const newValue = Math.min(5, Number((localLineHeight + 0.1).toFixed(1)));
@@ -405,12 +433,55 @@ export default function FontPanel({
                 }}
                 disabled={!selectedObject}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        </div>
-      </div>
+
+          {/* 对齐方式 */}
+          <div>
+            <label className="text-sm font-semibold mb-3 block">对齐方式</label>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className={`flex-1 h-10 ${textAlign === 'left' ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground' : ''}`}
+                onClick={() => {
+                  setTextAlign('left');
+                  onTextAlignChange?.('left');
+                }}
+                disabled={!selectedObject}
+              >
+                <AlignLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className={`flex-1 h-10 ${textAlign === 'center' ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground' : ''}`}
+                onClick={() => {
+                  setTextAlign('center');
+                  onTextAlignChange?.('center');
+                }}
+                disabled={!selectedObject}
+              >
+                <AlignCenter className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className={`flex-1 h-10 ${textAlign === 'right' ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground' : ''}`}
+                onClick={() => {
+                  setTextAlign('right');
+                  onTextAlignChange?.('right');
+                }}
+                disabled={!selectedObject}
+              >
+                <AlignRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Separator />
 
