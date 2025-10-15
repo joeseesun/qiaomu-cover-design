@@ -563,8 +563,17 @@ export class CanvasManager {
 
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
+
+        // 保存当前滚动位置，防止 enterEditing 导致页面滚动
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+
         editText.enterEditing();
         editText.selectAll();
+
+        // 恢复滚动位置
+        window.scrollTo(scrollX, scrollY);
+
         this.canvas.renderAll();
 
         // 监听文本编辑完成，重新创建 Group
@@ -1141,8 +1150,16 @@ export class CanvasManager {
 
         this.canvas.add(editText);
         this.canvas.setActiveObject(editText);
+
+        // 保存当前滚动位置，防止 enterEditing 导致页面滚动
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+
         editText.enterEditing();
         editText.selectAll();
+
+        // 恢复滚动位置
+        window.scrollTo(scrollX, scrollY);
 
         editText.on('editing:exited', () => {
           const newConfig = {
@@ -1280,8 +1297,16 @@ export class CanvasManager {
 
           this.canvas.add(editText);
           this.canvas.setActiveObject(editText);
+
+          // 保存当前滚动位置，防止 enterEditing 导致页面滚动
+          const scrollX = window.scrollX;
+          const scrollY = window.scrollY;
+
           editText.enterEditing();
           editText.selectAll();
+
+          // 恢复滚动位置
+          window.scrollTo(scrollX, scrollY);
 
           editText.on('editing:exited', () => {
             const newConfig = {
