@@ -32,11 +32,118 @@ export class CanvasManager {
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
 
+    // 监听双击事件,在进入编辑前就开始防滚动
+    this.canvas.on('mouse:dblclick', (e: any) => {
+      const target = e.target;
+      // 只处理文本对象的双击
+      if (target && (target.type === 'i-text' || target.type === 'textbox')) {
+        console.log('🖱️ [防滚动] 检测到文本双击');
+        this.preventScrollOnEdit();
+      }
+    });
+
     // 监听所有文本对象进入编辑模式
     this.canvas.on('text:editing:entered', (e: any) => {
       console.log('📝 Text editing entered');
       this.setupTextEditingListeners(e.target);
     });
+  }
+
+  // 防止编辑时滚动
+  private preventScrollOnEdit() {
+    // 保存当前滚动位置
+    const savedScrollX = window.scrollX;
+    const savedScrollY = window.scrollY;
+    console.log('🔍 [防滚动] 保存滚动位置:', { savedScrollX, savedScrollY });
+
+    // 检查当前页面尺寸
+    console.log('📏 [防滚动] 页面尺寸:', {
+      bodyScrollHeight: document.body.scrollHeight,
+      bodyClientHeight: document.body.clientHeight,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentClientHeight: document.documentElement.clientHeight,
+      windowInnerHeight: window.innerHeight,
+    });
+
+    // 保存body和html的overflow样式
+    const bodyOverflow = document.body.style.overflow;
+    const htmlOverflow = document.documentElement.style.overflow;
+    console.log('💾 [防滚动] 保存overflow样式:', { bodyOverflow, htmlOverflow });
+
+    // 临时禁用滚动
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    console.log('🚫 [防滚动] 已设置overflow: hidden');
+
+    // 强制阻止滚动的函数
+    const preventScroll = (e: Event) => {
+      console.log('⚠️ [防滚动] 检测到滚动事件!', {
+        target: (e.target as any)?.tagName,
+        currentScroll: { x: window.scrollX, y: window.scrollY },
+      });
+      e.preventDefault();
+      e.stopPropagation();
+      window.scrollTo(savedScrollX, savedScrollY);
+      return false;
+    };
+
+    // 在多个事件上阻止滚动
+    window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    document.body.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    console.log('👂 [防滚动] 已添加滚动监听器');
+
+    // 强制恢复滚动位置(多次尝试)
+    const restoreScroll = () => {
+      const beforeX = window.scrollX;
+      const beforeY = window.scrollY;
+
+      window.scrollTo(savedScrollX, savedScrollY);
+      document.documentElement.scrollTop = savedScrollY;
+      document.documentElement.scrollLeft = savedScrollX;
+      document.body.scrollTop = savedScrollY;
+      document.body.scrollLeft = savedScrollX;
+
+      if (beforeX !== savedScrollX || beforeY !== savedScrollY) {
+        console.log('🔄 [防滚动] 恢复滚动位置:', {
+          before: { x: beforeX, y: beforeY },
+          target: { x: savedScrollX, y: savedScrollY },
+          after: { x: window.scrollX, y: window.scrollY },
+        });
+      }
+    };
+
+    // 立即恢复一次
+    setTimeout(restoreScroll, 0);
+    setTimeout(restoreScroll, 10);
+    setTimeout(restoreScroll, 50);
+    setTimeout(restoreScroll, 100);
+
+    // 延迟移除滚动监听和恢复overflow
+    setTimeout(() => {
+      console.log('🧹 [防滚动] 准备清理监听器和恢复overflow');
+
+      window.removeEventListener('scroll', preventScroll, { capture: true } as any);
+      document.removeEventListener('scroll', preventScroll, { capture: true } as any);
+      document.body.removeEventListener('scroll', preventScroll, { capture: true } as any);
+      console.log('✅ [防滚动] 已移除滚动监听器');
+
+      // 恢复overflow样式
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = htmlOverflow;
+      console.log('✅ [防滚动] 已恢复overflow样式:', { bodyOverflow, htmlOverflow });
+
+      // 最后一次恢复滚动位置
+      restoreScroll();
+
+      // 最终检查
+      console.log('🏁 [防滚动] 最终页面尺寸:', {
+        bodyScrollHeight: document.body.scrollHeight,
+        bodyClientHeight: document.body.clientHeight,
+        documentScrollHeight: document.documentElement.scrollHeight,
+        documentClientHeight: document.documentElement.clientHeight,
+      });
+    }, 300);
   }
 
   // 设置文本编辑监听器(用于普通IText和Textbox)
