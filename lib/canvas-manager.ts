@@ -805,7 +805,98 @@ export class CanvasManager {
 
   // 从 JSON 加载
   loadFromJSON(json: string) {
-    this.canvas.loadFromJSON(json, () => this.canvas.renderAll());
+    this.canvas.loadFromJSON(json, () => {
+      // 加载完成后，重新绑定所有 Group 对象的双击事件
+      this.rebindGroupEvents();
+      this.canvas.renderAll();
+    });
+  }
+
+  // 重新绑定所有 Group 对象的双击事件
+  private rebindGroupEvents() {
+    const objects = this.canvas.getObjects();
+
+    objects.forEach((obj: any) => {
+      if (obj.type === 'group' && obj._objects) {
+        const textObj = obj._objects.find((o: any) => o.type === 'i-text');
+        if (!textObj) return;
+
+        // 提取配置
+        const config = this.extractTextConfig(obj);
+        if (!config) return;
+
+        // 绑定双击事件
+        obj.on('mousedblclick', () => {
+          const savedLeft = obj.left || 0;
+          const savedTop = obj.top || 0;
+          const savedAngle = obj.angle || 0;
+          const savedScaleX = obj.scaleX || 1;
+          const savedScaleY = obj.scaleY || 1;
+
+          // 保存文本属性
+          const textContent = textObj.text || '';
+          const originalFontSize = textObj.fontSize || 60;
+          const fontFamily = textObj.fontFamily || 'Noto Sans SC';
+          const fill = textObj.fill || '#333333';
+          const lineHeight = textObj.lineHeight || 1.2;
+          const charSpacing = textObj.charSpacing || 0;
+          const scaledFontSize = originalFontSize * savedScaleX;
+
+          // 移除 Group
+          this.canvas.remove(obj);
+
+          // 创建新的文本对象用于编辑
+          const editText = new fabric.IText(textContent, {
+            left: savedLeft,
+            top: savedTop,
+            angle: savedAngle,
+            fontSize: scaledFontSize,
+            fontFamily: fontFamily,
+            fill: fill,
+            lineHeight: lineHeight,
+            charSpacing: charSpacing,
+            scaleX: 1,
+            scaleY: 1,
+            originX: 'center',
+            originY: 'center',
+            editable: true,
+            selectable: true,
+            textAlign: 'center',
+            textBaseline: 'middle',
+          });
+
+          this.canvas.add(editText);
+          this.canvas.setActiveObject(editText);
+          editText.enterEditing();
+          editText.selectAll();
+
+          editText.on('editing:exited', () => {
+            const newConfig = {
+              ...config,
+              text: editText.text || '',
+              fontSize: originalFontSize,
+              fontFamily: fontFamily,
+              fill: fill,
+              lineHeight: lineHeight,
+              charSpacing: charSpacing,
+              left: editText.left,
+              top: editText.top,
+              angle: editText.angle,
+              scaleX: savedScaleX,
+              scaleY: savedScaleY,
+            };
+            this.canvas.remove(editText);
+
+            // 根据配置类型选择创建方法
+            if (config.backgroundStyle || config.underlineStyle || config.borderStyle) {
+              this.createDecoratedText(newConfig);
+            } else if (config.type) {
+              this.addHighlightText(newConfig);
+            }
+          });
+        });
+      }
+    });
   }
 
   // 导出为 Blob
