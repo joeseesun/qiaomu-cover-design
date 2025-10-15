@@ -22,6 +22,7 @@ export default function Home() {
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(DEFAULT_CANVAS_SIZE);
   const [userZoom, setUserZoom] = useState(100); // 用户手动缩放（50-200%）
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // 初始化
   useEffect(() => {
@@ -204,6 +205,17 @@ export default function Home() {
         }
       };
       input.click();
+    } else if (tool === 'emoji') {
+      // 切换 Emoji 选择器
+      setShowEmojiPicker(!showEmojiPicker);
+    }
+  };
+
+  // 添加 Emoji 到画布
+  const handleEmojiSelect = (emoji: string) => {
+    if (managerRef.current) {
+      managerRef.current.addText(emoji);
+      setShowEmojiPicker(false);
     }
   };
 
@@ -431,9 +443,56 @@ export default function Home() {
       />
 
       {/* 主内容区 */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* 左侧工具栏 */}
         <Sidebar activeTool={activeTool} onToolChange={handleToolChange} />
+
+        {/* Emoji 选择器 */}
+        {showEmojiPicker && (
+          <>
+            {/* 背景遮罩 */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowEmojiPicker(false)}
+            />
+            {/* Emoji 弹层 */}
+            <div
+              className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-4"
+              style={{ left: '72px', top: '50%', transform: 'translateY(-50%)', maxHeight: '400px', overflowY: 'auto' }}
+            >
+              <div className="grid grid-cols-8 gap-2">
+                {[
+                  '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+                  '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
+                  '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪',
+                  '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨',
+                  '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥',
+                  '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕',
+                  '🤢', '🤮', '🤧', '🥵', '🥶', '😵', '🤯', '🤠',
+                  '🥳', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️',
+                  '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨',
+                  '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞',
+                  '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬',
+                  '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙',
+                  '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪',
+                  '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+                  '💯', '💢', '💥', '💫', '💦', '💨', '🕳️', '💬',
+                  '👁️', '🗨️', '🗯️', '💭', '💤', '⭐', '🌟', '✨',
+                  '🔥', '💧', '🌈', '☀️', '🌙', '⚡', '☁️', '❄️',
+                  '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉',
+                ].map((emoji) => (
+                  <button
+                    key={emoji}
+                    className="text-2xl hover:bg-gray-100 rounded p-2 transition-colors"
+                    onClick={() => handleEmojiSelect(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* 画布区域 */}
         <Canvas

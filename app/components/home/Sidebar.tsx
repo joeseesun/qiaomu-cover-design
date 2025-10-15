@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   Type,
   Image,
+  Smile,
   Undo2,
   Redo2,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ export default function Sidebar({
   const tools = [
     { id: 'text', label: '文本', icon: Type },
     { id: 'image', label: '图片', icon: Image },
+    { id: 'emoji', label: 'Emoji', icon: Smile },
   ];
 
   return (

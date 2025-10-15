@@ -797,7 +797,8 @@ export class CanvasManager {
           {
             stroke: lineColor,
             strokeWidth: lineWidth,
-            // ✅ 不设置 origin，让它使用默认的 'left', 'top'
+            originX: 'center',
+            originY: 'center',
           }
         );
       } else if (config.underlineStyle === 'dotted') {
@@ -807,7 +808,8 @@ export class CanvasManager {
             stroke: lineColor,
             strokeWidth: lineWidth,
             strokeDashArray: [lineWidth * 2, lineWidth * 2],
-            // ✅ 不设置 origin，让它使用默认的 'left', 'top'
+            originX: 'center',
+            originY: 'center',
           }
         );
       } else {
@@ -825,7 +827,8 @@ export class CanvasManager {
           stroke: lineColor,
           strokeWidth: lineWidth,
           fill: '',
-          // ✅ 不设置 origin，让它使用默认的 'left', 'top'
+          originX: 'center',
+          originY: 'center',
         });
       }
       objects.push(underline);
@@ -837,11 +840,15 @@ export class CanvasManager {
     // 如果有装饰，创建 Group；否则只添加文本
     if (objects.length > 1) {
       // 确保所有对象的位置都是 (0, 0)，这样它们在 Group 内部就是居中的
+      // 但是下划线需要保持其 Y 坐标偏移
       objects.forEach(obj => {
-        obj.set({
-          left: 0,
-          top: 0,
-        });
+        if (obj.type === 'line' || obj.type === 'polyline') {
+          // 下划线：只设置 left: 0，保持 top 为其计算的 Y 坐标
+          obj.set({ left: 0 });
+        } else {
+          // 其他对象：设置 left: 0, top: 0
+          obj.set({ left: 0, top: 0 });
+        }
       });
 
       const group = new fabric.Group(objects, {
