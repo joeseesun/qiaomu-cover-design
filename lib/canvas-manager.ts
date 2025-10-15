@@ -495,32 +495,67 @@ export class CanvasManager {
   bringToFront() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
+      const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.bringToFront();
       this.canvas.renderAll();
+      const afterIndex = this.canvas.getObjects().indexOf(activeObject);
+      console.log('📌 置于顶层:', {
+        type: activeObject.type,
+        beforeIndex,
+        afterIndex,
+        totalObjects: this.canvas.getObjects().length
+      });
     }
   }
 
   sendToBack() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
+      const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.sendToBack();
       this.canvas.renderAll();
+      const afterIndex = this.canvas.getObjects().indexOf(activeObject);
+      console.log('📌 置于底层:', {
+        type: activeObject.type,
+        beforeIndex,
+        afterIndex,
+        totalObjects: this.canvas.getObjects().length
+      });
+
+      // 打印所有对象的顺序
+      console.log('📋 当前图层顺序(从底到顶):',
+        this.canvas.getObjects().map((obj, i) => `${i}: ${obj.type}`)
+      );
     }
   }
 
   bringForward() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
+      const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.bringForward();
       this.canvas.renderAll();
+      const afterIndex = this.canvas.getObjects().indexOf(activeObject);
+      console.log('📌 上移一层:', {
+        type: activeObject.type,
+        beforeIndex,
+        afterIndex
+      });
     }
   }
 
   sendBackwards() {
     const activeObject = this.canvas.getActiveObject();
     if (activeObject) {
+      const beforeIndex = this.canvas.getObjects().indexOf(activeObject);
       activeObject.sendBackwards();
       this.canvas.renderAll();
+      const afterIndex = this.canvas.getObjects().indexOf(activeObject);
+      console.log('📌 下移一层:', {
+        type: activeObject.type,
+        beforeIndex,
+        afterIndex
+      });
     }
   }
 
