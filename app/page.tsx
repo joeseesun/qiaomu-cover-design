@@ -15,6 +15,7 @@ import ImageUploadDialog from './components/home/ImageUploadDialog';
 import ShapeDialog from './components/home/ShapeDialog';
 import ConfirmDialog from './components/ui/ConfirmDialog';
 import Toast, { ToastType } from './components/ui/Toast';
+import { HexColorPicker } from 'react-colorful';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +31,8 @@ export default function Home() {
   const [userZoom, setUserZoom] = useState(100); // 用户手动缩放（50-200%）
   const [isPanMode, setIsPanMode] = useState(false); // 拖拽模式锁定状态
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showShapeFillPicker, setShowShapeFillPicker] = useState(false);
+  const [showShapeStrokePicker, setShowShapeStrokePicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAIImageDialog, setShowAIImageDialog] = useState(false);
   const [showImageLibrary, setShowImageLibrary] = useState(false);
@@ -838,13 +841,38 @@ export default function Home() {
           {/* 背景遮罩，点击关闭菜单 */}
           <div
             className="fixed inset-0 z-40"
-            onClick={() => setContextMenu(null)}
+            onClick={() => {
+              setContextMenu(null);
+              setShowShapeFillPicker(false);
+              setShowShapeStrokePicker(false);
+            }}
           />
           {/* 菜单 */}
           <div
             className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
+            {/* 形状专属选项 */}
+            {(selectedObject as any).isShape && (
+              <>
+                <div className="px-4 py-1 text-xs text-gray-500 font-medium">形状设置</div>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                  onClick={() => setShowShapeFillPicker(!showShapeFillPicker)}
+                >
+                  改变填充颜色
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                  onClick={() => setShowShapeStrokePicker(!showShapeStrokePicker)}
+                >
+                  改变边框颜色
+                </button>
+                <div className="h-px bg-gray-200 my-1" />
+                <div className="px-4 py-1 text-xs text-gray-500 font-medium">图层</div>
+              </>
+            )}
+
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
               onClick={() => {
@@ -886,6 +914,42 @@ export default function Home() {
               <span className="text-xs text-gray-400">⌘⇧[</span>
             </button>
           </div>
+
+          {/* 填充颜色选择器 */}
+          {showShapeFillPicker && (
+            <div
+              className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
+              style={{ left: contextMenu.x + 180, top: contextMenu.y }}
+            >
+              <HexColorPicker
+                color={(selectedObject as any).fill || '#3b82f6'}
+                onChange={(color) => {
+                  if (selectedObject) {
+                    selectedObject.set('fill', color);
+                    managerRef.current?.canvas.renderAll();
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {/* 边框颜色选择器 */}
+          {showShapeStrokePicker && (
+            <div
+              className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
+              style={{ left: contextMenu.x + 180, top: contextMenu.y + 40 }}
+            >
+              <HexColorPicker
+                color={(selectedObject as any).stroke || '#1e40af'}
+                onChange={(color) => {
+                  if (selectedObject) {
+                    selectedObject.set('stroke', color);
+                    managerRef.current?.canvas.renderAll();
+                  }
+                }}
+              />
+            </div>
+          )}
         </>
       )}
 
