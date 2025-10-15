@@ -46,8 +46,8 @@ export default function Sidebar({
 
   return (
     <aside
-      className="flex flex-col items-center py-8 gap-4 bg-background"
-      style={{ width: '72px', borderRight: '1px solid hsl(var(--border))' }}
+      className="flex flex-col items-center py-6 gap-2 bg-background"
+      style={{ width: '56px', borderRight: '1px solid hsl(var(--border))' }}
     >
       <TooltipProvider delayDuration={300}>
         {/* 工具按钮 */}
@@ -61,19 +61,19 @@ export default function Sidebar({
                   variant={isActive ? 'default' : 'ghost'}
                   size="icon"
                   onClick={() => onToolChange(tool.id)}
-                  className="relative h-12 w-12"
+                  className="relative h-10 w-10"
                 >
                   <Icon className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={8} align="center">
                 <p>{tool.label}</p>
               </TooltipContent>
             </Tooltip>
           );
         })}
 
-        <Separator className="w-6 my-3" />
+        <Separator className="w-6 my-2" />
 
         {/* 撤销/重做 */}
         <Tooltip>
@@ -81,14 +81,14 @@ export default function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-12 w-12"
+              className="h-10 w-10"
               disabled={!canUndo}
               onClick={onUndo}
             >
               <Undo2 className="h-5 w-5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">
+          <TooltipContent side="right" sideOffset={8} align="center">
             <p>撤销</p>
           </TooltipContent>
         </Tooltip>
@@ -98,14 +98,14 @@ export default function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-12 w-12"
+              className="h-10 w-10"
               disabled={!canRedo}
               onClick={onRedo}
             >
               <Redo2 className="h-5 w-5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">
+          <TooltipContent side="right" sideOffset={8} align="center">
             <p>重做</p>
           </TooltipContent>
         </Tooltip>
