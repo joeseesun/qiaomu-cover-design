@@ -632,17 +632,33 @@ export class CanvasManager {
         // 保存当前滚动位置
         const savedScrollX = window.scrollX;
         const savedScrollY = window.scrollY;
+        console.log('🔍 [防滚动] 保存滚动位置:', { savedScrollX, savedScrollY });
+
+        // 检查当前页面尺寸
+        console.log('📏 [防滚动] 页面尺寸:', {
+          bodyScrollHeight: document.body.scrollHeight,
+          bodyClientHeight: document.body.clientHeight,
+          documentScrollHeight: document.documentElement.scrollHeight,
+          documentClientHeight: document.documentElement.clientHeight,
+          windowInnerHeight: window.innerHeight,
+        });
 
         // 保存body和html的overflow样式
         const bodyOverflow = document.body.style.overflow;
         const htmlOverflow = document.documentElement.style.overflow;
+        console.log('💾 [防滚动] 保存overflow样式:', { bodyOverflow, htmlOverflow });
 
         // 临时禁用滚动
         document.body.style.overflow = 'hidden';
         document.documentElement.style.overflow = 'hidden';
+        console.log('🚫 [防滚动] 已设置overflow: hidden');
 
         // 强制阻止滚动的函数
         const preventScroll = (e: Event) => {
+          console.log('⚠️ [防滚动] 检测到滚动事件!', {
+            target: (e.target as any)?.tagName,
+            currentScroll: { x: window.scrollX, y: window.scrollY },
+          });
           e.preventDefault();
           e.stopPropagation();
           window.scrollTo(savedScrollX, savedScrollY);
@@ -653,19 +669,40 @@ export class CanvasManager {
         window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
         document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
         document.body.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+        console.log('👂 [防滚动] 已添加滚动监听器');
 
         // 延迟进入编辑模式，并立即恢复滚动
         setTimeout(() => {
+          console.log('✏️ [防滚动] 准备进入编辑模式');
           editText.enterEditing();
+          console.log('✅ [防滚动] 已调用enterEditing()');
+
           editText.selectAll();
+          console.log('✅ [防滚动] 已调用selectAll()');
+
+          // 检查滚动位置是否变化
+          console.log('🔍 [防滚动] 进入编辑后滚动位置:', {
+            x: window.scrollX,
+            y: window.scrollY,
+            changed: window.scrollX !== savedScrollX || window.scrollY !== savedScrollY,
+          });
 
           // 强制恢复滚动位置(多次尝试)
           const restoreScroll = () => {
+            const beforeX = window.scrollX;
+            const beforeY = window.scrollY;
+
             window.scrollTo(savedScrollX, savedScrollY);
             document.documentElement.scrollTop = savedScrollY;
             document.documentElement.scrollLeft = savedScrollX;
             document.body.scrollTop = savedScrollY;
             document.body.scrollLeft = savedScrollX;
+
+            console.log('🔄 [防滚动] 恢复滚动位置:', {
+              before: { x: beforeX, y: beforeY },
+              target: { x: savedScrollX, y: savedScrollY },
+              after: { x: window.scrollX, y: window.scrollY },
+            });
           };
 
           restoreScroll();
@@ -674,16 +711,28 @@ export class CanvasManager {
 
           // 延迟移除滚动监听和恢复overflow，确保编辑模式完全稳定
           setTimeout(() => {
+            console.log('🧹 [防滚动] 准备清理监听器和恢复overflow');
+
             window.removeEventListener('scroll', preventScroll, { capture: true } as any);
             document.removeEventListener('scroll', preventScroll, { capture: true } as any);
             document.body.removeEventListener('scroll', preventScroll, { capture: true } as any);
+            console.log('✅ [防滚动] 已移除滚动监听器');
 
             // 恢复overflow样式
             document.body.style.overflow = bodyOverflow;
             document.documentElement.style.overflow = htmlOverflow;
+            console.log('✅ [防滚动] 已恢复overflow样式:', { bodyOverflow, htmlOverflow });
 
             // 最后一次恢复滚动位置
             restoreScroll();
+
+            // 最终检查
+            console.log('🏁 [防滚动] 最终页面尺寸:', {
+              bodyScrollHeight: document.body.scrollHeight,
+              bodyClientHeight: document.body.clientHeight,
+              documentScrollHeight: document.documentElement.scrollHeight,
+              documentClientHeight: document.documentElement.clientHeight,
+            });
           }, 200);
         }, 0);
 
