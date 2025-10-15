@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CanvasManager } from '@/lib/canvas-manager';
 import { VersionManager } from '@/lib/version-manager';
 import { AIImageGenerator } from '@/lib/ai-image-generator';
+import { ImageToImageGenerator } from '@/lib/image-to-image-generator';
 import { CanvasVersion, CanvasSize, DEFAULT_CANVAS_SIZE } from '@/lib/types';
 import Topbar from './components/home/Topbar';
 import Sidebar from './components/home/Sidebar';
@@ -13,6 +14,7 @@ import { AIImageDialog } from './components/home/AIImageDialog';
 import ImageLibrary from './components/home/ImageLibrary';
 import ImageUploadDialog from './components/home/ImageUploadDialog';
 import ShapeDialog from './components/home/ShapeDialog';
+import ImageToImageDialog from './components/home/ImageToImageDialog';
 import ConfirmDialog from './components/ui/ConfirmDialog';
 import Toast, { ToastType } from './components/ui/Toast';
 import { HexColorPicker } from 'react-colorful';
@@ -50,7 +52,9 @@ export default function Home() {
   }>({ show: false, message: '', type: 'success' });
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [showImageToImageDialog, setShowImageToImageDialog] = useState(false);
   const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
+  const imageToImageGeneratorRef = useRef<ImageToImageGenerator | null>(null);
 
   // 初始化 - 只在组件挂载时执行一次
   useEffect(() => {
@@ -63,6 +67,7 @@ export default function Home() {
     );
     versionRef.current = new VersionManager();
     aiImageGeneratorRef.current = new AIImageGenerator();
+    imageToImageGeneratorRef.current = new ImageToImageGenerator();
 
     const allVersions = versionRef.current.getAll();
     const activeVersion = versionRef.current.getActive();
@@ -201,6 +206,16 @@ export default function Home() {
           managerRef.current.undo();
         }
         return;
+      }
+
+      // Tab键 - 打开图片转换对话框（需要选中对象）
+      if (e.key === 'Tab' && managerRef.current) {
+        const activeObjects = managerRef.current.canvas.getActiveObjects();
+        if (activeObjects.length > 0) {
+          e.preventDefault();
+          setShowImageToImageDialog(true);
+          return;
+        }
       }
 
       // 图层调整快捷键和复制快捷键（需要选中对象）
@@ -378,6 +393,55 @@ export default function Home() {
   const handleSelectShape = (shapeType: string) => {
     if (!managerRef.current) return;
     managerRef.current.addShape(shapeType);
+  };
+
+  // 图片转图片生成
+  const handleImageToImageGenerate = async (prompt: string, size: '1K' | '2K' | '4K') => {
+    if (!managerRef.current || !imageToImageGeneratorRef.current) return;
+
+    try {
+      // 显示加载提示
+      setToast({ show: true, message: '正在转换对象为图片...', type: 'info' });
+
+      // 将选中的对象转换为图片URL
+      const imageUrls = await managerRef.current.getSelectedObjectsAsImages();
+
+      console.log('✅ 对象已转换为图片:', imageUrls);
+
+      // 显示生成提示
+      setToast({ show: true, message: '正在生成新图片...', type: 'info' });
+
+      // 调用API生成新图片
+      let generatedImageUrl: string;
+      if (imageUrls.length === 1) {
+        generatedImageUrl = await imageToImageGeneratorRef.current.generateFromSingleImage(
+          prompt,
+          imageUrls[0],
+          size
+        );
+      } else {
+        generatedImageUrl = await imageToImageGeneratorRef.current.generateFromMultipleImages(
+          prompt,
+          imageUrls,
+          size
+        );
+      }
+
+      console.log('✅ 新图片已生成:', generatedImageUrl);
+
+      // 将生成的图片添加到画布
+      await managerRef.current.addImageFromURL(generatedImageUrl);
+
+      setToast({ show: true, message: '图片生成成功!', type: 'success' });
+    } catch (error) {
+      console.error('❌ 图片转换失败:', error);
+      setToast({
+        show: true,
+        message: error instanceof Error ? error.message : '图片转换失败',
+        type: 'error'
+      });
+      throw error;
+    }
   };
 
   // 本地上传图片
@@ -958,6 +1022,14 @@ export default function Home() {
         open={showAIImageDialog}
         onOpenChange={setShowAIImageDialog}
         onGenerate={handleAIImageGenerate}
+      />
+
+      {/* 图片转图片对话框 */}
+      <ImageToImageDialog
+        open={showImageToImageDialog}
+        onClose={() => setShowImageToImageDialog(false)}
+        onGenerate={handleImageToImageGenerate}
+        imageCount={managerRef.current?.canvas.getActiveObjects().length || 0}
       />
 
       {/* 图片库 */}

@@ -105,5 +105,28 @@ export class QiniuUploader {
     const file = new File([blob], 'clipboard-image.png', { type: blob.type });
     return this.uploadFile(file);
   }
+
+  // 上传 Base64 编码的图片
+  async uploadBase64(base64Data: string, fileName: string): Promise<string> {
+    try {
+      // 将 base64 转换为 Blob
+      const byteString = atob(base64Data);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: 'image/png' });
+
+      // 创建 File 对象
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      // 使用现有的 uploadFile 方法
+      return this.uploadFile(file);
+    } catch (error) {
+      console.error('❌ Base64 图片上传失败:', error);
+      throw error;
+    }
+  }
 }
 

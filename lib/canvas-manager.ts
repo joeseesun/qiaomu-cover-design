@@ -2317,6 +2317,75 @@ export class CanvasManager {
     return this.historyIndex < this.history.length - 1;
   }
 
+  /**
+   * 将选中的对象转换为图片URL数组
+   * @returns 图片URL数组
+   */
+  async getSelectedObjectsAsImages(): Promise<string[]> {
+    const activeObjects = this.canvas.getActiveObjects();
+    if (activeObjects.length === 0) {
+      throw new Error('没有选中的对象');
+    }
+
+    const imageUrls: string[] = [];
+
+    for (const obj of activeObjects) {
+      try {
+        // 创建临时画布
+        const tempCanvas = document.createElement('canvas');
+        const padding = 20; // 添加一些内边距
+
+        // 获取对象的边界框
+        const boundingRect = obj.getBoundingRect();
+        tempCanvas.width = boundingRect.width + padding * 2;
+        tempCanvas.height = boundingRect.height + padding * 2;
+
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('无法创建canvas context');
+        }
+
+        // 设置白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // 保存当前状态
+        ctx.save();
+
+        // 移动到中心位置
+        ctx.translate(padding, padding);
+
+        // 如果对象有旋转,需要处理
+        if (obj.angle) {
+          ctx.translate(boundingRect.width / 2, boundingRect.height / 2);
+          ctx.rotate((obj.angle * Math.PI) / 180);
+          ctx.translate(-boundingRect.width / 2, -boundingRect.height / 2);
+        }
+
+        // 渲染对象到临时画布
+        obj.render(ctx);
+
+        ctx.restore();
+
+        // 转换为DataURL
+        const dataUrl = tempCanvas.toDataURL('image/png');
+
+        // 上传到七牛云
+        const uploadedUrl = await this.qiniuUploader.uploadBase64(
+          dataUrl.split(',')[1], // 去掉data:image/png;base64,前缀
+          `image-to-image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.png`
+        );
+
+        imageUrls.push(uploadedUrl);
+      } catch (error) {
+        console.error('转换对象为图片失败:', error);
+        throw error;
+      }
+    }
+
+    return imageUrls;
+  }
+
   // 销毁画布
   dispose() {
     this.canvas.dispose();
