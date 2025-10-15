@@ -6,7 +6,7 @@ import { CanvasSize } from '@/lib/types';
 import { ZoomIn, ZoomOut, Hand } from 'lucide-react';
 
 interface CanvasProps {
-  canvasRef: RefObject<HTMLCanvasElement>;
+  canvasRef: RefObject<HTMLCanvasElement | null>;
   canvasSize: CanvasSize;
   userZoom?: number; // 用户手动缩放（50-200）
   isPanMode?: boolean; // 是否锁定拖拽模式
