@@ -1,6 +1,7 @@
 // 画布管理器
 import { fabric } from 'fabric';
 import { HighlightConfig, CANVAS_WIDTH, CANVAS_HEIGHT } from './types';
+import { QiniuUploader } from './qiniu-uploader';
 
 export class CanvasManager {
   canvas: fabric.Canvas;
@@ -10,10 +11,12 @@ export class CanvasManager {
   private historyIndex: number = -1;
   private isUndoRedoing: boolean = false;
   private saveHistoryTimer: NodeJS.Timeout | null = null;
+  private qiniuUploader: QiniuUploader;
 
   constructor(element: HTMLCanvasElement, width = CANVAS_WIDTH, height = CANVAS_HEIGHT) {
     this.width = width;
     this.height = height;
+    this.qiniuUploader = new QiniuUploader();
     this.canvas = new fabric.Canvas(element, {
       width: this.width,
       height: this.height,
@@ -120,16 +123,21 @@ export class CanvasManager {
     });
   }
 
-  // 添加图片
+  // 添加图片（上传到七牛云）
   addImage(file: File): Promise<fabric.Image> {
     return new Promise(async (resolve, reject) => {
       try {
-        // 压缩图片
-        const compressedUrl = await this.compressImage(file, 1200, 0.8);
+        console.log('📤 开始上传图片到七牛云...');
 
-        fabric.Image.fromURL(compressedUrl, (img) => {
+        // 上传到七牛云
+        const imageUrl = await this.qiniuUploader.uploadFile(file);
+
+        console.log('✅ 图片上传成功，URL:', imageUrl);
+
+        // 从七牛云 URL 加载图片
+        fabric.Image.fromURL(imageUrl, (img) => {
           if (!img) {
-            reject(new Error('Failed to load image'));
+            reject(new Error('Failed to load image from Qiniu'));
             return;
           }
 
@@ -155,26 +163,29 @@ export class CanvasManager {
           this.canvas.setActiveObject(img);
           this.canvas.renderAll();
           resolve(img);
-        });
+        }, { crossOrigin: 'anonymous' }); // 允许跨域
       } catch (error) {
+        console.error('❌ 图片上传失败:', error);
         reject(error);
       }
     });
   }
 
-  // 从剪贴板添加图片
+  // 从剪贴板添加图片（上传到七牛云）
   addImageFromClipboard(blob: Blob): Promise<fabric.Image> {
     return new Promise(async (resolve, reject) => {
       try {
-        // 将 Blob 转换为 File 以便使用压缩函数
-        const file = new File([blob], 'clipboard-image.png', { type: blob.type });
+        console.log('📤 开始上传剪贴板图片到七牛云...');
 
-        // 压缩图片
-        const compressedUrl = await this.compressImage(file, 1200, 0.8);
+        // 上传到七牛云
+        const imageUrl = await this.qiniuUploader.uploadBlob(blob);
 
-        fabric.Image.fromURL(compressedUrl, (img) => {
+        console.log('✅ 剪贴板图片上传成功，URL:', imageUrl);
+
+        // 从七牛云 URL 加载图片
+        fabric.Image.fromURL(imageUrl, (img) => {
           if (!img) {
-            reject(new Error('Failed to load image'));
+            reject(new Error('Failed to load image from Qiniu'));
             return;
           }
 
@@ -200,8 +211,9 @@ export class CanvasManager {
           this.canvas.setActiveObject(img);
           this.canvas.renderAll();
           resolve(img);
-        });
+        }, { crossOrigin: 'anonymous' }); // 允许跨域
       } catch (error) {
+        console.error('❌ 剪贴板图片上传失败:', error);
         reject(error);
       }
     });
