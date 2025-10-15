@@ -50,7 +50,10 @@ function generateUploadToken(key: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, size = '1024x1024' } = await request.json();
+    const body = await request.json();
+    const { prompt, size = '1024x1024' } = body;
+
+    console.log('📥 后端收到请求:', body);
 
     if (!prompt) {
       return NextResponse.json(
