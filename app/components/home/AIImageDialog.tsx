@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { getQuickPromptsManager, QuickPrompt } from '@/lib/quick-prompts';
 
 interface AIImageDialogProps {
   open: boolean;
@@ -25,6 +26,17 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
   const [prompt, setPrompt] = useState('');
   const [size, setSize] = useState('1024x1024'); // 默认 1:1
   const [isGenerating, setIsGenerating] = useState(false);
+  const [quickPrompts, setQuickPrompts] = useState<QuickPrompt[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+  const [newPromptText, setNewPromptText] = useState('');
+
+  // 加载快速提示词
+  useEffect(() => {
+    const manager = getQuickPromptsManager();
+    setQuickPrompts(manager.getAll());
+  }, []);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -53,20 +65,51 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
     }
   };
 
-  // 示例提示词
-  const examplePrompts = [
-    '星际穿越，黑洞，黑洞里冲出一辆快支离破碎的复古列车，抢视觉冲击力，电影大片，末日既视感',
-    '赛博朋克城市，霓虹灯，雨夜，未来感，科幻，高清，电影质感',
-    '中国风，水墨画，山水，云雾缭绕，意境深远，古典美学',
-    '宇宙星空，星云，璀璨星河，深邃，神秘，壮观',
-  ];
+  // 添加快速提示词
+  const handleAddPrompt = () => {
+    if (!newPromptText.trim()) return;
+    const manager = getQuickPromptsManager();
+    manager.add(newPromptText);
+    setQuickPrompts(manager.getAll());
+    setNewPromptText('');
+    setIsAdding(false);
+  };
+
+  // 更新快速提示词
+  const handleUpdatePrompt = (id: string) => {
+    if (!editingText.trim()) return;
+    const manager = getQuickPromptsManager();
+    manager.update(id, editingText);
+    setQuickPrompts(manager.getAll());
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  // 删除快速提示词
+  const handleDeletePrompt = (id: string) => {
+    const manager = getQuickPromptsManager();
+    manager.delete(id);
+    setQuickPrompts(manager.getAll());
+  };
+
+  // 开始编辑
+  const startEdit = (prompt: QuickPrompt) => {
+    setEditingId(prompt.id);
+    setEditingText(prompt.text);
+  };
+
+  // 取消编辑
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[900px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
+            <Sparkles className="h-5 w-5 text-gray-700" />
             AI 生成图片
           </DialogTitle>
         </DialogHeader>
@@ -85,8 +128,8 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                   disabled={isGenerating}
                   className={`px-3 py-2 text-xs rounded border transition-colors ${
                     size === option.value
-                      ? 'bg-purple-500 text-white border-purple-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-purple-500'
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-900'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {option.ratio}
@@ -117,21 +160,123 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
             />
           </div>
 
-          {/* 示例提示词 */}
+          {/* 快速提示词 */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              示例提示词（点击使用）
-            </label>
-            <div className="grid grid-cols-1 gap-2">
-              {examplePrompts.map((example, index) => (
-                <button
-                  key={index}
-                  onClick={() => setPrompt(example)}
-                  disabled={isGenerating}
-                  className="text-left text-xs p-2 rounded border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-muted-foreground">
+                快速提示词（点击使用）
+              </label>
+              <button
+                onClick={() => setIsAdding(true)}
+                disabled={isGenerating}
+                className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="h-3 w-3" />
+                新增
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto">
+              {/* 新增输入框 */}
+              {isAdding && (
+                <div className="flex gap-2 p-2 border border-gray-300 rounded bg-gray-50">
+                  <input
+                    type="text"
+                    value={newPromptText}
+                    onChange={(e) => setNewPromptText(e.target.value)}
+                    placeholder="输入新的提示词..."
+                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddPrompt();
+                      if (e.key === 'Escape') {
+                        setIsAdding(false);
+                        setNewPromptText('');
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={handleAddPrompt}
+                    className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAdding(false);
+                      setNewPromptText('');
+                    }}
+                    className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* 提示词列表 */}
+              {quickPrompts.map((promptItem) => (
+                <div
+                  key={promptItem.id}
+                  className="group relative"
                 >
-                  {example.length > 80 ? example.substring(0, 80) + '...' : example}
-                </button>
+                  {editingId === promptItem.id ? (
+                    // 编辑模式
+                    <div className="flex gap-2 p-2 border border-gray-300 rounded bg-gray-50">
+                      <input
+                        type="text"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleUpdatePrompt(promptItem.id);
+                          if (e.key === 'Escape') cancelEdit();
+                        }}
+                      />
+                      <button
+                        onClick={() => handleUpdatePrompt(promptItem.id)}
+                        className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
+                      >
+                        保存
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    // 显示模式
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPrompt(promptItem.text)}
+                        disabled={isGenerating}
+                        className="flex-1 text-left text-xs p-2 rounded border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {promptItem.text.length > 80 ? promptItem.text.substring(0, 80) + '...' : promptItem.text}
+                      </button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => startEdit(promptItem)}
+                          disabled={isGenerating}
+                          className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                          title="编辑"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePrompt(promptItem.id)}
+                          disabled={isGenerating}
+                          className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50"
+                          title="删除"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -148,6 +293,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !prompt.trim()}
+              className="bg-gray-900 hover:bg-gray-800 text-white border border-gray-900"
             >
               {isGenerating ? (
                 <>
