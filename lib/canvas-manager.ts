@@ -2213,6 +2213,84 @@ export class CanvasManager {
     });
   }
 
+  // 导出选中对象为 Blob
+  async exportObjectToBlob(obj?: fabric.Object): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      try {
+        // 如果没有传入对象,使用当前选中的对象
+        const targetObj = obj || this.canvas.getActiveObject();
+        if (!targetObj) {
+          reject(new Error('没有选中的对象'));
+          return;
+        }
+
+        // 创建临时画布
+        const tempCanvas = document.createElement('canvas');
+        const padding = 20; // 添加一些内边距
+
+        // 获取对象的边界框
+        const boundingRect = targetObj.getBoundingRect();
+        tempCanvas.width = boundingRect.width + padding * 2;
+        tempCanvas.height = boundingRect.height + padding * 2;
+
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('无法创建canvas context'));
+          return;
+        }
+
+        // 设置白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // 保存当前状态
+        ctx.save();
+
+        // 移动到中心位置
+        ctx.translate(
+          padding - boundingRect.left,
+          padding - boundingRect.top
+        );
+
+        // 渲染对象到临时画布
+        targetObj.render(ctx);
+
+        ctx.restore();
+
+        // 转换为Blob
+        tempCanvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 下载选中对象为图片
+  async downloadObject(obj?: fabric.Object, filename?: string) {
+    try {
+      const blob = await this.exportObjectToBlob(obj);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = filename || `object-${Date.now()}.png`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('❌ 下载对象失败:', error);
+      throw error;
+    }
+  }
+
   // 生成缩略图
   toThumbnail() {
     return this.canvas.toDataURL({

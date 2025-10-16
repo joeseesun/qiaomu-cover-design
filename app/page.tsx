@@ -225,6 +225,17 @@ export default function Home() {
 
       // 图层调整快捷键和复制快捷键（需要选中对象）
       if (managerRef.current && managerRef.current.canvas.getActiveObject()) {
+        // 下载对象快捷键 Cmd/Ctrl + Shift + D
+        if (cmdOrCtrl && e.shiftKey && e.key === 'D') {
+          e.preventDefault();
+          managerRef.current.downloadObject().then(() => {
+            setToast({ show: true, message: '下载成功', type: 'success' });
+          }).catch(() => {
+            setToast({ show: true, message: '下载失败', type: 'error' });
+          });
+          return;
+        }
+
         // 复制快捷键 Cmd/Ctrl + D
         if (cmdOrCtrl && e.key === 'd') {
           e.preventDefault();
@@ -924,6 +935,25 @@ export default function Home() {
             className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
+            {/* 下载为图片 */}
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={async () => {
+                try {
+                  await managerRef.current?.downloadObject();
+                  setToast({ show: true, message: '下载成功', type: 'success' });
+                } catch (error) {
+                  setToast({ show: true, message: '下载失败', type: 'error' });
+                }
+                setContextMenu(null);
+              }}
+            >
+              <span>下载为图片</span>
+              <span className="text-xs text-gray-400">⌘⇧D</span>
+            </button>
+
+            <div className="h-px bg-gray-200 my-1" />
+
             {/* 形状专属选项 */}
             {(selectedObject as any).isShape && (
               <>
@@ -941,10 +971,13 @@ export default function Home() {
                   改变边框颜色
                 </button>
                 <div className="h-px bg-gray-200 my-1" />
-                <div className="px-4 py-1 text-xs text-gray-500 font-medium">图层</div>
               </>
             )}
 
+            {/* 图层操作 */}
+            {(selectedObject as any).isShape && (
+              <div className="px-4 py-1 text-xs text-gray-500 font-medium">图层</div>
+            )}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
               onClick={() => {
