@@ -935,6 +935,18 @@ export default function Home() {
             className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
+            {/* AI图片转换 */}
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={() => {
+                setShowImageToImageDialog(true);
+                setContextMenu(null);
+              }}
+            >
+              <span>AI图片转换</span>
+              <span className="text-xs text-gray-400">Tab</span>
+            </button>
+
             {/* 下载为图片 */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"

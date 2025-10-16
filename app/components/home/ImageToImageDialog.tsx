@@ -62,22 +62,26 @@ export default function ImageToImageDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 背景遮罩 */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
       {/* 对话框内容 */}
-      <div className="relative bg-white rounded-lg shadow-xl p-6 w-[560px]">
-        <h2 className="text-lg font-semibold mb-4">
-          AI 图片转换
-          <span className="ml-2 text-sm text-gray-500">
-            ({imageCount} 个对象)
-          </span>
-        </h2>
-        
-        <form onSubmit={handleSubmit}>
+      <div className="relative bg-white rounded-xl shadow-2xl w-[600px] overflow-hidden">
+        {/* 标题栏 */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-base font-semibold text-gray-900">
+            AI 图片转换
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              已选择 {imageCount} 个对象
+            </span>
+          </h2>
+        </div>
+
+        {/* 内容区 */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Prompt输入 */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              描述你想要的效果
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              描述转换效果
             </label>
             <textarea
               ref={inputRef}
@@ -85,35 +89,35 @@ export default function ImageToImageDialog({
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                imageCount > 1 
-                  ? "例如: 将图1的服装换为图2的服装" 
+                imageCount > 1
+                  ? "例如: 将图1的服装换为图2的服装"
                   : "例如: 生成狗狗趴在草地上的近景画面"
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 resize-none text-sm placeholder:text-gray-400"
               rows={4}
               disabled={isGenerating}
             />
-            <p className="mt-1 text-xs text-gray-500">
-              按 Enter 提交，Shift+Enter 换行，Esc 关闭
+            <p className="mt-2 text-xs text-gray-500">
+              Enter 提交 · Shift+Enter 换行 · Esc 关闭
             </p>
           </div>
 
           {/* 尺寸选择 */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              图片尺寸
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              输出尺寸
             </label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {(['1K', '2K', '4K'] as const).map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setSize(s)}
                   disabled={isGenerating}
-                  className={`flex-1 py-2 px-4 rounded-md border transition-colors ${
+                  className={`py-2.5 px-4 rounded-lg border text-sm font-medium transition-all ${
                     size === s
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-900 hover:bg-gray-50'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {s}
@@ -122,20 +126,20 @@ export default function ImageToImageDialog({
             </div>
           </div>
 
-          {/* 按钮 */}
-          <div className="flex gap-3">
+          {/* 按钮组 */}
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isGenerating}
-              className="flex-1 py-2 px-4 rounded-md border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={!prompt.trim() || isGenerating}
-              className="flex-1 py-2 px-4 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 px-4 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isGenerating ? (
                 <>
