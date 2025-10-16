@@ -162,30 +162,20 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
 
           {/* 快速提示词 */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-muted-foreground">
-                快速提示词（点击使用）
-              </label>
-              <button
-                onClick={() => setIsAdding(true)}
-                disabled={isGenerating}
-                className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus className="h-3 w-3" />
-                新增
-              </button>
-            </div>
+            <label className="text-sm font-medium text-muted-foreground">
+              快速提示词（点击使用）
+            </label>
 
-            <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {/* 新增输入框 */}
               {isAdding && (
-                <div className="flex gap-2 p-2 border border-gray-300 rounded bg-gray-50">
+                <div className="relative">
                   <input
                     type="text"
                     value={newPromptText}
                     onChange={(e) => setNewPromptText(e.target.value)}
-                    placeholder="输入新的提示词..."
-                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    placeholder="输入新的提示词,按Enter保存,Esc取消"
+                    className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleAddPrompt();
@@ -195,21 +185,23 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                       }
                     }}
                   />
-                  <button
-                    onClick={handleAddPrompt}
-                    className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsAdding(false);
-                      setNewPromptText('');
-                    }}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                    <button
+                      onClick={handleAddPrompt}
+                      className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
+                    >
+                      保存
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsAdding(false);
+                        setNewPromptText('');
+                      }}
+                      className="p-1 text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -221,63 +213,89 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                 >
                   {editingId === promptItem.id ? (
                     // 编辑模式
-                    <div className="flex gap-2 p-2 border border-gray-300 rounded bg-gray-50">
+                    <div className="relative">
                       <input
                         type="text"
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        placeholder="按Enter保存,Esc取消"
+                        className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleUpdatePrompt(promptItem.id);
                           if (e.key === 'Escape') cancelEdit();
                         }}
                       />
-                      <button
-                        onClick={() => handleUpdatePrompt(promptItem.id)}
-                        className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
-                      >
-                        保存
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                        <button
+                          onClick={() => handleUpdatePrompt(promptItem.id)}
+                          className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
+                        >
+                          保存
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="p-1 text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     // 显示模式
-                    <div className="flex items-center gap-2">
+                    <div className="relative">
                       <button
                         onClick={() => setPrompt(promptItem.text)}
                         disabled={isGenerating}
-                        className="flex-1 text-left text-xs p-2 rounded border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-left px-3 py-2 pr-20 text-xs border border-gray-200 rounded hover:border-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {promptItem.text.length > 80 ? promptItem.text.substring(0, 80) + '...' : promptItem.text}
+                        {promptItem.text}
                       </button>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                      {/* Hover时显示的编辑/删除按钮 */}
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-1 bg-white">
                         <button
-                          onClick={() => startEdit(promptItem)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(promptItem);
+                          }}
                           disabled={isGenerating}
-                          className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                          className="p-1.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                           title="编辑"
                         >
-                          <Pencil className="h-3 w-3" />
+                          <Pencil className="h-3.5 w-3.5 text-gray-600" />
                         </button>
                         <button
-                          onClick={() => handleDeletePrompt(promptItem.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePrompt(promptItem.id);
+                          }}
                           disabled={isGenerating}
-                          className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50"
+                          className="p-1.5 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 disabled:opacity-50"
                           title="删除"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
               ))}
+
+              {/* 新增按钮 - 放在列表最后 */}
+              {!isAdding && (
+                <button
+                  onClick={() => {
+                    setIsAdding(true);
+                    setNewPromptText('');
+                  }}
+                  disabled={isGenerating}
+                  className="w-full px-3 py-2 text-xs text-left border border-dashed border-gray-300 rounded hover:border-gray-900 hover:bg-gray-50 transition-colors text-gray-500 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4 inline mr-2" />
+                  新增提示词
+                </button>
+              )}
             </div>
           </div>
 
