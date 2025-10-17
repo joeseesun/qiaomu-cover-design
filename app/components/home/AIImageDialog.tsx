@@ -19,6 +19,7 @@ const sizeOptions = [
   { label: '4:3 (1152x864)', value: '1152x864', ratio: '4:3', pixels: 995328 },
   { label: '3:4 (864x1152)', value: '864x1152', ratio: '3:4', pixels: 995328 },
   { label: '16:9 (1280x720)', value: '1280x720', ratio: '16:9', pixels: 921600 },
+  { label: '21:9 (1680x720)', value: '1680x720', ratio: '21:9', pixels: 1209600 },
   { label: '9:16 (720x1280)', value: '720x1280', ratio: '9:16', pixels: 921600 },
 ];
 
@@ -120,7 +121,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
             <label className="text-sm font-medium">
               图片尺寸
             </label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {sizeOptions.map((option) => (
                 <button
                   key={option.value}

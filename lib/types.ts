@@ -89,6 +89,8 @@ export const CANVAS_RATIOS = {
     { name: '2560×1440', width: 2560, height: 1440, ratio: '16:9' },
   ],
   '21:9': [
+    { name: '1680×720', width: 1680, height: 720, ratio: '21:9' },
+    { name: '2100×900', width: 2100, height: 900, ratio: '21:9' },
     { name: '2560×1080', width: 2560, height: 1080, ratio: '21:9' },
     { name: '3440×1440', width: 3440, height: 1440, ratio: '21:9' },
     { name: '5120×2160', width: 5120, height: 2160, ratio: '21:9' },
