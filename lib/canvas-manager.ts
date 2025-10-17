@@ -2224,9 +2224,40 @@ export class CanvasManager {
           return;
         }
 
+        // 如果是图片对象,直接下载原图
+        if (targetObj.type === 'image') {
+          const imageObj = targetObj as fabric.Image;
+          const imageElement = imageObj.getElement() as HTMLImageElement;
+
+          // 如果图片有src,直接从URL获取
+          if (imageElement && imageElement.src) {
+            fetch(imageElement.src)
+              .then(response => response.blob())
+              .then(blob => resolve(blob))
+              .catch(error => {
+                console.error('❌ 获取图片失败,使用渲染方式:', error);
+                // 如果获取失败,降级到渲染方式
+                this.renderObjectToBlob(targetObj, false).then(resolve).catch(reject);
+              });
+            return;
+          }
+        }
+
+        // 对于非图片对象(文本、形状等),使用渲染方式并添加白色背景
+        this.renderObjectToBlob(targetObj, true).then(resolve).catch(reject);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 渲染对象到Blob的辅助方法
+  private renderObjectToBlob(targetObj: fabric.Object, addBackground: boolean): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      try {
         // 创建临时画布
         const tempCanvas = document.createElement('canvas');
-        const padding = 20; // 添加一些内边距
+        const padding = addBackground ? 20 : 0; // 图片不添加内边距
 
         // 获取对象的边界框
         const boundingRect = targetObj.getBoundingRect();
@@ -2239,9 +2270,11 @@ export class CanvasManager {
           return;
         }
 
-        // 设置白色背景
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        // 只有非图片对象才设置白色背景
+        if (addBackground) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        }
 
         // 保存当前状态
         ctx.save();
