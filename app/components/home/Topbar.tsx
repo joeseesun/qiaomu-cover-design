@@ -56,7 +56,7 @@ export default function Topbar({
   onClearStorage,
 }: TopbarProps) {
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
-  const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3' | '16:9' | '9:16'>('3:4');
+  const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3' | '16:9' | '21:9' | '9:16'>('3:4');
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -201,7 +201,7 @@ export default function Topbar({
           <DropdownMenuContent align="start" className="w-80 border-gray-200">
             {/* 比例 Tab */}
             <div className="flex border-b border-gray-200">
-              {(['3:4', '1:1', '4:3', '16:9', '9:16'] as const).map((ratio) => (
+              {(['3:4', '1:1', '4:3', '16:9', '21:9', '9:16'] as const).map((ratio) => (
                 <button
                   key={ratio}
                   onClick={() => setActiveRatio(ratio)}
