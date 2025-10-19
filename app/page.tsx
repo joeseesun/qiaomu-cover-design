@@ -223,6 +223,38 @@ export default function Home() {
         }
       }
 
+      // 复制快捷键 Cmd/Ctrl + C (需要选中对象)
+      if (cmdOrCtrl && e.key === 'c' && managerRef.current) {
+        const activeObject = managerRef.current.canvas.getActiveObject();
+        if (activeObject) {
+          // 检查是否有输入框获得焦点
+          const target = e.target as HTMLElement;
+          const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+          // 如果输入框获得焦点,不处理复制,让浏览器处理
+          if (!isInputFocused) {
+            e.preventDefault();
+            managerRef.current.copy();
+            setToast({ show: true, message: '已复制', type: 'success' });
+            return;
+          }
+        }
+      }
+
+      // 粘贴快捷键 Cmd/Ctrl + V
+      if (cmdOrCtrl && e.key === 'v' && managerRef.current) {
+        // 检查是否有输入框获得焦点
+        const target = e.target as HTMLElement;
+        const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+        // 如果输入框获得焦点,不处理粘贴,让浏览器处理
+        if (!isInputFocused) {
+          e.preventDefault();
+          managerRef.current.paste();
+          return;
+        }
+      }
+
       // 图层调整快捷键和复制快捷键（需要选中对象）
       if (managerRef.current && managerRef.current.canvas.getActiveObject()) {
         // 下载对象快捷键 Cmd/Ctrl + Shift + D
@@ -236,7 +268,7 @@ export default function Home() {
           return;
         }
 
-        // 复制快捷键 Cmd/Ctrl + D
+        // 原地复制快捷键 Cmd/Ctrl + D
         if (cmdOrCtrl && e.key === 'd') {
           e.preventDefault();
           managerRef.current.duplicateActive();

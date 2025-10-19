@@ -707,7 +707,97 @@ export class CanvasManager {
     }
   }
 
-  // 复制选中的对象
+  // 剪贴板存储
+  private clipboard: fabric.Object | fabric.Object[] | null = null;
+
+  // 复制选中的对象到剪贴板
+  copy() {
+    const activeObject = this.canvas.getActiveObject();
+    if (!activeObject) return;
+
+    // 处理多选
+    if (activeObject.type === 'activeSelection') {
+      const selection = activeObject as fabric.ActiveSelection;
+      const objects = selection.getObjects();
+
+      // 克隆所有对象到剪贴板
+      const clonedObjects: fabric.Object[] = [];
+      objects.forEach((obj: any) => {
+        obj.clone((cloned: fabric.Object) => {
+          clonedObjects.push(cloned);
+        }, ['data', 'selectable', 'evented']);
+      });
+
+      this.clipboard = clonedObjects;
+      console.log('✅ 已复制', clonedObjects.length, '个对象到剪贴板');
+      return;
+    }
+
+    // 处理单个对象
+    activeObject.clone((cloned: fabric.Object) => {
+      this.clipboard = cloned;
+      console.log('✅ 已复制对象到剪贴板:', cloned.type);
+    }, ['data', 'selectable', 'evented']);
+  }
+
+  // 从剪贴板粘贴对象
+  paste() {
+    if (!this.clipboard) {
+      console.log('⚠️ 剪贴板为空');
+      return;
+    }
+
+    // 取消当前选择
+    this.canvas.discardActiveObject();
+
+    // 处理多个对象
+    if (Array.isArray(this.clipboard)) {
+      const pastedObjects: fabric.Object[] = [];
+
+      this.clipboard.forEach((obj: any) => {
+        obj.clone((cloned: fabric.Object) => {
+          cloned.set({
+            left: (cloned.left || 0) + 20,
+            top: (cloned.top || 0) + 20,
+          });
+          this.canvas.add(cloned);
+          pastedObjects.push(cloned);
+        }, ['data', 'selectable', 'evented']);
+      });
+
+      // 选中粘贴的对象
+      setTimeout(() => {
+        const sel = new fabric.ActiveSelection(pastedObjects, {
+          canvas: this.canvas,
+        });
+        this.canvas.setActiveObject(sel);
+        this.canvas.renderAll();
+        console.log('✅ 已粘贴', pastedObjects.length, '个对象');
+      }, 10);
+
+      return;
+    }
+
+    // 处理单个对象
+    this.clipboard.clone((cloned: fabric.Object) => {
+      cloned.set({
+        left: (cloned.left || 0) + 20,
+        top: (cloned.top || 0) + 20,
+      });
+      this.canvas.add(cloned);
+      this.canvas.setActiveObject(cloned);
+      this.canvas.renderAll();
+
+      // 如果是 Group，需要重新绑定事件
+      if (cloned.type === 'group') {
+        this.rebindGroupEvents();
+      }
+
+      console.log('✅ 已粘贴对象:', cloned.type);
+    }, ['data', 'selectable', 'evented']);
+  }
+
+  // 复制选中的对象(原地复制,Cmd+D)
   duplicateActive() {
     const activeObject = this.canvas.getActiveObject();
     if (!activeObject) return;
