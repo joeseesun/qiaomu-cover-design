@@ -608,7 +608,7 @@ export class CanvasManager {
   }
 
   /**
-   * 添加AI生成图片的占位符（Apple 风格）
+   * 添加AI生成图片的占位符（渐变呼吸效果）
    * @param size 图片尺寸 (1024x1024, 1024x1792, 1792x1024)
    * @returns 占位图对象
    */
@@ -628,14 +628,17 @@ export class CanvasManager {
     const displayWidth = width * scale;
     const displayHeight = height * scale;
 
-    // 1. 背景矩形 - 半透明白色 + 毛玻璃效果
+    // 计算渐变圆形的基础半径（使用矩形的较小边）
+    const baseRadius = Math.min(displayWidth, displayHeight) / 2;
+
+    // 1. 背景矩形 - 半透明白色
     const background = new fabric.Rect({
       width: displayWidth,
       height: displayHeight,
       fill: 'rgba(255, 255, 255, 0.95)',
       stroke: 'rgba(0, 0, 0, 0.08)',
       strokeWidth: 1,
-      rx: 12, // 圆角
+      rx: 12,
       ry: 12,
       shadow: new fabric.Shadow({
         color: 'rgba(0, 0, 0, 0.1)',
@@ -647,48 +650,82 @@ export class CanvasManager {
       top: -displayHeight / 2,
     });
 
-    // 2. 创建 Apple 风格的 Spinner（旋转圆环）
-    const spinnerRadius = 20;
-    const spinner = new fabric.Circle({
-      radius: spinnerRadius,
-      fill: '',
-      stroke: 'rgba(0, 0, 0, 0.2)',
-      strokeWidth: 2.5,
-      strokeDashArray: [Math.PI * spinnerRadius * 0.7, Math.PI * spinnerRadius * 2],
-      strokeLineCap: 'round',
-      left: -spinnerRadius,
-      top: -spinnerRadius - 30, // Spinner 在中心上方
+    // 2. 创建外层渐变呼吸圆形（马卡龙黄色）
+    const outerRadius = baseRadius * 0.6; // 60% 的半径
+    const breathCircle = new fabric.Circle({
+      radius: outerRadius,
+      fill: new fabric.Gradient({
+        type: 'radial',
+        coords: {
+          x1: 0,
+          y1: 0,
+          x2: 0,
+          y2: 0,
+          r1: 0,
+          r2: outerRadius,
+        },
+        colorStops: [
+          { offset: 0, color: 'rgba(255, 193, 7, 0.25)' },    // 马卡龙黄色中心
+          { offset: 0.5, color: 'rgba(255, 235, 59, 0.2)' },  // 浅黄色中间
+          { offset: 1, color: 'rgba(255, 245, 157, 0.05)' },  // 淡黄色边缘
+        ],
+      }),
+      left: -outerRadius,
+      top: -outerRadius,
+      opacity: 0.8,
     });
 
-    // 3. 加载文本 - Apple 风格
-    const loadingText = new fabric.Text('正在生成', {
-      fontSize: 15,
-      fill: 'rgba(0, 0, 0, 0.6)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
-      fontWeight: '500',
-      textAlign: 'center',
-      originX: 'center',
-      originY: 'center',
-      left: 0,
-      top: 10, // 文字在 Spinner 下方
+    // 3. 中层圆（马卡龙粉红色）
+    const middleRadius = baseRadius * 0.4; // 40% 的半径
+    const middleCircle = new fabric.Circle({
+      radius: middleRadius,
+      fill: new fabric.Gradient({
+        type: 'radial',
+        coords: {
+          x1: 0,
+          y1: 0,
+          x2: 0,
+          y2: 0,
+          r1: 0,
+          r2: middleRadius,
+        },
+        colorStops: [
+          { offset: 0, color: 'rgba(255, 138, 128, 0.35)' },  // 马卡龙粉红色
+          { offset: 1, color: 'rgba(255, 171, 145, 0.1)' },   // 淡粉色
+        ],
+      }),
+      left: -middleRadius,
+      top: -middleRadius,
+      opacity: 0.85,
     });
 
-    // 4. 进度提示 - 更小更轻
-    const progressText = new fabric.Text('通常需要 10-30 秒', {
-      fontSize: 12,
-      fill: 'rgba(0, 0, 0, 0.35)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
-      fontWeight: '400',
-      textAlign: 'center',
-      originX: 'center',
-      originY: 'center',
-      left: 0,
-      top: 32, // 提示在文字下方
+    // 4. 内层小圆（马卡龙橙红色中心点）
+    const innerRadius = baseRadius * 0.2; // 20% 的半径
+    const innerCircle = new fabric.Circle({
+      radius: innerRadius,
+      fill: new fabric.Gradient({
+        type: 'radial',
+        coords: {
+          x1: 0,
+          y1: 0,
+          x2: 0,
+          y2: 0,
+          r1: 0,
+          r2: innerRadius,
+        },
+        colorStops: [
+          { offset: 0, color: 'rgba(255, 112, 67, 0.6)' },    // 马卡龙橙红色
+          { offset: 1, color: 'rgba(255, 138, 101, 0.25)' },  // 淡橙色
+        ],
+      }),
+      left: -innerRadius,
+      top: -innerRadius,
+      opacity: 0.9,
     });
 
-    // 5. 组合成一个Group（所有元素都相对于中心定位）
+    // 5. 组合成一个Group
     const placeholder = new fabric.Group(
-      [background, spinner, loadingText, progressText],
+      [background, breathCircle, middleCircle, innerCircle],
       {
         left: this.width / 2,
         top: this.height / 2,
@@ -702,42 +739,79 @@ export class CanvasManager {
     // 添加自定义属性标记
     (placeholder as any).isAIPlaceholder = true;
     (placeholder as any).targetSize = { width, height };
-    (placeholder as any).spinner = spinner;
+    (placeholder as any).breathCircle = breathCircle;
+    (placeholder as any).middleCircle = middleCircle;
+    (placeholder as any).innerCircle = innerCircle;
 
     // 添加到画布
     this.canvas.add(placeholder);
     this.canvas.renderAll();
 
-    // 启动 Apple 风格的旋转动画
-    this.startAppleSpinnerAnimation(spinner);
+    // 启动呼吸动画
+    this.startBreathingAnimation(placeholder, breathCircle, middleCircle, innerCircle);
 
-    console.log('✅ AI占位图已添加到画布（Apple 风格）');
+    console.log('✅ AI占位图已添加到画布（渐变呼吸效果）');
     return placeholder;
   }
 
   /**
-   * 启动 Apple 风格的 Spinner 动画
-   * 使用缓动函数实现平滑的旋转效果
+   * 启动呼吸动画（渐变圆形的缩放和透明度变化）
+   * 使用正弦波实现平滑的呼吸效果
    */
-  private startAppleSpinnerAnimation(spinner: fabric.Circle) {
+  private startBreathingAnimation(
+    placeholder: fabric.Group,
+    breathCircle: fabric.Circle,
+    middleCircle: fabric.Circle,
+    innerCircle: fabric.Circle
+  ) {
     const startTime = Date.now();
 
     const animate = () => {
-      if (!this.canvas.contains(spinner)) {
-        return; // 如果 spinner 已被移除，停止动画
+      // 检查占位图是否还在画布上
+      if (!this.canvas.contains(placeholder)) {
+        console.log('🛑 占位图已移除，停止呼吸动画');
+        return;
       }
 
-      // 计算经过的时间
-      const elapsed = Date.now() - startTime;
+      // 计算经过的时间（秒）
+      const elapsed = (Date.now() - startTime) / 1000;
 
-      // 使用缓动函数计算旋转角度（每秒旋转 360 度）
-      const rotation = (elapsed / 1000) * 360;
+      // 使用正弦波计算呼吸效果（周期 2.5 秒，更慢更优雅）
+      const breathPhase = Math.sin(elapsed * Math.PI * 0.8); // 0 -> 1 -> 0 -> -1 -> 0
 
-      spinner.rotate(rotation % 360);
-      this.canvas.renderAll();
+      // 外圆：缩放从 0.95 到 1.05
+      const outerScale = 1.0 + breathPhase * 0.05;
+      breathCircle.set({
+        scaleX: outerScale,
+        scaleY: outerScale,
+        opacity: 0.7 + breathPhase * 0.15,
+      });
+
+      // 中圆：缩放从 0.9 到 1.1
+      const middleScale = 1.0 + breathPhase * 0.1;
+      middleCircle.set({
+        scaleX: middleScale,
+        scaleY: middleScale,
+        opacity: 0.75 + breathPhase * 0.15,
+      });
+
+      // 内圆：缩放从 0.85 到 1.15（变化最大）
+      const innerScale = 1.0 + breathPhase * 0.15;
+      innerCircle.set({
+        scaleX: innerScale,
+        scaleY: innerScale,
+        opacity: 0.8 + breathPhase * 0.2,
+      });
+
+      // 🔑 关键：标记 Group 为 dirty，强制重新渲染
+      placeholder.dirty = true;
+      placeholder.setCoords();
+      this.canvas.requestRenderAll();
+
       requestAnimationFrame(animate);
     };
 
+    console.log('🎬 启动呼吸动画');
     animate();
   }
 

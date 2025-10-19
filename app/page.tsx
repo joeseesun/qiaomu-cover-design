@@ -597,52 +597,63 @@ export default function Home() {
     }
   };
 
-  // 图片转图片生成
+  // 图片转图片生成（异步模式）
   const handleImageToImageGenerate = async (prompt: string, size: '1K' | '2K' | '4K') => {
     if (!managerRef.current || !imageToImageGeneratorRef.current) return;
 
     try {
-      // 显示加载提示
-      setToast({ show: true, message: '正在转换对象为图片...', type: 'info' });
+      // 1. 立即添加占位图到画布
+      console.log('🎨 添加占位图到画布...');
+      const sizeMap = { '1K': '1024x1024', '2K': '2048x2048', '4K': '4096x4096' };
+      const placeholderImage = await managerRef.current.addAIPlaceholder(sizeMap[size]);
+
+      // 2. 异步转换和生成（不阻塞UI）
+      console.log('🚀 开始异步转换和生成图片...');
 
       // 将选中的对象转换为图片URL
-      const imageUrls = await managerRef.current.getSelectedObjectsAsImages();
+      managerRef.current.getSelectedObjectsAsImages()
+        .then(async (imageUrls) => {
+          console.log('✅ 对象已转换为图片:', imageUrls);
 
-      console.log('✅ 对象已转换为图片:', imageUrls);
+          // 调用API生成新图片
+          let generatedImageUrl: string;
+          if (imageUrls.length === 1) {
+            generatedImageUrl = await imageToImageGeneratorRef.current!.generateFromSingleImage(
+              prompt,
+              imageUrls[0],
+              size
+            );
+          } else {
+            generatedImageUrl = await imageToImageGeneratorRef.current!.generateFromMultipleImages(
+              prompt,
+              imageUrls,
+              size
+            );
+          }
 
-      // 显示生成提示
-      setToast({ show: true, message: '正在生成新图片...', type: 'info' });
+          console.log('✅ 新图片已生成:', generatedImageUrl);
 
-      // 调用API生成新图片
-      let generatedImageUrl: string;
-      if (imageUrls.length === 1) {
-        generatedImageUrl = await imageToImageGeneratorRef.current.generateFromSingleImage(
-          prompt,
-          imageUrls[0],
-          size
-        );
-      } else {
-        generatedImageUrl = await imageToImageGeneratorRef.current.generateFromMultipleImages(
-          prompt,
-          imageUrls,
-          size
-        );
-      }
+          // 替换占位图为真实图片
+          await managerRef.current?.replaceAIPlaceholder(placeholderImage, generatedImageUrl);
+          console.log('✅ 图片转换完成');
 
-      console.log('✅ 新图片已生成:', generatedImageUrl);
+          setToast({ show: true, message: '图片生成成功!', type: 'success' });
+        })
+        .catch((error) => {
+          // 生成失败，移除占位图并提示
+          console.error('❌ 图片转换失败:', error);
+          managerRef.current?.removeAIPlaceholder(placeholderImage);
+          setToast({
+            show: true,
+            message: error instanceof Error ? error.message : '图片转换失败',
+            type: 'error'
+          });
+        });
 
-      // 将生成的图片添加到画布
-      console.log('📥 准备添加图片转换结果到画布:', generatedImageUrl);
-      await managerRef.current.addImageFromURL(generatedImageUrl);
-
-      setToast({ show: true, message: '图片生成成功!', type: 'success' });
+      // 立即返回，不等待生成完成
+      console.log('💡 占位图已添加，图片正在后台生成...');
     } catch (error) {
-      console.error('❌ 图片转换失败:', error);
-      setToast({
-        show: true,
-        message: error instanceof Error ? error.message : '图片转换失败',
-        type: 'error'
-      });
+      console.error('❌ 添加占位图失败:', error);
       throw error;
     }
   };

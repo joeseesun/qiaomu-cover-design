@@ -37,11 +37,17 @@ export default function ImageToImageDialog({
 
     setIsGenerating(true);
     try {
+      // 调用生成函数（现在是异步的，会立即返回）
       await onGenerate(prompt, size);
+
+      // 立即清空输入并关闭对话框
       setPrompt('');
       onClose();
+
+      // 提示用户图片正在后台生成
+      console.log('💡 图片正在后台生成，请稍候...');
     } catch (error) {
-      console.error('生成失败:', error);
+      console.error('启动生成失败:', error);
     } finally {
       setIsGenerating(false);
     }
@@ -150,6 +156,11 @@ export default function ImageToImageDialog({
                 '生成图片'
               )}
             </button>
+          </div>
+
+          {/* 提示信息 */}
+          <div className="text-sm text-muted-foreground text-center py-2">
+            💡 点击生成后会立即添加占位图，图片将在后台生成（10-30秒）
           </div>
         </form>
       </div>
