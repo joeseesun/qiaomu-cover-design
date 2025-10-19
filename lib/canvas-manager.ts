@@ -643,56 +643,52 @@ export class CanvasManager {
         offsetX: 0,
         offsetY: 4,
       }),
+      left: -displayWidth / 2,
+      top: -displayHeight / 2,
     });
 
-    // 2. 内层装饰矩形 - 更浅的边框
-    const innerRect = new fabric.Rect({
-      width: displayWidth - 40,
-      height: displayHeight - 40,
-      fill: '',
-      stroke: 'rgba(0, 0, 0, 0.04)',
-      strokeWidth: 1,
-      rx: 8,
-      ry: 8,
-      top: 20,
-      left: 20,
-    });
-
-    // 3. 创建 Apple 风格的 Spinner（旋转圆环）
-    const spinnerRadius = 24;
+    // 2. 创建 Apple 风格的 Spinner（旋转圆环）
+    const spinnerRadius = 20;
     const spinner = new fabric.Circle({
       radius: spinnerRadius,
       fill: '',
-      stroke: 'rgba(0, 0, 0, 0.15)',
-      strokeWidth: 3,
-      strokeDashArray: [Math.PI * spinnerRadius * 0.75, Math.PI * spinnerRadius * 2],
+      stroke: 'rgba(0, 0, 0, 0.2)',
+      strokeWidth: 2.5,
+      strokeDashArray: [Math.PI * spinnerRadius * 0.7, Math.PI * spinnerRadius * 2],
       strokeLineCap: 'round',
-      top: -60,
+      left: -spinnerRadius,
+      top: -spinnerRadius - 30, // Spinner 在中心上方
     });
 
-    // 4. 加载文本 - Apple 风格
+    // 3. 加载文本 - Apple 风格
     const loadingText = new fabric.Text('正在生成', {
-      fontSize: 17,
+      fontSize: 15,
       fill: 'rgba(0, 0, 0, 0.6)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
       fontWeight: '500',
       textAlign: 'center',
-      top: -10,
+      originX: 'center',
+      originY: 'center',
+      left: 0,
+      top: 10, // 文字在 Spinner 下方
     });
 
-    // 5. 进度提示 - 更小更轻
+    // 4. 进度提示 - 更小更轻
     const progressText = new fabric.Text('通常需要 10-30 秒', {
-      fontSize: 13,
+      fontSize: 12,
       fill: 'rgba(0, 0, 0, 0.35)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
       fontWeight: '400',
       textAlign: 'center',
-      top: 15,
+      originX: 'center',
+      originY: 'center',
+      left: 0,
+      top: 32, // 提示在文字下方
     });
 
-    // 6. 组合成一个Group
+    // 5. 组合成一个Group（所有元素都相对于中心定位）
     const placeholder = new fabric.Group(
-      [background, innerRect, spinner, loadingText, progressText],
+      [background, spinner, loadingText, progressText],
       {
         left: this.width / 2,
         top: this.height / 2,
