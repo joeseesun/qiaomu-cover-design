@@ -723,7 +723,7 @@ export class CanvasManager {
       opacity: 0.9,
     });
 
-    // 5. 组合成一个Group
+    // 5. 组合成一个Group（可拖拽移动）
     const placeholder = new fabric.Group(
       [background, breathCircle, middleCircle, innerCircle],
       {
@@ -731,8 +731,13 @@ export class CanvasManager {
         top: this.height / 2,
         originX: 'center',
         originY: 'center',
-        selectable: false,
-        evented: false,
+        selectable: true,   // 可以选中
+        evented: true,      // 可以响应事件
+        hasControls: false, // 不显示缩放控制点
+        hasBorders: true,   // 显示边框
+        lockRotation: true, // 锁定旋转
+        lockScalingX: true, // 锁定水平缩放
+        lockScalingY: true, // 锁定垂直缩放
       }
     );
 
