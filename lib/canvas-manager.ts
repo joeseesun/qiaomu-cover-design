@@ -1123,10 +1123,22 @@ export class CanvasManager {
         const arrowPath = this.createArrowPath(arrowLength, 7);
         const angle = Math.atan2(height, width) * 180 / Math.PI;
 
-        (shape as fabric.Path).set({
-          path: fabric.util.parsePath(arrowPath) as any,
+        // 创建新的箭头路径对象
+        const newArrowPath = new fabric.Path(arrowPath, {
+          left: startPoint.x,
+          top: startPoint.y,
+          fill: (shape as any).fill,
+          stroke: (shape as any).stroke,
+          strokeWidth: 0,
           angle: angle,
+          selectable: false,
+          evented: false,
         });
+
+        // 替换临时形状
+        this.canvas.remove(shape);
+        this.canvas.add(newArrowPath);
+        this.tempShape = newArrowPath;
         break;
     }
   }
