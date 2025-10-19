@@ -608,7 +608,7 @@ export class CanvasManager {
   }
 
   /**
-   * 添加AI生成图片的占位符
+   * 添加AI生成图片的占位符（Apple 风格）
    * @param size 图片尺寸 (1024x1024, 1024x1792, 1792x1024)
    * @returns 占位图对象
    */
@@ -628,79 +628,120 @@ export class CanvasManager {
     const displayWidth = width * scale;
     const displayHeight = height * scale;
 
-    // 创建占位矩形（浅灰色背景）
-    const rect = new fabric.Rect({
+    // 1. 背景矩形 - 半透明白色 + 毛玻璃效果
+    const background = new fabric.Rect({
       width: displayWidth,
       height: displayHeight,
-      fill: '#f5f5f5',
-      stroke: '#e0e0e0',
-      strokeWidth: 2,
-      strokeDashArray: [10, 5],
+      fill: 'rgba(255, 255, 255, 0.95)',
+      stroke: 'rgba(0, 0, 0, 0.08)',
+      strokeWidth: 1,
+      rx: 12, // 圆角
+      ry: 12,
+      shadow: new fabric.Shadow({
+        color: 'rgba(0, 0, 0, 0.1)',
+        blur: 20,
+        offsetX: 0,
+        offsetY: 4,
+      }),
     });
 
-    // 创建加载文本
-    const loadingText = new fabric.Text('AI 生成中...', {
-      fontSize: 24,
-      fill: '#999',
-      fontFamily: 'Arial',
-      textAlign: 'center',
-    });
-
-    // 创建进度提示
-    const progressText = new fabric.Text('通常需要 10-30 秒', {
-      fontSize: 16,
-      fill: '#bbb',
-      fontFamily: 'Arial',
-      textAlign: 'center',
-    });
-
-    // 创建加载动画圆圈
-    const circle = new fabric.Circle({
-      radius: 30,
+    // 2. 内层装饰矩形 - 更浅的边框
+    const innerRect = new fabric.Rect({
+      width: displayWidth - 40,
+      height: displayHeight - 40,
       fill: '',
-      stroke: '#999',
-      strokeWidth: 3,
-      strokeDashArray: [20, 10],
+      stroke: 'rgba(0, 0, 0, 0.04)',
+      strokeWidth: 1,
+      rx: 8,
+      ry: 8,
+      top: 20,
+      left: 20,
     });
 
-    // 组合成一个Group
-    const placeholder = new fabric.Group([rect, circle, loadingText, progressText], {
-      left: this.width / 2,
-      top: this.height / 2,
-      originX: 'center',
-      originY: 'center',
-      selectable: false,
-      evented: false,
+    // 3. 创建 Apple 风格的 Spinner（旋转圆环）
+    const spinnerRadius = 24;
+    const spinner = new fabric.Circle({
+      radius: spinnerRadius,
+      fill: '',
+      stroke: 'rgba(0, 0, 0, 0.15)',
+      strokeWidth: 3,
+      strokeDashArray: [Math.PI * spinnerRadius * 0.75, Math.PI * spinnerRadius * 2],
+      strokeLineCap: 'round',
+      top: -60,
     });
+
+    // 4. 加载文本 - Apple 风格
+    const loadingText = new fabric.Text('正在生成', {
+      fontSize: 17,
+      fill: 'rgba(0, 0, 0, 0.6)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
+      fontWeight: '500',
+      textAlign: 'center',
+      top: -10,
+    });
+
+    // 5. 进度提示 - 更小更轻
+    const progressText = new fabric.Text('通常需要 10-30 秒', {
+      fontSize: 13,
+      fill: 'rgba(0, 0, 0, 0.35)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
+      fontWeight: '400',
+      textAlign: 'center',
+      top: 15,
+    });
+
+    // 6. 组合成一个Group
+    const placeholder = new fabric.Group(
+      [background, innerRect, spinner, loadingText, progressText],
+      {
+        left: this.width / 2,
+        top: this.height / 2,
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+      }
+    );
 
     // 添加自定义属性标记
     (placeholder as any).isAIPlaceholder = true;
     (placeholder as any).targetSize = { width, height };
+    (placeholder as any).spinner = spinner;
 
     // 添加到画布
     this.canvas.add(placeholder);
     this.canvas.renderAll();
 
-    // 启动旋转动画
-    this.startPlaceholderAnimation(circle);
+    // 启动 Apple 风格的旋转动画
+    this.startAppleSpinnerAnimation(spinner);
 
-    console.log('✅ AI占位图已添加到画布');
+    console.log('✅ AI占位图已添加到画布（Apple 风格）');
     return placeholder;
   }
 
   /**
-   * 启动占位图的旋转动画
+   * 启动 Apple 风格的 Spinner 动画
+   * 使用缓动函数实现平滑的旋转效果
    */
-  private startPlaceholderAnimation(circle: fabric.Circle) {
+  private startAppleSpinnerAnimation(spinner: fabric.Circle) {
+    let startTime = Date.now();
+
     const animate = () => {
-      if (!this.canvas.contains(circle)) {
-        return; // 如果圆圈已被移除，停止动画
+      if (!this.canvas.contains(spinner)) {
+        return; // 如果 spinner 已被移除，停止动画
       }
 
-      circle.rotate((circle.angle || 0) + 5);
+      // 计算经过的时间
+      const elapsed = Date.now() - startTime;
+
+      // 使用缓动函数计算旋转角度（每秒旋转 360 度）
+      const rotation = (elapsed / 1000) * 360;
+
+      spinner.rotate(rotation % 360);
       this.canvas.renderAll();
       requestAnimationFrame(animate);
     };
+
     animate();
   }
 
