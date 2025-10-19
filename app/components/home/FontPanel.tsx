@@ -113,8 +113,7 @@ export default function FontPanel({
           console.log('📋 读取背景:', {
             color: bgRect.fill,
             fabricOpacity,
-            transparency,
-            displayTransparency: Math.round(transparency * 100) + '%'
+            displayOpacity: Math.round(fabricOpacity * 100) + '%'
           });
         } else {
           setBackgroundStyle('none');
