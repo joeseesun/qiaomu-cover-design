@@ -720,7 +720,7 @@ export class CanvasManager {
    * 使用缓动函数实现平滑的旋转效果
    */
   private startAppleSpinnerAnimation(spinner: fabric.Circle) {
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     const animate = () => {
       if (!this.canvas.contains(spinner)) {
