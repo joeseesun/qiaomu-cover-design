@@ -47,12 +47,18 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
 
     setIsGenerating(true);
     try {
+      // 调用生成函数（现在是异步的，会立即返回）
       await onGenerate(prompt, size);
-      setPrompt(''); // 清空输入
-      onOpenChange(false); // 关闭对话框
+
+      // 立即清空输入并关闭对话框
+      setPrompt('');
+      onOpenChange(false);
+
+      // 提示用户图片正在后台生成
+      console.log('💡 图片正在后台生成，请稍候...');
     } catch (error) {
-      console.error('生成图片失败:', error);
-      alert(`生成图片失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('启动生成失败:', error);
+      alert(`启动生成失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
       setIsGenerating(false);
     }
@@ -329,11 +335,9 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
           </div>
 
           {/* 提示信息 */}
-          {isGenerating && (
-            <div className="text-sm text-muted-foreground text-center py-2">
-              正在生成图片，请稍候...（通常需要 10-30 秒）
-            </div>
-          )}
+          <div className="text-sm text-muted-foreground text-center py-2">
+            💡 点击生成后会立即添加占位图，图片将在后台生成（10-30秒）
+          </div>
         </div>
       </DialogContent>
     </Dialog>

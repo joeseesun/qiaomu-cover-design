@@ -532,21 +532,35 @@ export default function Home() {
     }
   };
 
-  // AI 生成图片
+  // AI 生成图片（异步）
   const handleAIImageGenerate = async (prompt: string, size: string) => {
     if (!aiImageGeneratorRef.current || !managerRef.current) return;
 
     try {
-      // 生成图片
-      const imageUrl = await aiImageGeneratorRef.current.generateImage(prompt, size);
+      // 1. 立即添加占位图到画布
+      console.log('🎨 添加占位图到画布...');
+      const placeholderImage = await managerRef.current.addAIPlaceholder(size);
 
-      // 从 URL 加载图片到画布
-      console.log('📥 准备添加AI生成的图片到画布:', imageUrl);
-      await managerRef.current.addImageFromURL(imageUrl);
+      // 2. 异步生成图片（不阻塞UI）
+      console.log('🚀 开始异步生成图片...');
+      aiImageGeneratorRef.current.generateImage(prompt, size)
+        .then(async (imageUrl) => {
+          // 3. 生成成功，替换占位图
+          console.log('✅ 图片生成成功，替换占位图:', imageUrl);
+          await managerRef.current?.replaceAIPlaceholder(placeholderImage, imageUrl);
+          console.log('✅ AI 生成的图片已添加到画布');
+        })
+        .catch((error) => {
+          // 4. 生成失败，移除占位图并提示
+          console.error('❌ AI 生图失败:', error);
+          managerRef.current?.removeAIPlaceholder(placeholderImage);
+          alert(`生成图片失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        });
 
-      console.log('✅ AI 生成的图片已添加到画布');
+      // 立即返回，不等待生成完成
+      console.log('💡 占位图已添加，图片正在后台生成...');
     } catch (error) {
-      console.error('❌ AI 生图失败:', error);
+      console.error('❌ 添加占位图失败:', error);
       throw error;
     }
   };

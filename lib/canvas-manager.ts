@@ -607,6 +607,172 @@ export class CanvasManager {
     });
   }
 
+  /**
+   * 添加AI生成图片的占位符
+   * @param size 图片尺寸 (1024x1024, 1024x1792, 1792x1024)
+   * @returns 占位图对象
+   */
+  async addAIPlaceholder(size: string): Promise<fabric.Group> {
+    // 解析尺寸
+    const [width, height] = size.split('x').map(Number);
+
+    // 计算缩放比例（占位图最大不超过画布的80%）
+    const maxWidth = this.width * 0.8;
+    const maxHeight = this.height * 0.8;
+    const scale = Math.min(
+      maxWidth / width,
+      maxHeight / height,
+      1
+    );
+
+    const displayWidth = width * scale;
+    const displayHeight = height * scale;
+
+    // 创建占位矩形（浅灰色背景）
+    const rect = new fabric.Rect({
+      width: displayWidth,
+      height: displayHeight,
+      fill: '#f5f5f5',
+      stroke: '#e0e0e0',
+      strokeWidth: 2,
+      strokeDashArray: [10, 5],
+    });
+
+    // 创建加载文本
+    const loadingText = new fabric.Text('AI 生成中...', {
+      fontSize: 24,
+      fill: '#999',
+      fontFamily: 'Arial',
+      textAlign: 'center',
+    });
+
+    // 创建进度提示
+    const progressText = new fabric.Text('通常需要 10-30 秒', {
+      fontSize: 16,
+      fill: '#bbb',
+      fontFamily: 'Arial',
+      textAlign: 'center',
+    });
+
+    // 创建加载动画圆圈
+    const circle = new fabric.Circle({
+      radius: 30,
+      fill: '',
+      stroke: '#999',
+      strokeWidth: 3,
+      strokeDashArray: [20, 10],
+    });
+
+    // 组合成一个Group
+    const placeholder = new fabric.Group([rect, circle, loadingText, progressText], {
+      left: this.width / 2,
+      top: this.height / 2,
+      originX: 'center',
+      originY: 'center',
+      selectable: false,
+      evented: false,
+    });
+
+    // 添加自定义属性标记
+    (placeholder as any).isAIPlaceholder = true;
+    (placeholder as any).targetSize = { width, height };
+
+    // 添加到画布
+    this.canvas.add(placeholder);
+    this.canvas.renderAll();
+
+    // 启动旋转动画
+    this.startPlaceholderAnimation(circle);
+
+    console.log('✅ AI占位图已添加到画布');
+    return placeholder;
+  }
+
+  /**
+   * 启动占位图的旋转动画
+   */
+  private startPlaceholderAnimation(circle: fabric.Circle) {
+    const animate = () => {
+      if (!this.canvas.contains(circle)) {
+        return; // 如果圆圈已被移除，停止动画
+      }
+
+      circle.rotate((circle.angle || 0) + 5);
+      this.canvas.renderAll();
+      requestAnimationFrame(animate);
+    };
+    animate();
+  }
+
+  /**
+   * 替换AI占位图为真实图片
+   * @param placeholder 占位图对象
+   * @param imageUrl 真实图片URL
+   */
+  async replaceAIPlaceholder(placeholder: fabric.Group, imageUrl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // 获取占位图的位置和尺寸信息
+      const left = placeholder.left || 0;
+      const top = placeholder.top || 0;
+      const targetSize = (placeholder as any).targetSize;
+
+      // 加载真实图片
+      fabric.Image.fromURL(imageUrl, (img) => {
+        if (!img || !img.width || !img.height) {
+          console.error('❌ 加载图片失败');
+          reject(new Error('加载图片失败'));
+          return;
+        }
+
+        // 计算缩放比例
+        const maxWidth = this.width * 0.8;
+        const maxHeight = this.height * 0.8;
+        const scale = Math.min(
+          maxWidth / (img.width || 1),
+          maxHeight / (img.height || 1),
+          1
+        );
+
+        // 设置图片属性（继承占位图的位置）
+        img.set({
+          left: left,
+          top: top,
+          originX: 'center',
+          originY: 'center',
+          scaleX: scale,
+          scaleY: scale,
+        });
+
+        // 移除占位图
+        this.canvas.remove(placeholder);
+
+        // 添加真实图片
+        this.canvas.add(img);
+        this.canvas.setActiveObject(img);
+        this.canvas.renderAll();
+
+        // 保存到图片库
+        console.log('📚 准备保存到图库:', imageUrl);
+        const library = getImageLibrary();
+        const fileName = imageUrl.split('/').pop() || 'ai-generated.jpg';
+        const isNew = library.addImage(imageUrl, fileName);
+        console.log('✅ 图片已保存到图库:', fileName, '是否新图片:', isNew);
+
+        resolve();
+      }, { crossOrigin: 'anonymous' });
+    });
+  }
+
+  /**
+   * 移除AI占位图（生成失败时调用）
+   * @param placeholder 占位图对象
+   */
+  removeAIPlaceholder(placeholder: fabric.Group): void {
+    this.canvas.remove(placeholder);
+    this.canvas.renderAll();
+    console.log('🗑️ AI占位图已移除');
+  }
+
   // 调整图层顺序
   bringToFront() {
     const activeObject = this.canvas.getActiveObject();
