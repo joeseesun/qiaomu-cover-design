@@ -15,6 +15,9 @@ import ImageLibrary from './components/home/ImageLibrary';
 import ImageUploadDialog from './components/home/ImageUploadDialog';
 import ShapeDialog from './components/home/ShapeDialog';
 import ImageToImageDialog from './components/home/ImageToImageDialog';
+import KeyboardShortcutsHelp from './components/home/KeyboardShortcutsHelp';
+import ShapePropertiesPanel from './components/home/properties/ShapePropertiesPanel';
+import PathPropertiesPanel from './components/home/properties/PathPropertiesPanel';
 import ConfirmDialog from './components/ui/ConfirmDialog';
 import Toast, { ToastType } from './components/ui/Toast';
 import { HexColorPicker } from 'react-colorful';
@@ -40,6 +43,7 @@ export default function Home() {
   const [showImageLibrary, setShowImageLibrary] = useState(false);
   const [showImageUploadDialog, setShowImageUploadDialog] = useState(false);
   const [showShapeDialog, setShowShapeDialog] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     message: string;
@@ -165,13 +169,122 @@ export default function Home() {
       }
     };
 
-    // 键盘事件：删除选中对象、图层调整
+    // 键盘事件：删除选中对象、图层调整、工具快捷键
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && managerRef.current) {
-        // 检查是否有输入框获得焦点
-        const target = e.target as HTMLElement;
-        const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      // 检查是否有输入框获得焦点
+      const target = e.target as HTMLElement;
+      const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
+      // 平台检测
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      // 工具快捷键(不需要Cmd/Ctrl修饰键,但要避免在输入框中触发)
+      if (!isInputFocused && managerRef.current) {
+        // T - 文本工具
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          handleToolChange('text');
+          return;
+        }
+
+        // R - 矩形工具
+        if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          managerRef.current.addShape('rect');
+          setActiveTool('shape');
+          return;
+        }
+
+        // O - 圆形工具
+        if (e.key === 'o' || e.key === 'O') {
+          e.preventDefault();
+          managerRef.current.addShape('circle');
+          setActiveTool('shape');
+          return;
+        }
+
+        // L - 线条工具
+        if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault();
+          // Shift+L = 箭头, L = 线条
+          if (e.shiftKey) {
+            managerRef.current.addShape('arrow');
+          } else {
+            managerRef.current.addShape('line');
+          }
+          setActiveTool('shape');
+          return;
+        }
+
+        // P - 画笔工具
+        if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          const isDrawing = managerRef.current.toggleDrawingMode();
+          setActiveTool(isDrawing ? 'pencil' : 'select');
+          setToast({
+            show: true,
+            message: isDrawing ? '画笔模式已启用' : '画笔模式已禁用',
+            type: 'success'
+          });
+          return;
+        }
+
+        // V - 选择工具(取消当前工具,退出画笔模式和形状绘制模式)
+        if (e.key === 'v' || e.key === 'V') {
+          e.preventDefault();
+          // 如果在画笔模式,先退出
+          if (managerRef.current.getDrawingMode()) {
+            managerRef.current.disableDrawingMode();
+          }
+          // 如果在形状绘制模式,先退出
+          if (managerRef.current.getShapeDrawingMode()) {
+            managerRef.current.exitShapeDrawingMode();
+          }
+          setActiveTool('select');
+          return;
+        }
+
+        // Esc - 退出当前模式
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          // 退出画笔模式
+          if (managerRef.current.getDrawingMode()) {
+            managerRef.current.disableDrawingMode();
+            setActiveTool('select');
+          }
+          // 退出形状绘制模式
+          if (managerRef.current.getShapeDrawingMode()) {
+            managerRef.current.exitShapeDrawingMode();
+            setActiveTool('select');
+          }
+          return;
+        }
+
+        // H - 手型工具(拖拽模式)
+        if (e.key === 'h' || e.key === 'H') {
+          e.preventDefault();
+          setIsPanMode(!isPanMode);
+          return;
+        }
+
+        // ? - 快捷键帮助
+        if (e.key === '?' || e.key === '/') {
+          e.preventDefault();
+          setShowKeyboardHelp(true);
+          return;
+        }
+      }
+
+      // Cmd/Ctrl + / - 快捷键帮助
+      if (cmdOrCtrl && e.key === '/') {
+        e.preventDefault();
+        setShowKeyboardHelp(true);
+        return;
+      }
+
+      // 删除键处理
+      if ((e.key === 'Delete' || e.key === 'Backspace') && managerRef.current) {
         // 如果输入框获得焦点,不处理删除键,让浏览器处理
         if (isInputFocused) {
           return;
@@ -190,10 +303,6 @@ export default function Home() {
           // 如果处于编辑状态,让浏览器处理默认的删除行为（删除选中的文字）
         }
       }
-
-      // 全局快捷键（不需要选中对象）
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
       // 撤销/重做快捷键
       if (cmdOrCtrl && e.key === 'z' && managerRef.current) {
@@ -317,9 +426,23 @@ export default function Home() {
       }
     };
 
+    // 监听画笔完成事件
+    const handlePencilCompleted = () => {
+      console.log('🎨 收到画笔完成事件，切换回选择工具');
+      setActiveTool('select');
+    };
+
+    // 监听形状绘制完成事件
+    const handleShapeCompleted = () => {
+      console.log('🎨 收到形状绘制完成事件，切换回选择工具');
+      setActiveTool('select');
+    };
+
     window.addEventListener('click', handleGlobalClick);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('paste', handlePaste);
+    document.addEventListener('pencil:completed', handlePencilCompleted);
+    document.addEventListener('shape:completed', handleShapeCompleted);
 
     return () => {
       upperCanvas.removeEventListener('contextmenu', handleCanvasContextMenu);
@@ -327,6 +450,8 @@ export default function Home() {
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
+      document.removeEventListener('pencil:completed', handlePencilCompleted);
+      document.removeEventListener('shape:completed', handleShapeCompleted);
     };
   }, []); // 空依赖数组，只在组件挂载时执行一次
 
@@ -442,7 +567,20 @@ export default function Home() {
   // 选择形状
   const handleSelectShape = (shapeType: string) => {
     if (!managerRef.current) return;
-    managerRef.current.addShape(shapeType);
+
+    // 如果是画笔,切换画笔模式
+    if (shapeType === 'pencil') {
+      const isDrawing = managerRef.current.toggleDrawingMode();
+      setActiveTool(isDrawing ? 'pencil' : 'select');
+      setToast({
+        show: true,
+        message: isDrawing ? '画笔模式已启用' : '画笔模式已禁用',
+        type: 'success'
+      });
+    } else {
+      // 其他形状直接添加
+      managerRef.current.addShape(shapeType);
+    }
   };
 
   // 图片转图片生成
@@ -649,6 +787,32 @@ export default function Home() {
       alert('缓存已清理，页面即将刷新');
       window.location.reload();
     }
+  };
+
+  // 图形属性更新处理函数
+  const handleShapeFillColorChange = (color: string) => {
+    if (!managerRef.current) return;
+    managerRef.current.updateShapeFillColor(color);
+  };
+
+  const handleShapeStrokeColorChange = (color: string) => {
+    if (!managerRef.current) return;
+    managerRef.current.updateShapeStrokeColor(color);
+  };
+
+  const handleShapeStrokeWidthChange = (width: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.updateShapeStrokeWidth(width);
+  };
+
+  const handleObjectOpacityChange = (opacity: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.updateObjectOpacity(opacity);
+  };
+
+  const handleCornerRadiusChange = (radius: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.updateRectCornerRadius(radius);
   };
 
   // 导出
@@ -929,25 +1093,93 @@ export default function Home() {
           onContextMenu={handleContextMenu}
         />
 
-        {/* 右侧字体面板 */}
-        <FontPanel
-          selectedFont={getSelectedObjectProperty('fontFamily', 'LXGW WenKai')}
-          fontSize={getSelectedObjectProperty('fontSize', 60)}
-          textColor={getSelectedObjectProperty('fill', '#333333')}
-          lineHeight={getSelectedObjectProperty('lineHeight', 1.2)}
-          letterSpacing={getSelectedObjectProperty('charSpacing', 0)}
-          selectedObject={selectedObject}
-          onFontChange={handleFontChange}
-          onFontSizeChange={handleFontSizeChange}
-          onColorChange={handleColorChange}
-          onLineHeightChange={handleLineHeightChange}
-          onLetterSpacingChange={handleLetterSpacingChange}
-          onTextAlignChange={handleTextAlignChange}
-          onBackgroundChange={handleBackgroundChange}
-          onUnderlineChange={handleUnderlineChange}
-          onBorderChange={handleBorderChange}
-          onCanvasBackgroundChange={handleCanvasBackgroundChange}
-        />
+        {/* 右侧属性面板 - 根据选中对象类型动态切换 */}
+        {(() => {
+          // 判断对象类型
+          const objectType = selectedObject?.type;
+          const shapeType = (selectedObject as any)?.shapeType;
+
+          const isTextObject = objectType === 'i-text' || objectType === 'textbox';
+          const isShapeObject = objectType === 'rect' || objectType === 'circle' || objectType === 'triangle';
+          const isLineObject = objectType === 'line';
+
+          // Path 对象需要区分：箭头和画笔路径 vs 形状（星形、爱心、六边形）
+          const isPathShape = objectType === 'path' && ['star', 'heart', 'hexagon'].includes(shapeType);
+          const isPathLine = objectType === 'path' && ['arrow'].includes(shapeType);
+          const isPathDrawing = objectType === 'path' && !shapeType; // 画笔绘制的路径
+
+          // 文本对象 - 显示字体面板
+          if (isTextObject) {
+            return (
+              <FontPanel
+                selectedFont={getSelectedObjectProperty('fontFamily', 'LXGW WenKai')}
+                fontSize={getSelectedObjectProperty('fontSize', 60)}
+                textColor={getSelectedObjectProperty('fill', '#333333')}
+                lineHeight={getSelectedObjectProperty('lineHeight', 1.2)}
+                letterSpacing={getSelectedObjectProperty('charSpacing', 0)}
+                selectedObject={selectedObject}
+                onFontChange={handleFontChange}
+                onFontSizeChange={handleFontSizeChange}
+                onColorChange={handleColorChange}
+                onLineHeightChange={handleLineHeightChange}
+                onLetterSpacingChange={handleLetterSpacingChange}
+                onTextAlignChange={handleTextAlignChange}
+                onBackgroundChange={handleBackgroundChange}
+                onUnderlineChange={handleUnderlineChange}
+                onBorderChange={handleBorderChange}
+                onCanvasBackgroundChange={handleCanvasBackgroundChange}
+              />
+            );
+          }
+
+          // 图形对象 - 显示图形属性面板（包括基础形状和 Path 形状）
+          if (isShapeObject || isPathShape) {
+            return (
+              <ShapePropertiesPanel
+                selectedObject={selectedObject}
+                onFillColorChange={handleShapeFillColorChange}
+                onStrokeColorChange={handleShapeStrokeColorChange}
+                onStrokeWidthChange={handleShapeStrokeWidthChange}
+                onOpacityChange={handleObjectOpacityChange}
+                onCornerRadiusChange={handleCornerRadiusChange}
+              />
+            );
+          }
+
+          // 线条或路径对象 - 显示路径属性面板（线条、箭头、画笔路径）
+          if (isLineObject || isPathLine || isPathDrawing) {
+            return (
+              <PathPropertiesPanel
+                selectedObject={selectedObject}
+                onStrokeColorChange={handleShapeStrokeColorChange}
+                onStrokeWidthChange={handleShapeStrokeWidthChange}
+                onOpacityChange={handleObjectOpacityChange}
+              />
+            );
+          }
+
+          // 默认显示字体面板(包含画布背景设置)
+          return (
+            <FontPanel
+              selectedFont={getSelectedObjectProperty('fontFamily', 'LXGW WenKai')}
+              fontSize={getSelectedObjectProperty('fontSize', 60)}
+              textColor={getSelectedObjectProperty('fill', '#333333')}
+              lineHeight={getSelectedObjectProperty('lineHeight', 1.2)}
+              letterSpacing={getSelectedObjectProperty('charSpacing', 0)}
+              selectedObject={selectedObject}
+              onFontChange={handleFontChange}
+              onFontSizeChange={handleFontSizeChange}
+              onColorChange={handleColorChange}
+              onLineHeightChange={handleLineHeightChange}
+              onLetterSpacingChange={handleLetterSpacingChange}
+              onTextAlignChange={handleTextAlignChange}
+              onBackgroundChange={handleBackgroundChange}
+              onUnderlineChange={handleUnderlineChange}
+              onBorderChange={handleBorderChange}
+              onCanvasBackgroundChange={handleCanvasBackgroundChange}
+            />
+          );
+        })()}
       </div>
 
       {/* 右键菜单 */}
@@ -1138,6 +1370,12 @@ export default function Home() {
         open={showShapeDialog}
         onClose={() => setShowShapeDialog(false)}
         onSelectShape={handleSelectShape}
+      />
+
+      {/* 快捷键帮助 */}
+      <KeyboardShortcutsHelp
+        open={showKeyboardHelp}
+        onClose={() => setShowKeyboardHelp(false)}
       />
 
       {/* 通用确认对话框 */}

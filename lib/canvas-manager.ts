@@ -36,6 +36,30 @@ export class CanvasManager {
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
 
+    // 监听画笔绘制完成事件
+    this.canvas.on('path:created', (e: any) => {
+      console.log('✏️ 画笔路径创建完成');
+      const path = e.path;
+
+      // 保存画笔颜色
+      if (path.stroke) {
+        this.saveLastUsedColor('pencilStroke', path.stroke as string);
+      }
+
+      // 自动选中刚创建的路径
+      this.canvas.setActiveObject(path);
+      this.canvas.renderAll();
+
+      // 自动退出画笔模式，切换回选择工具
+      this.disableDrawingMode();
+
+      // 触发自定义事件，通知page.tsx切换工具
+      const event = new CustomEvent('pencil:completed');
+      document.dispatchEvent(event);
+
+      console.log('✅ 已自动选中路径并退出画笔模式');
+    });
+
     // 全局监听滚动,在任何时候都立即恢复
     let savedScrollPosition = { x: 0, y: 0 };
     let isEditingText = false;
@@ -112,6 +136,9 @@ export class CanvasManager {
     };
     window.addEventListener('scroll', globalScrollHandler, { passive: false, capture: true });
     document.addEventListener('scroll', globalScrollHandler, { passive: false, capture: true });
+
+    // 监听形状绘制的鼠标事件
+    this.setupShapeDrawingEvents();
   }
 
   // 防止编辑时滚动
@@ -312,100 +339,21 @@ export class CanvasManager {
     return obj;
   }
 
-  // 添加形状
+  // 添加形状 - 进入绘制模式或直接生成
   addShape(shapeType: string) {
-    let shape: fabric.Object;
-    const centerX = this.width / 2;
-    const centerY = this.height / 2;
-    const defaultFill = '#3b82f6'; // 蓝色填充
-    const defaultStroke = '#1e40af'; // 深蓝色边框
-
-    switch (shapeType) {
-      case 'rect':
-        shape = new fabric.Rect({
-          left: centerX - 75,
-          top: centerY - 50,
-          width: 150,
-          height: 100,
-          fill: defaultFill,
-          stroke: defaultStroke,
-          strokeWidth: 2,
-        });
-        break;
-
-      case 'circle':
-        shape = new fabric.Circle({
-          left: centerX - 60,
-          top: centerY - 60,
-          radius: 60,
-          fill: defaultFill,
-          stroke: defaultStroke,
-          strokeWidth: 2,
-        });
-        break;
-
-      case 'triangle':
-        shape = new fabric.Triangle({
-          left: centerX - 60,
-          top: centerY - 60,
-          width: 120,
-          height: 120,
-          fill: defaultFill,
-          stroke: defaultStroke,
-          strokeWidth: 2,
-        });
-        break;
-
-      case 'star':
-        // 创建五角星路径
-        const starPath = this.createStarPath(5, 60, 30);
-        shape = new fabric.Path(starPath, {
-          left: centerX - 60,
-          top: centerY - 60,
-          fill: defaultFill,
-          stroke: defaultStroke,
-          strokeWidth: 2,
-        });
-        break;
-
-      case 'heart':
-        // 创建爱心路径
-        const heartPath = 'M 50,30 C 50,20 40,10 30,10 C 20,10 10,20 10,30 C 10,45 25,60 50,80 C 75,60 90,45 90,30 C 90,20 80,10 70,10 C 60,10 50,20 50,30 Z';
-        shape = new fabric.Path(heartPath, {
-          left: centerX - 50,
-          top: centerY - 40,
-          fill: '#ef4444', // 红色爱心
-          stroke: '#dc2626',
-          strokeWidth: 2,
-          scaleX: 1.2,
-          scaleY: 1.2,
-        });
-        break;
-
-      case 'hexagon':
-        // 创建六边形路径
-        const hexPath = this.createPolygonPath(6, 60);
-        shape = new fabric.Path(hexPath, {
-          left: centerX - 60,
-          top: centerY - 60,
-          fill: defaultFill,
-          stroke: defaultStroke,
-          strokeWidth: 2,
-        });
-        break;
-
-      default:
-        return;
+    // 支持拖拽绘制的形状
+    const drawableShapes = ['rect', 'circle', 'triangle', 'line', 'arrow'];
+    if (drawableShapes.includes(shapeType)) {
+      this.enterShapeDrawingMode(shapeType);
+      return;
     }
 
-    // 添加自定义属性标记这是形状对象
-    (shape as any).isShape = true;
-    (shape as any).shapeType = shapeType;
-
-    this.canvas.add(shape);
-    this.canvas.setActiveObject(shape);
-    this.canvas.renderAll();
-    return shape;
+    // 固定形状（星形、爱心、六边形）- 点击直接生成
+    const fixedShapes = ['star', 'heart', 'hexagon'];
+    if (fixedShapes.includes(shapeType)) {
+      this.createFixedShape(shapeType);
+      return;
+    }
   }
 
   // 创建五角星路径
@@ -422,6 +370,26 @@ export class CanvasManager {
       path += (i === 0 ? 'M ' : 'L ') + x + ',' + y + ' ';
     }
     path += 'Z';
+    return path;
+  }
+
+  // 创建箭头路径
+  private createArrowPath(length: number, strokeWidth: number): string {
+    const headWidth = strokeWidth * 4; // 箭头宽度
+    const headLength = strokeWidth * 5; // 箭头长度
+    const halfStroke = strokeWidth / 2;
+
+    // 绘制箭头: 线条 + 三角形箭头
+    const path = `
+      M 0,${halfStroke}
+      L ${length - headLength},${halfStroke}
+      L ${length - headLength},${halfStroke + headWidth}
+      L ${length},0
+      L ${length - headLength},${-halfStroke - headWidth}
+      L ${length - headLength},${-halfStroke}
+      L 0,${-halfStroke}
+      Z
+    `;
     return path;
   }
 
@@ -710,6 +678,15 @@ export class CanvasManager {
   // 剪贴板存储
   private clipboard: fabric.Object | fabric.Object[] | null = null;
 
+  // 画笔模式状态
+  private isDrawingMode = false;
+
+  // 绘制模式状态
+  private shapeDrawingMode: string | null = null; // 'rect', 'circle', 'line', 'arrow', etc.
+  private isDrawingShape = false;
+  private drawingStartPoint: { x: number; y: number } | null = null;
+  private tempShape: fabric.Object | null = null;
+
   // 复制选中的对象到剪贴板
   copy() {
     const activeObject = this.canvas.getActiveObject();
@@ -795,6 +772,388 @@ export class CanvasManager {
 
       console.log('✅ 已粘贴对象:', cloned.type);
     }, ['data', 'selectable', 'evented']);
+  }
+
+  // 启用画笔模式
+  enableDrawingMode(color?: string, width?: number) {
+    this.canvas.isDrawingMode = true;
+    this.isDrawingMode = true;
+
+    // 使用上次的颜色或默认黑色
+    const pencilColor = color || this.getLastUsedColor('pencilStroke', '#000000');
+    const pencilWidth = width || 7; // 粗线
+
+    // 设置画笔属性
+    if (this.canvas.freeDrawingBrush) {
+      this.canvas.freeDrawingBrush.color = pencilColor;
+      this.canvas.freeDrawingBrush.width = pencilWidth;
+    }
+
+    console.log('✏️ 画笔模式已启用');
+  }
+
+  // 禁用画笔模式
+  disableDrawingMode() {
+    this.canvas.isDrawingMode = false;
+    this.isDrawingMode = false;
+    console.log('✏️ 画笔模式已禁用');
+  }
+
+  // 切换画笔模式
+  toggleDrawingMode() {
+    if (this.isDrawingMode) {
+      this.disableDrawingMode();
+    } else {
+      this.enableDrawingMode();
+    }
+    return this.isDrawingMode;
+  }
+
+  // 获取画笔模式状态
+  getDrawingMode() {
+    return this.isDrawingMode;
+  }
+
+  // ==================== 形状绘制模式 ====================
+
+  /**
+   * 进入形状绘制模式
+   * @param shapeType 形状类型 (rect, circle, line, arrow, etc.)
+   */
+  enterShapeDrawingMode(shapeType: string) {
+    // 先退出画笔模式
+    if (this.isDrawingMode) {
+      this.disableDrawingMode();
+    }
+
+    // 取消选中
+    this.canvas.discardActiveObject();
+    this.canvas.renderAll();
+
+    // 设置绘制模式
+    this.shapeDrawingMode = shapeType;
+    this.canvas.selection = false; // 禁用框选
+    this.canvas.defaultCursor = 'crosshair'; // 十字光标
+
+    console.log(`🎨 进入 ${shapeType} 绘制模式`);
+  }
+
+  /**
+   * 退出形状绘制模式
+   */
+  exitShapeDrawingMode() {
+    this.shapeDrawingMode = null;
+    this.isDrawingShape = false;
+    this.drawingStartPoint = null;
+
+    // 清理临时形状
+    if (this.tempShape) {
+      this.canvas.remove(this.tempShape);
+      this.tempShape = null;
+    }
+
+    this.canvas.selection = true; // 恢复框选
+    this.canvas.defaultCursor = 'default';
+    this.canvas.renderAll();
+
+    console.log('✅ 退出形状绘制模式');
+  }
+
+  /**
+   * 获取当前绘制模式
+   */
+  getShapeDrawingMode() {
+    return this.shapeDrawingMode;
+  }
+
+  /**
+   * 创建固定大小的形状（星形、爱心、六边形）
+   */
+  private createFixedShape(shapeType: string) {
+    const centerX = this.width / 2;
+    const centerY = this.height / 2;
+    const defaultFill = this.getLastUsedColor('shapeFill', '#D9D9D9');
+    const defaultStroke = this.getLastUsedColor('shapeStroke', '#D9D9D9');
+
+    let shape: fabric.Object;
+
+    switch (shapeType) {
+      case 'star':
+        // 创建五角星路径
+        const starPath = this.createStarPath(5, 60, 30);
+        shape = new fabric.Path(starPath, {
+          left: centerX - 60,
+          top: centerY - 60,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 0,
+        });
+        break;
+
+      case 'heart':
+        // 创建爱心路径
+        const heartPath = 'M 50,30 C 50,20 40,10 30,10 C 20,10 10,20 10,30 C 10,45 25,60 50,80 C 75,60 90,45 90,30 C 90,20 80,10 70,10 C 60,10 50,20 50,30 Z';
+        shape = new fabric.Path(heartPath, {
+          left: centerX - 50,
+          top: centerY - 40,
+          fill: '#ef4444', // 红色爱心（保持语义化颜色）
+          stroke: '#ef4444',
+          strokeWidth: 0,
+          scaleX: 1.2,
+          scaleY: 1.2,
+        });
+        break;
+
+      case 'hexagon':
+        // 创建六边形路径
+        const hexPath = this.createPolygonPath(6, 60);
+        shape = new fabric.Path(hexPath, {
+          left: centerX - 60,
+          top: centerY - 60,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 0,
+        });
+        break;
+
+      default:
+        return;
+    }
+
+    // 标记为形状对象
+    (shape as any).isShape = true;
+    (shape as any).shapeType = shapeType;
+
+    this.canvas.add(shape);
+    this.canvas.setActiveObject(shape);
+    this.canvas.renderAll();
+
+    console.log(`✅ 创建固定形状: ${shapeType}`);
+  }
+
+  /**
+   * 设置形状绘制的鼠标事件
+   */
+  private setupShapeDrawingEvents() {
+    // 鼠标按下 - 开始绘制
+    this.canvas.on('mouse:down', (e) => {
+      if (!this.shapeDrawingMode || !e.pointer) return;
+
+      this.isDrawingShape = true;
+      this.drawingStartPoint = { x: e.pointer.x, y: e.pointer.y };
+
+      // 创建临时形状
+      this.tempShape = this.createTempShape(this.shapeDrawingMode, e.pointer.x, e.pointer.y);
+      if (this.tempShape) {
+        this.canvas.add(this.tempShape);
+      }
+    });
+
+    // 鼠标移动 - 更新形状大小
+    this.canvas.on('mouse:move', (e) => {
+      if (!this.isDrawingShape || !this.tempShape || !this.drawingStartPoint || !e.pointer) return;
+
+      this.updateTempShape(this.tempShape, this.shapeDrawingMode!, this.drawingStartPoint, e.pointer);
+      this.canvas.renderAll();
+    });
+
+    // 鼠标松开 - 完成绘制
+    this.canvas.on('mouse:up', (e) => {
+      if (!this.isDrawingShape || !this.tempShape) return;
+
+      this.isDrawingShape = false;
+      this.drawingStartPoint = null;
+
+      // 如果形状太小，删除它
+      const minSize = 5;
+      if (this.isTempShapeTooSmall(this.tempShape, minSize)) {
+        this.canvas.remove(this.tempShape);
+        this.tempShape = null;
+        return;
+      }
+
+      // 恢复形状的可选择和可交互属性
+      this.tempShape.set({
+        selectable: true,
+        evented: true,
+      });
+
+      // 标记为形状对象
+      (this.tempShape as any).isShape = true;
+      (this.tempShape as any).shapeType = this.shapeDrawingMode;
+
+      // 选中新创建的形状
+      this.canvas.setActiveObject(this.tempShape);
+      this.tempShape = null;
+
+      // 退出绘制模式
+      this.exitShapeDrawingMode();
+
+      // 触发自定义事件，通知 page.tsx 切换回选择工具
+      const event = new CustomEvent('shape:completed');
+      document.dispatchEvent(event);
+
+      this.canvas.renderAll();
+      console.log('✅ 形状绘制完成');
+    });
+  }
+
+  /**
+   * 创建临时形状
+   */
+  private createTempShape(shapeType: string, x: number, y: number): fabric.Object | null {
+    const defaultFill = this.getLastUsedColor('shapeFill', '#D9D9D9');
+    const defaultStroke = this.getLastUsedColor('shapeStroke', '#D9D9D9');
+    const defaultLineStroke = this.getLastUsedColor('lineStroke', '#000000');
+
+    switch (shapeType) {
+      case 'rect':
+        return new fabric.Rect({
+          left: x,
+          top: y,
+          width: 0,
+          height: 0,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 0,
+          selectable: false,
+          evented: false,
+        });
+
+      case 'circle':
+        return new fabric.Circle({
+          left: x,
+          top: y,
+          radius: 0,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 0,
+          selectable: false,
+          evented: false,
+        });
+
+      case 'triangle':
+        return new fabric.Triangle({
+          left: x,
+          top: y,
+          width: 0,
+          height: 0,
+          fill: defaultFill,
+          stroke: defaultStroke,
+          strokeWidth: 0,
+          selectable: false,
+          evented: false,
+        });
+
+      case 'line':
+        return new fabric.Line([x, y, x, y], {
+          stroke: defaultLineStroke,
+          strokeWidth: 7,
+          selectable: false,
+          evented: false,
+        });
+
+      case 'arrow':
+        // 箭头初始为一个点，后续在 updateTempShape 中更新
+        return new fabric.Path('M 0 0 L 0 0', {
+          left: x,
+          top: y,
+          fill: defaultLineStroke,
+          stroke: defaultLineStroke,
+          strokeWidth: 0,
+          selectable: false,
+          evented: false,
+        });
+
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * 更新临时形状的大小
+   */
+  private updateTempShape(
+    shape: fabric.Object,
+    shapeType: string,
+    startPoint: { x: number; y: number },
+    currentPoint: { x: number; y: number }
+  ) {
+    const width = currentPoint.x - startPoint.x;
+    const height = currentPoint.y - startPoint.y;
+
+    switch (shapeType) {
+      case 'rect':
+        (shape as fabric.Rect).set({
+          width: Math.abs(width),
+          height: Math.abs(height),
+          left: width > 0 ? startPoint.x : currentPoint.x,
+          top: height > 0 ? startPoint.y : currentPoint.y,
+        });
+        break;
+
+      case 'circle':
+        const radius = Math.sqrt(width * width + height * height) / 2;
+        (shape as fabric.Circle).set({
+          radius: Math.abs(radius),
+          left: startPoint.x,
+          top: startPoint.y,
+        });
+        break;
+
+      case 'triangle':
+        (shape as fabric.Triangle).set({
+          width: Math.abs(width),
+          height: Math.abs(height),
+          left: width > 0 ? startPoint.x : currentPoint.x,
+          top: height > 0 ? startPoint.y : currentPoint.y,
+        });
+        break;
+
+      case 'line':
+        (shape as fabric.Line).set({
+          x2: currentPoint.x,
+          y2: currentPoint.y,
+        });
+        break;
+
+      case 'arrow':
+        // 更新箭头路径
+        const arrowLength = Math.sqrt(width * width + height * height);
+        const arrowPath = this.createArrowPath(arrowLength, 7);
+        const angle = Math.atan2(height, width) * 180 / Math.PI;
+
+        (shape as fabric.Path).set({
+          path: fabric.util.parsePath(arrowPath) as any,
+          angle: angle,
+        });
+        break;
+    }
+  }
+
+  /**
+   * 检查临时形状是否太小
+   */
+  private isTempShapeTooSmall(shape: fabric.Object, minSize: number): boolean {
+    if (shape.type === 'rect' || shape.type === 'triangle') {
+      const width = (shape as any).width || 0;
+      const height = (shape as any).height || 0;
+      return width < minSize && height < minSize;
+    } else if (shape.type === 'circle') {
+      const radius = (shape as any).radius || 0;
+      return radius < minSize;
+    } else if (shape.type === 'line') {
+      const line = shape as fabric.Line;
+      const dx = (line.x2 || 0) - (line.x1 || 0);
+      const dy = (line.y2 || 0) - (line.y1 || 0);
+      const length = Math.sqrt(dx * dx + dy * dy);
+      return length < minSize;
+    } else if (shape.type === 'path') {
+      // Path 类型（箭头）- 检查路径长度
+      // 箭头的长度可以通过起点和终点计算
+      return false; // 暂时不过滤箭头
+    }
+    return false;
   }
 
   // 复制选中的对象(原地复制,Cmd+D)
@@ -1340,6 +1699,79 @@ export class CanvasManager {
 
     // 处理单个对象
     this.updateSingleObjectProperty(activeObj, property, value);
+    activeObj.setCoords();
+    this.canvas.renderAll();
+    this.canvas.fire('object:modified', { target: activeObj });
+  }
+
+  // 更新图形填充颜色
+  updateShapeFillColor(color: string) {
+    const activeObject = this.canvas.getActiveObject();
+    if (!activeObject) return;
+
+    // 判断是形状还是线条
+    const isShape = ['rect', 'circle', 'triangle', 'path'].includes(activeObject.type || '');
+    const isLine = activeObject.type === 'line';
+
+    if (isShape && activeObject.fill) {
+      // 形状填充色
+      this.saveLastUsedColor('shapeFill', color);
+    } else if (isLine || (activeObject.type === 'path' && !activeObject.fill)) {
+      // 线条颜色
+      this.saveLastUsedColor('lineStroke', color);
+    }
+
+    this.updateProperty('fill', color);
+  }
+
+  // 更新图形描边颜色
+  updateShapeStrokeColor(color: string) {
+    const activeObject = this.canvas.getActiveObject();
+    if (!activeObject) return;
+
+    // 判断是形状还是线条
+    const isShape = ['rect', 'circle', 'triangle', 'path'].includes(activeObject.type || '');
+    const isLine = activeObject.type === 'line';
+    const isArrow = (activeObject as any).shapeType === 'arrow';
+
+    if (isShape) {
+      // 形状描边色
+      this.saveLastUsedColor('shapeStroke', color);
+    } else if (isLine || activeObject.type === 'path') {
+      // 线条颜色
+      this.saveLastUsedColor('lineStroke', color);
+    }
+
+    // 箭头需要同时更新 fill 和 stroke（因为箭头是用 fill 渲染的）
+    if (isArrow) {
+      activeObject.set('fill', color);
+      activeObject.set('stroke', color);
+      this.canvas.renderAll();
+    } else {
+      this.updateProperty('stroke', color);
+    }
+  }
+
+  // 更新图形描边粗细
+  updateShapeStrokeWidth(width: number) {
+    this.updateProperty('strokeWidth', width);
+  }
+
+  // 更新对象透明度
+  updateObjectOpacity(opacity: number) {
+    this.updateProperty('opacity', opacity);
+  }
+
+  // 更新矩形圆角
+  updateRectCornerRadius(radius: number) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'rect') return;
+
+    (activeObj as fabric.Rect).set({
+      rx: radius,
+      ry: radius,
+    });
+
     activeObj.setCoords();
     this.canvas.renderAll();
     this.canvas.fire('object:modified', { target: activeObj });
@@ -2583,6 +3015,37 @@ export class CanvasManager {
     }
 
     return imageUrls;
+  }
+
+  // ==================== 颜色记忆功能 ====================
+
+  /**
+   * 获取上次使用的颜色
+   * @param key 颜色类型键名
+   * @param defaultColor 默认颜色
+   */
+  private getLastUsedColor(key: string, defaultColor: string): string {
+    try {
+      const saved = localStorage.getItem(`canvas_color_${key}`);
+      return saved || defaultColor;
+    } catch (error) {
+      console.warn('读取上次使用的颜色失败:', error);
+      return defaultColor;
+    }
+  }
+
+  /**
+   * 保存使用的颜色
+   * @param key 颜色类型键名
+   * @param color 颜色值
+   */
+  saveLastUsedColor(key: string, color: string): void {
+    try {
+      localStorage.setItem(`canvas_color_${key}`, color);
+      console.log(`💾 已保存颜色: ${key} = ${color}`);
+    } catch (error) {
+      console.warn('保存颜色失败:', error);
+    }
   }
 
   // 销毁画布

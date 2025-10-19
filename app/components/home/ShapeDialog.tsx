@@ -1,7 +1,7 @@
 // 形状选择对话框
 'use client';
 
-import { Square, Circle, Triangle, Star, Heart, Hexagon } from 'lucide-react';
+import { Square, Circle, Triangle, Star, Heart, Hexagon, Minus, ArrowRight, Pencil } from 'lucide-react';
 
 interface ShapeDialogProps {
   open: boolean;
@@ -13,9 +13,12 @@ const shapes = [
   { id: 'rect', label: '矩形', icon: Square },
   { id: 'circle', label: '圆形', icon: Circle },
   { id: 'triangle', label: '三角形', icon: Triangle },
+  { id: 'line', label: '线条', icon: Minus },
+  { id: 'arrow', label: '箭头', icon: ArrowRight },
   { id: 'star', label: '五角星', icon: Star },
   { id: 'heart', label: '爱心', icon: Heart },
   { id: 'hexagon', label: '六边形', icon: Hexagon },
+  { id: 'pencil', label: '画笔', icon: Pencil },
 ];
 
 export default function ShapeDialog({ open, onClose, onSelectShape }: ShapeDialogProps) {
