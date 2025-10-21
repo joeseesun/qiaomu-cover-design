@@ -1,18 +1,18 @@
 /**
  * 预设模板数据
- * 精选小红书风格封面模板（按比例分组）
+ * 精选小红书风格封面模板（黑灰主题，按比例分组）
  */
 
 import { Template } from './template-manager';
 
 // 预设模板列表
 export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
-  // ========== 3:4 竖版（1242×1660）==========
-  // 便签纸风格（黄色）
+  // ========== 3:4 竖版（960×1280）==========
+  // 极简黑白
   {
-    name: '便签纸·黄色',
+    name: '极简黑白·竖版',
     category: '文字卡片',
-    canvasSize: { width: 1242, height: 1660 },
+    canvasSize: { width: 960, height: 1280 },
     isPreset: true,
     canvasJSON: JSON.stringify({
       version: '5.3.0',

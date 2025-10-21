@@ -37,14 +37,26 @@ export default function TemplateLibraryDialog({
     if (open) {
       const manager = getTemplateManager();
 
+      // 🆕 清理旧的预设模板（名称不在新列表中的）
+      const presetNames = PRESET_TEMPLATES.map(t => t.name);
+      const allTemplates = manager.getAll();
+      allTemplates.forEach(template => {
+        if (template.isPreset && !presetNames.includes(template.name)) {
+          console.log('🗑️ 删除旧模板:', template.name);
+          manager.delete(template.id);
+        }
+      });
+
       // 🆕 每次打开都检查并添加缺失的预设模板
       manager.addPresetTemplates(PRESET_TEMPLATES);
 
-      // 为预设模板生成缩略图
+      // 为预设模板生成缩略图（强制重新生成）
       const generateThumbnails = async () => {
-        const allTemplates = manager.getAll();
-        for (const template of allTemplates) {
-          if (template.isPreset && !template.thumbnail) {
+        const updatedTemplates = manager.getAll();
+        console.log('📊 开始生成缩略图，共', updatedTemplates.length, '个模板');
+
+        for (const template of updatedTemplates) {
+          if (template.isPreset) {
             try {
               console.log('🖼️ 生成缩略图:', template.name);
               const thumbnail = await manager.generateThumbnailFromJSON(
@@ -53,14 +65,20 @@ export default function TemplateLibraryDialog({
                 template.canvasSize.height,
                 template.name
               );
-              manager.update(template.id, { thumbnail });
-              console.log('✅ 缩略图生成成功:', template.name);
+
+              if (thumbnail && thumbnail.startsWith('data:image')) {
+                manager.update(template.id, { thumbnail });
+                console.log('✅ 缩略图生成成功:', template.name, '大小:', thumbnail.length);
+              } else {
+                console.error('❌ 缩略图无效:', template.name);
+              }
             } catch (error) {
               console.error('❌ 生成缩略图失败:', template.name, error);
             }
           }
         }
         setTemplates(manager.getAll());
+        console.log('✅ 所有缩略图生成完成');
       };
 
       generateThumbnails();
@@ -144,7 +162,7 @@ export default function TemplateLibraryDialog({
                   onClick={() => setSelectedCategory(category)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                     selectedCategory === category
-                      ? 'bg-blue-500 text-white'
+                      ? 'bg-gray-900 text-white'
                       : 'text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -175,12 +193,12 @@ export default function TemplateLibraryDialog({
                   <div className="text-gray-600">
                     当前画布：{currentCanvasSize.width} × {currentCanvasSize.height}
                     {!showAllSizes && (
-                      <span className="ml-2 text-blue-600">（仅显示匹配比例）</span>
+                      <span className="ml-2 text-gray-900">（仅显示匹配比例）</span>
                     )}
                   </div>
                   <button
                     onClick={() => setShowAllSizes(!showAllSizes)}
-                    className="text-blue-600 hover:text-blue-700 underline"
+                    className="text-gray-900 hover:text-gray-700 underline"
                   >
                     {showAllSizes ? '只看匹配比例' : '显示所有尺寸'}
                   </button>
@@ -203,7 +221,7 @@ export default function TemplateLibraryDialog({
                       onClick={() => handleTemplateClick(template)}
                     >
                       {/* 缩略图 */}
-                      <div className="relative aspect-[3/4] bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 border border-gray-200 hover:border-blue-400">
+                      <div className="relative aspect-[3/4] bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 border border-gray-200 hover:border-gray-900">
                         {template.thumbnail ? (
                           <img
                             src={template.thumbnail}
@@ -217,9 +235,9 @@ export default function TemplateLibraryDialog({
                         )}
 
                         {/* 悬停遮罩 */}
-                        <div className="absolute inset-0 bg-blue-500 bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-gray-900 bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-4 py-2 rounded-full shadow-lg">
-                            <span className="text-sm font-medium text-blue-600">点击使用</span>
+                            <span className="text-sm font-medium text-gray-900">点击使用</span>
                           </div>
                         </div>
 
