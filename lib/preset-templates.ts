@@ -514,5 +514,101 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
       ],
     }),
   },
+
+  // ========== 16:9 横版（1280×720）==========
+  // 极简文字风格（白色·16:9）
+  {
+    name: '极简文字·白色·16:9',
+    category: '文字卡片',
+    canvasSize: { width: 1280, height: 720 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 超大标题
+        {
+          type: 'i-text',
+          left: 80,
+          top: 200,
+          fontSize: 100,
+          fontFamily: 'KaiTi, STKaiti, serif',
+          fontWeight: 'bold',
+          fill: '#1A1A1A',
+          text: '点击修改标题文字',
+          lineHeight: 1.2,
+        },
+        // 关键词方框
+        {
+          type: 'rect',
+          left: 65,
+          top: 320,
+          width: 600,
+          height: 130,
+          fill: 'transparent',
+          stroke: '#4CAF50',
+          strokeWidth: 8,
+          rx: 12,
+          ry: 12,
+        },
+      ],
+    }),
+  },
+
+  // ========== 9:16 竖版（720×1280）==========
+  // 便签纸风格（黄色·9:16）
+  {
+    name: '便签纸·黄色·9:16',
+    category: '文字卡片',
+    canvasSize: { width: 720, height: 1280 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 日期标签
+        {
+          type: 'i-text',
+          left: 60,
+          top: 50,
+          fontSize: 28,
+          fontFamily: 'Arial',
+          fill: '#999999',
+          text: 'Date: 12.25',
+        },
+        // 主标题
+        {
+          type: 'i-text',
+          left: 60,
+          top: 350,
+          fontSize: 80,
+          fontFamily: 'KaiTi, STKaiti, serif',
+          fontWeight: 'bold',
+          fill: '#000000',
+          text: '点击修改\n标题文字',
+          lineHeight: 1.3,
+          textAlign: 'left',
+        },
+        // 荧光笔背景
+        {
+          type: 'rect',
+          left: 45,
+          top: 340,
+          width: 630,
+          height: 240,
+          fill: '#FFE066',
+          opacity: 0.4,
+          selectable: false,
+          evented: false,
+        },
+        // 表情符号
+        {
+          type: 'i-text',
+          left: 580,
+          top: 1100,
+          fontSize: 80,
+          text: '🤔',
+        },
+      ],
+    }),
+  },
 ];
 

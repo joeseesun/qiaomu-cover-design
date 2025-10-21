@@ -204,6 +204,10 @@ export class TemplateManager {
           // 1:1 方形
           '极简文字·白色·方形': '#FFFFFF',
           '便签纸·粉色·方形': '#FFF0F5',
+          // 16:9 横版
+          '极简文字·白色·16:9': '#FFFFFF',
+          // 9:16 竖版
+          '便签纸·黄色·9:16': '#FFFBEA',
         };
 
         let backgroundColor = backgroundColorMap[template.name] || '#ffffff'; // 默认白色
@@ -356,6 +360,10 @@ export class TemplateManager {
           // 1:1 方形
           '极简文字·白色·方形': '#FFFFFF',
           '便签纸·粉色·方形': '#FFF0F5',
+          // 16:9 横版
+          '极简文字·白色·16:9': '#FFFFFF',
+          // 9:16 竖版
+          '便签纸·黄色·9:16': '#FFFBEA',
         };
 
         const backgroundColor = templateName ? (backgroundColorMap[templateName] || '#ffffff') : '#ffffff';
