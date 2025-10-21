@@ -34,35 +34,30 @@ export default function TemplateLibraryDialog({
     if (open) {
       const manager = getTemplateManager();
 
-      // 首次打开时，添加预设模板
-      const existingTemplates = manager.getAll();
-      if (existingTemplates.length === 0) {
-        manager.addPresetTemplates(PRESET_TEMPLATES);
+      // 🆕 每次打开都检查并添加缺失的预设模板
+      manager.addPresetTemplates(PRESET_TEMPLATES);
 
-        // 为预设模板生成缩略图
-        const generateThumbnails = async () => {
-          const allTemplates = manager.getAll();
-          for (const template of allTemplates) {
-            if (template.isPreset && !template.thumbnail) {
-              try {
-                const thumbnail = await manager.generateThumbnailFromJSON(
-                  template.canvasJSON,
-                  template.canvasSize.width,
-                  template.canvasSize.height
-                );
-                manager.update(template.id, { thumbnail });
-              } catch (error) {
-                console.error('❌ 生成缩略图失败:', error);
-              }
+      // 为预设模板生成缩略图
+      const generateThumbnails = async () => {
+        const allTemplates = manager.getAll();
+        for (const template of allTemplates) {
+          if (template.isPreset && !template.thumbnail) {
+            try {
+              const thumbnail = await manager.generateThumbnailFromJSON(
+                template.canvasJSON,
+                template.canvasSize.width,
+                template.canvasSize.height
+              );
+              manager.update(template.id, { thumbnail });
+            } catch (error) {
+              console.error('❌ 生成缩略图失败:', error);
             }
           }
-          setTemplates(manager.getAll());
-        };
+        }
+        setTemplates(manager.getAll());
+      };
 
-        generateThumbnails();
-      }
-
-      setTemplates(manager.getAll());
+      generateThumbnails();
     }
   }, [open]);
 
@@ -167,7 +162,7 @@ export default function TemplateLibraryDialog({
                   暂无模板
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-3">
                   {filteredTemplates.map(template => (
                     <div
                       key={template.id}
@@ -183,18 +178,18 @@ export default function TemplateLibraryDialog({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-gray-400 text-xs">
                             {template.name}
                           </div>
                         )}
                       </div>
 
                       {/* 模板信息 */}
-                      <div className="p-3">
-                        <div className="font-medium text-sm text-gray-900 truncate">
+                      <div className="p-2">
+                        <div className="font-medium text-xs text-gray-900 truncate">
                           {template.name}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-[10px] text-gray-500 mt-0.5">
                           {template.canvasSize.width} × {template.canvasSize.height}
                         </div>
                       </div>
