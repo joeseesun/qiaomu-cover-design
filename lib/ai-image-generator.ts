@@ -20,7 +20,7 @@ export class AIImageGenerator {
       console.log('🎨 开始生成图片...', {
         prompt,
         size,
-        hasCustomConfig: !!(config.apiKey || config.apiEndpoint || config.modelName)
+        hasCustomConfig: !!(config.apiKey || config.apiEndpoint || config.modelId)
       });
 
       const response = await fetch(this.apiUrl, {
