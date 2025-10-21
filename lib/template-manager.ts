@@ -177,6 +177,39 @@ export class TemplateManager {
         const canvasData = JSON.parse(template.canvasJSON);
         console.log('📦 模板数据:', canvasData);
 
+        // 🆕 从模板数据中移除背景矩形，改用画布背景
+        let backgroundColor = '#ffffff'; // 默认白色
+
+        // 查找并移除背景矩形
+        if (canvasData.objects && Array.isArray(canvasData.objects)) {
+          const backgroundIndex = canvasData.objects.findIndex((obj: any) =>
+            obj.type === 'rect' &&
+            obj.left === 0 &&
+            obj.top === 0 &&
+            obj.width === template.canvasSize.width &&
+            obj.height === template.canvasSize.height
+          );
+
+          if (backgroundIndex !== -1) {
+            const bgRect = canvasData.objects[backgroundIndex];
+            // 提取背景色
+            if (typeof bgRect.fill === 'string') {
+              backgroundColor = bgRect.fill;
+            } else if (bgRect.fill && bgRect.fill.type === 'linear') {
+              // 如果是渐变，使用第一个颜色
+              backgroundColor = bgRect.fill.colorStops?.[0]?.color || '#ffffff';
+            }
+            // 移除背景矩形
+            canvasData.objects.splice(backgroundIndex, 1);
+            console.log('🎨 已移除背景矩形，提取背景色:', backgroundColor);
+          }
+        }
+
+        // 设置画布背景色
+        canvas.setBackgroundColor(backgroundColor, () => {
+          console.log('✅ 画布背景色已设置:', backgroundColor);
+        });
+
         canvas.loadFromJSON(canvasData, () => {
           console.log('✅ JSON 加载完成');
 
