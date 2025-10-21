@@ -162,27 +162,36 @@ export class TemplateManager {
 
     return new Promise((resolve, reject) => {
       try {
+        console.log('🎨 开始应用模板:', template.name);
+
         // 清空画布
         canvas.clear();
+        console.log('✅ 画布已清空');
 
         // 设置画布尺寸
         canvas.setWidth(template.canvasSize.width);
         canvas.setHeight(template.canvasSize.height);
+        console.log('✅ 画布尺寸已设置:', template.canvasSize);
 
         // 加载模板 JSON
         const canvasData = JSON.parse(template.canvasJSON);
-        canvas.loadFromJSON(canvasData, (error?: Error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
+        console.log('📦 模板数据:', canvasData);
+
+        canvas.loadFromJSON(canvasData, () => {
+          console.log('✅ JSON 加载完成');
           canvas.renderAll();
-          // 等待渲染完成
+          console.log('✅ 画布渲染完成');
+
+          // 等待多帧确保完全渲染
           requestAnimationFrame(() => {
-            resolve();
+            requestAnimationFrame(() => {
+              console.log('✅ 模板应用完成');
+              resolve();
+            });
           });
         });
       } catch (error) {
+        console.error('❌ 应用模板失败:', error);
         reject(error);
       }
     });

@@ -1032,7 +1032,9 @@ export default function Home() {
           );
 
           // 应用模板
+          console.log('🎨 开始应用模板...');
           await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
+          console.log('✅ 模板应用完成');
 
           // 重新绑定事件
           managerRef.current.canvas.on('selection:created', (e) => {
@@ -1045,11 +1047,12 @@ export default function Home() {
             setSelectedObject(null);
           });
 
-          // 等待 canvas 完全渲染后再保存到版本历史
-          // 使用 requestAnimationFrame 确保在下一帧执行
-          requestAnimationFrame(() => {
+          // 等待足够长的时间确保 canvas 完全初始化
+          // 使用 setTimeout 而不是 requestAnimationFrame，因为需要更长的延迟
+          setTimeout(() => {
             if (versionRef.current && managerRef.current) {
               try {
+                console.log('💾 开始保存到版本历史...');
                 const canvasJSON = managerRef.current.toJSON();
                 versionRef.current.update(activeId, canvasJSON);
                 console.log('✅ 模板应用后已保存到版本历史');
@@ -1057,7 +1060,7 @@ export default function Home() {
                 console.error('❌ 保存版本历史失败:', error);
               }
             }
-          });
+          }, 300); // 延迟 300ms
 
           setToast({ show: true, message: '模板应用成功', type: 'success' });
         } catch (error) {

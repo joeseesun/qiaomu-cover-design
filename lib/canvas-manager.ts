@@ -2803,9 +2803,23 @@ export class CanvasManager {
         });
       }
 
-      return JSON.stringify(this.canvas.toJSON());
+      // 检查每个对象是否有效
+      const objects = this.canvas.getObjects();
+      console.log('📊 Canvas 对象数量:', objects.length);
+
+      // 尝试序列化
+      const canvasData = this.canvas.toJSON();
+      const jsonString = JSON.stringify(canvasData);
+
+      return jsonString;
     } catch (error) {
       console.error('❌ toJSON 失败:', error);
+      console.error('Canvas 状态:', {
+        hasCanvas: !!this.canvas,
+        hasObjects: !!this.canvas?._objects,
+        objectCount: this.canvas?.getObjects?.()?.length || 0,
+      });
+
       // 返回一个空的有效 JSON
       return JSON.stringify({
         version: '5.3.0',
