@@ -20,7 +20,8 @@ export class CanvasManager {
     this.height = height;
     this.qiniuUploader = new QiniuUploader();
 
-    // 🆕 初始化时暂时禁用历史记录，避免构造过程中的事件触发保存
+    // 🆕 初始化时禁用历史记录，避免构造过程中的事件触发保存
+    // 注意：不要在构造函数中自动启用，由外部调用者控制
     this.isLoadingTemplate = true;
 
     this.canvas = new fabric.Canvas(element, {
@@ -40,13 +41,6 @@ export class CanvasManager {
     this.canvas.on('object:added', () => this.scheduleHistorySave());
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
-
-    // 🆕 构造完成后，启用历史记录
-    // 使用 setTimeout 确保在下一个事件循环中执行
-    setTimeout(() => {
-      this.isLoadingTemplate = false;
-      console.log('✅ CanvasManager 构造完成，已启用历史记录');
-    }, 0);
 
     // 监听画笔绘制完成事件
     this.canvas.on('path:created', (e: any) => {
@@ -3251,9 +3245,25 @@ export class CanvasManager {
       // 使用更安全的方式调用 toJSON
       let canvasData;
       try {
+        // 先检查每个对象是否有效
+        const allObjects = this.canvas.getObjects();
+        console.log('🔍 准备序列化对象:', allObjects.map((obj: any) => ({
+          type: obj.type,
+          hasStroke: obj.stroke !== undefined,
+          hasFill: obj.fill !== undefined,
+          hasPath: obj.path !== undefined,
+        })));
+
         canvasData = this.canvas.toJSON(['data', 'selectable', 'evented']);
       } catch (innerError) {
         console.error('❌ canvas.toJSON() 内部错误:', innerError);
+        console.error('Canvas 对象详情:', this.canvas.getObjects().map((obj: any) => ({
+          type: obj.type,
+          left: obj.left,
+          top: obj.top,
+          width: obj.width,
+          height: obj.height,
+        })));
         return; // 直接返回，不保存历史
       }
 

@@ -80,6 +80,9 @@ export default function Home() {
       canvasSize.width,
       canvasSize.height
     );
+    // 🆕 启用历史记录（构造函数中默认禁用）
+    managerRef.current.setLoadingTemplate(false);
+
     versionRef.current = new VersionManager();
     aiImageGeneratorRef.current = new AIImageGenerator();
     imageToImageGeneratorRef.current = new ImageToImageGenerator();
@@ -961,8 +964,19 @@ export default function Home() {
         newSize.height
       );
 
+      // 🆕 如果需要加载数据，先禁用历史记录
       if (currentData) {
+        managerRef.current.setLoadingTemplate(true);
         managerRef.current.loadFromJSON(currentData);
+        // 加载完成后启用历史记录
+        setTimeout(() => {
+          if (managerRef.current) {
+            managerRef.current.setLoadingTemplate(false);
+          }
+        }, 100);
+      } else {
+        // 没有数据要加载，直接启用历史记录
+        managerRef.current.setLoadingTemplate(false);
       }
 
       managerRef.current.canvas.on('selection:created', (e) => {
