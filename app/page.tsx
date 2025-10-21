@@ -1004,95 +1004,88 @@ export default function Home() {
     setUserZoom(100);
   };
 
-  // 应用模板
+  // 应用模板（确认已在模板库对话框中完成）
   const handleApplyTemplate = async (templateId: string) => {
     if (!managerRef.current || !canvasRef.current) return;
 
-    // 显示确认对话框
-    setConfirmDialog({
-      open: true,
-      message: '应用模板将清空当前内容，是否继续？',
-      onConfirm: async () => {
-        try {
-          const templateManager = getTemplateManager();
-          const template = templateManager.getById(templateId);
+    try {
+      const templateManager = getTemplateManager();
+      const template = templateManager.getById(templateId);
 
-          if (!template) {
-            setToast({ show: true, message: '模板不存在', type: 'error' });
-            return;
-          }
+      if (!template) {
+        setToast({ show: true, message: '模板不存在', type: 'error' });
+        return;
+      }
 
-          // 创建完整的 CanvasSize 对象
-          const newCanvasSize: CanvasSize = {
-            name: `${template.canvasSize.width}×${template.canvasSize.height}`,
-            width: template.canvasSize.width,
-            height: template.canvasSize.height,
-            ratio: template.canvasSize.width > template.canvasSize.height ? '4:3' : '3:4',
-          };
+      // 创建完整的 CanvasSize 对象
+      const newCanvasSize: CanvasSize = {
+        name: `${template.canvasSize.width}×${template.canvasSize.height}`,
+        width: template.canvasSize.width,
+        height: template.canvasSize.height,
+        ratio: template.canvasSize.width > template.canvasSize.height ? '4:3' : '3:4',
+      };
 
-          // 更新画布尺寸
-          setCanvasSize(newCanvasSize);
+      // 更新画布尺寸
+      setCanvasSize(newCanvasSize);
 
-          // 重新创建 CanvasManager
-          if (managerRef.current) {
-            managerRef.current.dispose();
-          }
-          if (!canvasRef.current) return;
+      // 重新创建 CanvasManager
+      if (managerRef.current) {
+        managerRef.current.dispose();
+      }
+      if (!canvasRef.current) return;
 
-          // 创建新的 CanvasManager
-          managerRef.current = new CanvasManager(
-            canvasRef.current,
-            template.canvasSize.width,
-            template.canvasSize.height
-          );
+      // 创建新的 CanvasManager
+      managerRef.current = new CanvasManager(
+        canvasRef.current,
+        template.canvasSize.width,
+        template.canvasSize.height
+      );
 
-          // 🆕 立即设置加载模板标志，禁用历史记录保存
-          // 必须在 applyToCanvas 之前设置，因为 applyToCanvas 会触发事件
-          managerRef.current.setLoadingTemplate(true);
-          console.log('🎨 开始应用模板...');
+      // 🆕 立即设置加载模板标志，禁用历史记录保存
+      // 必须在 applyToCanvas 之前设置，因为 applyToCanvas 会触发事件
+      managerRef.current.setLoadingTemplate(true);
+      console.log('🎨 开始应用模板...');
 
+      try {
+        await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
+        console.log('✅ 模板应用完成');
+      } finally {
+        // 🆕 无论成功失败都要恢复历史记录保存
+        managerRef.current.setLoadingTemplate(false);
+        console.log('✅ 已恢复历史记录保存');
+      }
+
+      // 重新绑定事件
+      managerRef.current.canvas.on('selection:created', (e) => {
+        setSelectedObject(e.selected?.[0]);
+      });
+      managerRef.current.canvas.on('selection:updated', (e) => {
+        setSelectedObject(e.selected?.[0]);
+      });
+      managerRef.current.canvas.on('selection:cleared', () => {
+        setSelectedObject(null);
+      });
+
+      // 等待足够长的时间确保 canvas 完全初始化
+      // 使用 setTimeout 而不是 requestAnimationFrame，因为需要更长的延迟
+      setTimeout(() => {
+        if (versionRef.current && managerRef.current) {
           try {
-            await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
-            console.log('✅ 模板应用完成');
-          } finally {
-            // 🆕 无论成功失败都要恢复历史记录保存
-            managerRef.current.setLoadingTemplate(false);
-            console.log('✅ 已恢复历史记录保存');
+            console.log('💾 开始保存到版本历史...');
+            const canvasJSON = managerRef.current.toJSON();
+            versionRef.current.update(activeId, canvasJSON);
+            console.log('✅ 模板应用后已保存到版本历史');
+          } catch (error) {
+            console.error('❌ 保存版本历史失败:', error);
           }
-
-          // 重新绑定事件
-          managerRef.current.canvas.on('selection:created', (e) => {
-            setSelectedObject(e.selected?.[0]);
-          });
-          managerRef.current.canvas.on('selection:updated', (e) => {
-            setSelectedObject(e.selected?.[0]);
-          });
-          managerRef.current.canvas.on('selection:cleared', () => {
-            setSelectedObject(null);
-          });
-
-          // 等待足够长的时间确保 canvas 完全初始化
-          // 使用 setTimeout 而不是 requestAnimationFrame，因为需要更长的延迟
-          setTimeout(() => {
-            if (versionRef.current && managerRef.current) {
-              try {
-                console.log('💾 开始保存到版本历史...');
-                const canvasJSON = managerRef.current.toJSON();
-                versionRef.current.update(activeId, canvasJSON);
-                console.log('✅ 模板应用后已保存到版本历史');
-              } catch (error) {
-                console.error('❌ 保存版本历史失败:', error);
-              }
-            }
-          }, 300); // 延迟 300ms
-
-          setToast({ show: true, message: '模板应用成功', type: 'success' });
-        } catch (error) {
-          console.error('❌ 应用模板失败:', error);
-          setToast({ show: true, message: '应用模板失败', type: 'error' });
         }
-      },
-    });
+      }, 300); // 延迟 300ms
+
+      setToast({ show: true, message: '模板应用成功', type: 'success' });
+    } catch (error) {
+      console.error('❌ 应用模板失败:', error);
+      setToast({ show: true, message: '应用模板失败', type: 'error' });
+    }
   };
 
   // 保存为模板
