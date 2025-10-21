@@ -27,7 +27,6 @@ export default function TemplateLibraryDialog({
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
 
   // 加载模板
   useEffect(() => {
@@ -98,10 +97,12 @@ export default function TemplateLibraryDialog({
     }
   };
 
-  // 应用模板
-  const handleApply = (templateId: string) => {
-    onApplyTemplate(templateId);
-    onClose();
+  // 应用模板（点击后直接弹出确认对话框）
+  const handleApply = (template: Template) => {
+    if (confirm(`确定要使用「${template.name}」模板吗？\n\n当前画布内容将被替换。`)) {
+      onApplyTemplate(template.id);
+      onClose();
+    }
   };
 
   return (
@@ -162,15 +163,15 @@ export default function TemplateLibraryDialog({
                   暂无模板
                 </div>
               ) : (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-4">
                   {filteredTemplates.map(template => (
                     <div
                       key={template.id}
-                      className="group relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow bg-white"
-                      onClick={() => setPreviewTemplate(template)}
+                      className="group cursor-pointer"
+                      onClick={() => handleApply(template)}
                     >
                       {/* 缩略图 */}
-                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                      <div className="relative aspect-[3/4] bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 border border-gray-200 hover:border-blue-400">
                         {template.thumbnail ? (
                           <img
                             src={template.thumbnail}
@@ -178,31 +179,38 @@ export default function TemplateLibraryDialog({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="text-gray-400 text-xs">
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
                             {template.name}
                           </div>
                         )}
+
+                        {/* 悬停遮罩 */}
+                        <div className="absolute inset-0 bg-blue-500 bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-4 py-2 rounded-full shadow-lg">
+                            <span className="text-sm font-medium text-blue-600">点击使用</span>
+                          </div>
+                        </div>
+
+                        {/* 删除按钮（仅自定义模板） */}
+                        {!template.isPreset && (
+                          <button
+                            onClick={(e) => handleDelete(template.id, e)}
+                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
 
-                      {/* 模板信息 */}
-                      <div className="p-2">
-                        <div className="font-medium text-xs text-gray-900 truncate">
+                      {/* 模板名称（独立显示在缩略图下方） */}
+                      <div className="mt-2 text-center">
+                        <div className="font-medium text-sm text-gray-900 truncate px-1">
                           {template.name}
                         </div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">
+                        <div className="text-xs text-gray-500 mt-0.5">
                           {template.canvasSize.width} × {template.canvasSize.height}
                         </div>
                       </div>
-
-                      {/* 删除按钮（仅自定义模板） */}
-                      {!template.isPreset && (
-                        <button
-                          onClick={(e) => handleDelete(template.id, e)}
-                          className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -210,67 +218,6 @@ export default function TemplateLibraryDialog({
             </div>
           </div>
         </div>
-
-        {/* 预览对话框 */}
-        {previewTemplate && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-[600px] w-full mx-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">{previewTemplate.name}</h3>
-                <button
-                  onClick={() => setPreviewTemplate(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* 预览图 */}
-              <div className="mb-4 border rounded-lg overflow-hidden bg-gray-100">
-                <div className="aspect-[3/4] flex items-center justify-center">
-                  {previewTemplate.thumbnail ? (
-                    <img
-                      src={previewTemplate.thumbnail}
-                      alt={previewTemplate.name}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="text-gray-400">暂无预览</div>
-                  )}
-                </div>
-              </div>
-
-              {/* 模板信息 */}
-              <div className="mb-4 text-sm text-gray-600">
-                <div>分类：{previewTemplate.category}</div>
-                <div>
-                  尺寸：{previewTemplate.canvasSize.width} × {previewTemplate.canvasSize.height}
-                </div>
-                <div>类型：{previewTemplate.isPreset ? '预设模板' : '自定义模板'}</div>
-              </div>
-
-              {/* 操作按钮 */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPreviewTemplate(null)}
-                  className="flex-1"
-                >
-                  取消
-                </Button>
-                <Button
-                  onClick={() => {
-                    handleApply(previewTemplate.id);
-                    setPreviewTemplate(null);
-                  }}
-                  className="flex-1"
-                >
-                  使用此模板
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
