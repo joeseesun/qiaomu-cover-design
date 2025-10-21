@@ -27,6 +27,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
+        {/* Umami 流量统计 */}
+        <script defer src="https://cloud.umami.is/script.js" data-website-id="32816fbe-e9c8-49ff-a796-8e63466e1f1f"></script>
         {/* 汇文明朝体字体 */}
         <link rel='stylesheet' href='https://chinese-fonts-cdn.deno.dev/packages/hwmct/dist/汇文明朝体/result.css' />
         {/* 抖音美好体字体 */}
