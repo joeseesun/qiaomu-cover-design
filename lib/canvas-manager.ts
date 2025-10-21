@@ -19,6 +19,10 @@ export class CanvasManager {
     this.width = width;
     this.height = height;
     this.qiniuUploader = new QiniuUploader();
+
+    // 🆕 初始化时暂时禁用历史记录，避免构造过程中的事件触发保存
+    this.isLoadingTemplate = true;
+
     this.canvas = new fabric.Canvas(element, {
       width: this.width,
       height: this.height,
@@ -36,6 +40,13 @@ export class CanvasManager {
     this.canvas.on('object:added', () => this.scheduleHistorySave());
     this.canvas.on('object:modified', () => this.scheduleHistorySave());
     this.canvas.on('object:removed', () => this.scheduleHistorySave());
+
+    // 🆕 构造完成后，启用历史记录
+    // 使用 setTimeout 确保在下一个事件循环中执行
+    setTimeout(() => {
+      this.isLoadingTemplate = false;
+      console.log('✅ CanvasManager 构造完成，已启用历史记录');
+    }, 0);
 
     // 监听画笔绘制完成事件
     this.canvas.on('path:created', (e: any) => {
@@ -3230,7 +3241,23 @@ export class CanvasManager {
     }
 
     try {
-      const json = JSON.stringify(this.canvas.toJSON(['data', 'selectable', 'evented']));
+      // 再次检查 _objects，因为可能在 try 块内部才出错
+      const objects = this.canvas.getObjects();
+      if (!objects || objects.length === 0) {
+        console.warn('⚠️ Canvas 没有对象，跳过历史记录保存');
+        return;
+      }
+
+      // 使用更安全的方式调用 toJSON
+      let canvasData;
+      try {
+        canvasData = this.canvas.toJSON(['data', 'selectable', 'evented']);
+      } catch (innerError) {
+        console.error('❌ canvas.toJSON() 内部错误:', innerError);
+        return; // 直接返回，不保存历史
+      }
+
+      const json = JSON.stringify(canvasData);
 
       // 检查是否与上一个状态相同，避免重复保存
       if (this.history.length > 0 && this.history[this.historyIndex] === json) {

@@ -1025,23 +1025,26 @@ export default function Home() {
           }
           if (!canvasRef.current) return;
 
+          // 创建新的 CanvasManager
           managerRef.current = new CanvasManager(
             canvasRef.current,
             template.canvasSize.width,
             template.canvasSize.height
           );
 
-          // 应用模板
+          // 🆕 立即设置加载模板标志，禁用历史记录保存
+          // 必须在 applyToCanvas 之前设置，因为 applyToCanvas 会触发事件
+          managerRef.current.setLoadingTemplate(true);
           console.log('🎨 开始应用模板...');
 
-          // 🆕 设置加载模板标志，禁用历史记录保存
-          managerRef.current.setLoadingTemplate(true);
-
-          await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
-          console.log('✅ 模板应用完成');
-
-          // 🆕 恢复历史记录保存
-          managerRef.current.setLoadingTemplate(false);
+          try {
+            await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
+            console.log('✅ 模板应用完成');
+          } finally {
+            // 🆕 无论成功失败都要恢复历史记录保存
+            managerRef.current.setLoadingTemplate(false);
+            console.log('✅ 已恢复历史记录保存');
+          }
 
           // 重新绑定事件
           managerRef.current.canvas.on('selection:created', (e) => {
