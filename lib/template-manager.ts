@@ -216,13 +216,14 @@ export class TemplateManager {
           }
         }
 
-        // 设置画布背景色
-        canvas.setBackgroundColor(backgroundColor, () => {
-          console.log('✅ 画布背景色已设置:', backgroundColor);
-        });
-
         canvas.loadFromJSON(canvasData, () => {
           console.log('✅ JSON 加载完成');
+
+          // 🆕 设置画布背景色（在 loadFromJSON 之后，避免被重置）
+          canvas.setBackgroundColor(backgroundColor, () => {
+            console.log('✅ 画布背景色已设置:', backgroundColor);
+            canvas.renderAll();
+          });
 
           // 🆕 修复加载后的对象，确保所有必要属性都存在
           const objects = canvas.getObjects();
