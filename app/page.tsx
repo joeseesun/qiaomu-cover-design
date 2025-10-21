@@ -340,7 +340,7 @@ export default function Home() {
           // 检查是否配置了 API Key
           if (!hasApiKeyConfigured()) {
             setShowSettingsDialog(true);
-            showToast('请先配置 API Key', 'info');
+            setToast({ show: true, message: '请先配置 API Key', type: 'info' });
             return;
           }
 
@@ -577,7 +577,7 @@ export default function Home() {
       // 检查是否配置了 API Key
       if (!hasApiKeyConfigured()) {
         setShowSettingsDialog(true);
-        showToast('请先配置 API Key', 'info');
+        setToast({ show: true, message: '请先配置 API Key', type: 'info' });
         return;
       }
       // 打开 AI 生图对话框
@@ -1285,7 +1285,7 @@ export default function Home() {
                 // 检查是否配置了 API Key
                 if (!hasApiKeyConfigured()) {
                   setShowSettingsDialog(true);
-                  showToast('请先配置 API Key', 'info');
+                  setToast({ show: true, message: '请先配置 API Key', type: 'info' });
                   setContextMenu(null);
                   return;
                 }
