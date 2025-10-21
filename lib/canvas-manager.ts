@@ -11,6 +11,7 @@ export class CanvasManager {
   private history: string[] = [];
   private historyIndex: number = -1;
   private isUndoRedoing: boolean = false;
+  private isLoadingTemplate: boolean = false; // 🆕 标记是否正在加载模板
   private saveHistoryTimer: NodeJS.Timeout | null = null;
   private qiniuUploader: QiniuUploader;
 
@@ -2837,6 +2838,12 @@ export class CanvasManager {
     });
   }
 
+  // 🆕 设置是否正在加载模板
+  setLoadingTemplate(loading: boolean) {
+    this.isLoadingTemplate = loading;
+    console.log('🔄 设置加载模板状态:', loading);
+  }
+
   // 重新绑定所有 Group 对象的双击事件
   private rebindGroupEvents() {
     const objects = this.canvas.getObjects();
@@ -3214,27 +3221,39 @@ export class CanvasManager {
   // 保存历史记录
   private saveHistory() {
     if (this.isUndoRedoing) return;
+    if (this.isLoadingTemplate) return; // 🆕 加载模板时不保存历史
 
-    const json = JSON.stringify(this.canvas.toJSON(['data', 'selectable', 'evented']));
-
-    // 检查是否与上一个状态相同，避免重复保存
-    if (this.history.length > 0 && this.history[this.historyIndex] === json) {
+    // 确保 canvas 已完全初始化
+    if (!this.canvas || !this.canvas._objects) {
+      console.warn('⚠️ Canvas 未完全初始化，跳过历史记录保存');
       return;
     }
 
-    // 如果当前不在历史记录的末尾，删除后面的记录
-    if (this.historyIndex < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIndex + 1);
-    }
+    try {
+      const json = JSON.stringify(this.canvas.toJSON(['data', 'selectable', 'evented']));
 
-    // 添加新记录
-    this.history.push(json);
-    this.historyIndex++;
+      // 检查是否与上一个状态相同，避免重复保存
+      if (this.history.length > 0 && this.history[this.historyIndex] === json) {
+        return;
+      }
 
-    // 限制历史记录数量（最多 20 条，减少内存占用）
-    if (this.history.length > 20) {
-      this.history.shift();
-      this.historyIndex--;
+      // 如果当前不在历史记录的末尾，删除后面的记录
+      if (this.historyIndex < this.history.length - 1) {
+        this.history = this.history.slice(0, this.historyIndex + 1);
+      }
+
+      // 添加新记录
+      this.history.push(json);
+      this.historyIndex++;
+
+      // 限制历史记录数量（最多 20 条，减少内存占用）
+      if (this.history.length > 20) {
+        this.history.shift();
+        this.historyIndex--;
+      }
+    } catch (error) {
+      console.error('❌ 保存历史记录失败:', error);
+      // 静默失败，不影响用户操作
     }
   }
 

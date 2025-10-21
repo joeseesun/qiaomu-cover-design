@@ -1033,8 +1033,15 @@ export default function Home() {
 
           // 应用模板
           console.log('🎨 开始应用模板...');
+
+          // 🆕 设置加载模板标志，禁用历史记录保存
+          managerRef.current.setLoadingTemplate(true);
+
           await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
           console.log('✅ 模板应用完成');
+
+          // 🆕 恢复历史记录保存
+          managerRef.current.setLoadingTemplate(false);
 
           // 重新绑定事件
           managerRef.current.canvas.on('selection:created', (e) => {
