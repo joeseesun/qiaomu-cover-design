@@ -2795,6 +2795,15 @@ export class CanvasManager {
   // 导出为 JSON
   toJSON() {
     try {
+      // 如果正在加载模板，返回空 JSON
+      if (this.isLoadingTemplate) {
+        console.warn('⚠️ 正在加载模板，跳过 toJSON');
+        return JSON.stringify({
+          version: '5.3.0',
+          objects: [],
+        });
+      }
+
       // 确保 canvas 已初始化
       if (!this.canvas) {
         throw new Error('Canvas 未初始化');
@@ -2813,8 +2822,19 @@ export class CanvasManager {
       const objects = this.canvas.getObjects();
       console.log('📊 Canvas 对象数量:', objects.length);
 
-      // 尝试序列化
-      const canvasData = this.canvas.toJSON();
+      // 尝试序列化 - 使用 try-catch 保护
+      let canvasData;
+      try {
+        canvasData = this.canvas.toJSON();
+      } catch (innerError) {
+        console.error('❌ canvas.toJSON() 内部错误:', innerError);
+        // 返回空的有效 JSON
+        return JSON.stringify({
+          version: '5.3.0',
+          objects: [],
+        });
+      }
+
       const jsonString = JSON.stringify(canvasData);
 
       return jsonString;
