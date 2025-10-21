@@ -171,9 +171,16 @@ export class TemplateManager {
 
         // 加载模板 JSON
         const canvasData = JSON.parse(template.canvasJSON);
-        canvas.loadFromJSON(canvasData, () => {
+        canvas.loadFromJSON(canvasData, (error?: Error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
           canvas.renderAll();
-          resolve();
+          // 等待渲染完成
+          requestAnimationFrame(() => {
+            resolve();
+          });
         });
       } catch (error) {
         reject(error);
