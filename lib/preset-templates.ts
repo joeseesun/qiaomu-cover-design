@@ -394,5 +394,289 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
       ],
     }),
   },
+
+  // ========== 小红书风格模板 ==========
+
+  // 便签纸风格（黄色）
+  {
+    name: '便签纸·黄色',
+    category: '文字卡片',
+    canvasSize: { width: 1242, height: 1660 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 日期标签
+        {
+          type: 'i-text',
+          left: 80,
+          top: 50,
+          fontSize: 32,
+          fontFamily: 'Arial',
+          fill: '#666666',
+          text: 'Date: __.__',
+        },
+        // 主标题
+        {
+          type: 'i-text',
+          left: 120,
+          top: 280,
+          fontSize: 72,
+          fontFamily: 'KaiTi, STKaiti, serif',
+          fontWeight: 'bold',
+          fill: '#000000',
+          text: '点击修改标题文字',
+          lineHeight: 1.4,
+        },
+        // 荧光笔背景
+        {
+          type: 'rect',
+          left: 100,
+          top: 270,
+          width: 1000,
+          height: 220,
+          fill: '#FFE066',
+          opacity: 0.4,
+          selectable: false,
+          evented: false,
+        },
+        // 表情符号
+        {
+          type: 'i-text',
+          left: 1050,
+          top: 1500,
+          fontSize: 80,
+          text: '🤔',
+        },
+      ],
+    }),
+  },
+
+  // 引用卡片风格（蓝色）
+  {
+    name: '引用卡片·蓝色',
+    category: '文字卡片',
+    canvasSize: { width: 1242, height: 1660 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 圆角卡片
+        {
+          type: 'rect',
+          left: 80,
+          top: 80,
+          width: 1082,
+          height: 1500,
+          fill: 'rgba(255, 255, 255, 0.7)',
+          rx: 40,
+          ry: 40,
+          selectable: false,
+          evented: false,
+        },
+        // 引号装饰
+        {
+          type: 'i-text',
+          left: 150,
+          top: 150,
+          fontSize: 120,
+          fontFamily: 'Georgia, serif',
+          fill: '#90CAF9',
+          fontWeight: 'bold',
+          text: '"',
+          selectable: false,
+          evented: false,
+        },
+        // 主文字
+        {
+          type: 'i-text',
+          left: 150,
+          top: 350,
+          fontSize: 68,
+          fontFamily: 'SimHei, STHeiti, sans-serif',
+          fill: '#333333',
+          text: '点击修改文字内容\n可以多行显示',
+          lineHeight: 1.5,
+        },
+        // 装饰短线
+        {
+          type: 'line',
+          left: 950,
+          top: 1450,
+          x1: 0,
+          y1: 0,
+          x2: 100,
+          y2: 0,
+          stroke: '#90CAF9',
+          strokeWidth: 8,
+          selectable: false,
+          evented: false,
+        },
+      ],
+    }),
+  },
+
+  // 极简文字风格（白色）
+  {
+    name: '极简文字·白色',
+    category: '文字卡片',
+    canvasSize: { width: 1242, height: 1660 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 超大标题
+        {
+          type: 'i-text',
+          left: 120,
+          top: 400,
+          fontSize: 96,
+          fontFamily: 'KaiTi, STKaiti, serif',
+          fontWeight: 'bold',
+          fill: '#2C3E50',
+          text: '点击修改\n标题文字',
+          lineHeight: 1.3,
+        },
+        // 关键词方框
+        {
+          type: 'rect',
+          left: 110,
+          top: 550,
+          width: 280,
+          height: 120,
+          fill: 'transparent',
+          stroke: '#4CAF50',
+          strokeWidth: 6,
+          rx: 8,
+          ry: 8,
+        },
+      ],
+    }),
+  },
+
+  // 便签纸风格（粉色）
+  {
+    name: '便签纸·粉色',
+    category: '文字卡片',
+    canvasSize: { width: 1242, height: 1660 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 顶部标签
+        {
+          type: 'i-text',
+          left: 400,
+          top: 30,
+          fontSize: 24,
+          fontFamily: 'Arial',
+          fill: '#999999',
+          text: 'Info Doc.    Encyclopedia    •    •',
+          selectable: false,
+          evented: false,
+        },
+        // 主标题
+        {
+          type: 'i-text',
+          left: 120,
+          top: 300,
+          fontSize: 76,
+          fontFamily: 'SimHei, STHeiti, sans-serif',
+          fontWeight: 'bold',
+          fill: '#000000',
+          text: '点击修改标题，\n可以换行显示！',
+          lineHeight: 1.4,
+        },
+        // 粉色荧光笔
+        {
+          type: 'rect',
+          left: 100,
+          top: 420,
+          width: 600,
+          height: 100,
+          fill: '#FFB6D9',
+          opacity: 0.5,
+          selectable: false,
+          evented: false,
+        },
+        // 底部小字
+        {
+          type: 'i-text',
+          left: 900,
+          top: 1600,
+          fontSize: 20,
+          fontFamily: 'Arial',
+          fill: '#CCCCCC',
+          text: 'Source / Xiaohongshu',
+          selectable: false,
+          evented: false,
+        },
+      ],
+    }),
+  },
+
+  // 引用卡片风格（绿色）
+  {
+    name: '引用卡片·绿色',
+    category: '文字卡片',
+    canvasSize: { width: 1242, height: 1660 },
+    isPreset: true,
+    canvasJSON: JSON.stringify({
+      version: '5.3.0',
+      objects: [
+        // 圆角卡片
+        {
+          type: 'rect',
+          left: 80,
+          top: 80,
+          width: 1082,
+          height: 1500,
+          fill: 'rgba(255, 255, 255, 0.8)',
+          rx: 40,
+          ry: 40,
+          selectable: false,
+          evented: false,
+        },
+        // 引号装饰
+        {
+          type: 'i-text',
+          left: 150,
+          top: 120,
+          fontSize: 100,
+          fontFamily: 'Georgia, serif',
+          fill: '#C8E6C9',
+          fontWeight: 'bold',
+          text: '"',
+          selectable: false,
+          evented: false,
+        },
+        // 主文字
+        {
+          type: 'i-text',
+          left: 150,
+          top: 350,
+          fontSize: 64,
+          fontFamily: 'SimHei, STHeiti, sans-serif',
+          fill: '#2E7D32',
+          text: '点击修改文字内容\n（可以多行）',
+          lineHeight: 1.5,
+        },
+        // 装饰短线
+        {
+          type: 'line',
+          left: 950,
+          top: 1450,
+          x1: 0,
+          y1: 0,
+          x2: 100,
+          y2: 0,
+          stroke: '#81C784',
+          strokeWidth: 8,
+          selectable: false,
+          evented: false,
+        },
+      ],
+    }),
+  },
 ];
 

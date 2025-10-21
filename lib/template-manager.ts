@@ -178,7 +178,16 @@ export class TemplateManager {
         console.log('📦 模板数据:', canvasData);
 
         // 🆕 从模板数据中移除背景矩形，改用画布背景
-        let backgroundColor = '#ffffff'; // 默认白色
+        // 根据模板名称设置背景色
+        const backgroundColorMap: Record<string, string> = {
+          '便签纸·黄色': '#FFFBEA',
+          '引用卡片·蓝色': '#E3F2FD',
+          '极简文字·白色': '#FFFFFF',
+          '便签纸·粉色': '#FFF0F5',
+          '引用卡片·绿色': '#E8F5E9',
+        };
+
+        let backgroundColor = backgroundColorMap[template.name] || '#ffffff'; // 默认白色
 
         // 查找并移除背景矩形
         if (canvasData.objects && Array.isArray(canvasData.objects)) {
@@ -192,12 +201,14 @@ export class TemplateManager {
 
           if (backgroundIndex !== -1) {
             const bgRect = canvasData.objects[backgroundIndex];
-            // 提取背景色
-            if (typeof bgRect.fill === 'string') {
-              backgroundColor = bgRect.fill;
-            } else if (bgRect.fill && bgRect.fill.type === 'linear') {
-              // 如果是渐变，使用第一个颜色
-              backgroundColor = bgRect.fill.colorStops?.[0]?.color || '#ffffff';
+            // 提取背景色（如果没有在映射表中）
+            if (!backgroundColorMap[template.name]) {
+              if (typeof bgRect.fill === 'string') {
+                backgroundColor = bgRect.fill;
+              } else if (bgRect.fill && bgRect.fill.type === 'linear') {
+                // 如果是渐变，使用第一个颜色
+                backgroundColor = bgRect.fill.colorStops?.[0]?.color || '#ffffff';
+              }
             }
             // 移除背景矩形
             canvasData.objects.splice(backgroundIndex, 1);
