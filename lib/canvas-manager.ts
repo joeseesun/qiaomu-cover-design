@@ -2820,6 +2820,28 @@ export class CanvasManager {
 
       // 检查每个对象是否有效
       const objects = this.canvas.getObjects();
+
+      // 检查每个对象的关键属性
+      for (let i = 0; i < objects.length; i++) {
+        const obj = objects[i] as any;
+        if (!obj) {
+          console.warn(`⚠️ 对象 ${i} 为 null/undefined，跳过序列化`);
+          return JSON.stringify({
+            version: '5.3.0',
+            objects: [],
+          });
+        }
+
+        // 检查对象是否有必要的属性
+        if (obj.type === 'path' && !obj.path) {
+          console.warn(`⚠️ Path 对象 ${i} 缺少 path 属性，跳过序列化`);
+          return JSON.stringify({
+            version: '5.3.0',
+            objects: [],
+          });
+        }
+      }
+
       console.log('📊 Canvas 对象数量:', objects.length);
 
       // 尝试序列化 - 使用 try-catch 保护
@@ -2828,6 +2850,15 @@ export class CanvasManager {
         canvasData = this.canvas.toJSON();
       } catch (innerError) {
         console.error('❌ canvas.toJSON() 内部错误:', innerError);
+        console.error('出错时的对象列表:', objects.map((obj: any, idx) => ({
+          index: idx,
+          type: obj?.type,
+          left: obj?.left,
+          top: obj?.top,
+          hasPath: obj?.path !== undefined,
+          hasFill: obj?.fill !== undefined,
+          hasStroke: obj?.stroke !== undefined,
+        })));
         // 返回空的有效 JSON
         return JSON.stringify({
           version: '5.3.0',
