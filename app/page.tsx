@@ -24,6 +24,9 @@ import { HexColorPicker } from 'react-colorful';
 import SettingsDialog, { hasApiKeyConfigured } from './components/home/SettingsDialog';
 import DonationDialog from './components/home/DonationDialog';
 import WeChatDialog from './components/home/WeChatDialog';
+import TemplateLibraryDialog from './components/home/TemplateLibraryDialog';
+import SaveTemplateDialog from './components/home/SaveTemplateDialog';
+import { getTemplateManager, TemplateCategory } from '@/lib/template-manager';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,6 +53,8 @@ export default function Home() {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showDonationDialog, setShowDonationDialog] = useState(false);
   const [showWeChatDialog, setShowWeChatDialog] = useState(false);
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     message: string;
@@ -985,6 +990,92 @@ export default function Home() {
     setUserZoom(100);
   };
 
+  // 应用模板
+  const handleApplyTemplate = async (templateId: string) => {
+    if (!managerRef.current || !canvasRef.current) return;
+
+    // 显示确认对话框
+    setConfirmDialog({
+      open: true,
+      message: '应用模板将清空当前内容，是否继续？',
+      onConfirm: async () => {
+        try {
+          const templateManager = getTemplateManager();
+          const template = templateManager.getById(templateId);
+
+          if (!template) {
+            setToast({ show: true, message: '模板不存在', type: 'error' });
+            return;
+          }
+
+          // 创建完整的 CanvasSize 对象
+          const newCanvasSize: CanvasSize = {
+            name: `${template.canvasSize.width}×${template.canvasSize.height}`,
+            width: template.canvasSize.width,
+            height: template.canvasSize.height,
+            ratio: template.canvasSize.width > template.canvasSize.height ? '4:3' : '3:4',
+          };
+
+          // 更新画布尺寸
+          setCanvasSize(newCanvasSize);
+
+          // 重新创建 CanvasManager
+          if (managerRef.current) {
+            managerRef.current.dispose();
+          }
+          if (!canvasRef.current) return;
+
+          managerRef.current = new CanvasManager(
+            canvasRef.current,
+            template.canvasSize.width,
+            template.canvasSize.height
+          );
+
+          // 应用模板
+          await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
+
+          // 重新绑定事件
+          managerRef.current.canvas.on('selection:created', (e) => {
+            setSelectedObject(e.selected?.[0]);
+          });
+          managerRef.current.canvas.on('selection:updated', (e) => {
+            setSelectedObject(e.selected?.[0]);
+          });
+          managerRef.current.canvas.on('selection:cleared', () => {
+            setSelectedObject(null);
+          });
+
+          // 保存到版本历史
+          if (versionRef.current && managerRef.current) {
+            versionRef.current.update(
+              activeId,
+              managerRef.current.toJSON()
+            );
+          }
+
+          setToast({ show: true, message: '模板应用成功', type: 'success' });
+        } catch (error) {
+          console.error('❌ 应用模板失败:', error);
+          setToast({ show: true, message: '应用模板失败', type: 'error' });
+        }
+      },
+    });
+  };
+
+  // 保存为模板
+  const handleSaveAsTemplate = async (name: string, category: TemplateCategory) => {
+    if (!managerRef.current) return;
+
+    try {
+      const templateManager = getTemplateManager();
+      await templateManager.saveFromCanvas(managerRef.current.canvas, name, category);
+      setToast({ show: true, message: '模板保存成功', type: 'success' });
+    } catch (error) {
+      console.error('❌ 保存模板失败:', error);
+      setToast({ show: true, message: '保存模板失败', type: 'error' });
+    }
+  };
+
   // 字体面板操作
   const handleFontChange = (fontFamily: string) => {
     managerRef.current?.updateProperty('fontFamily', fontFamily);
@@ -1100,6 +1191,8 @@ export default function Home() {
         onOpenSettings={() => setShowSettingsDialog(true)}
         onOpenDonation={() => setShowDonationDialog(true)}
         onOpenWeChat={() => setShowWeChatDialog(true)}
+        onOpenTemplateLibrary={() => setShowTemplateLibrary(true)}
+        onSaveAsTemplate={() => setShowSaveTemplateDialog(true)}
       />
 
       {/* 主内容区 */}
@@ -1500,6 +1593,20 @@ export default function Home() {
       <WeChatDialog
         isOpen={showWeChatDialog}
         onClose={() => setShowWeChatDialog(false)}
+      />
+
+      {/* 模板库对话框 */}
+      <TemplateLibraryDialog
+        open={showTemplateLibrary}
+        onClose={() => setShowTemplateLibrary(false)}
+        onApplyTemplate={handleApplyTemplate}
+      />
+
+      {/* 保存为模板对话框 */}
+      <SaveTemplateDialog
+        open={showSaveTemplateDialog}
+        onClose={() => setShowSaveTemplateDialog(false)}
+        onSave={handleSaveAsTemplate}
       />
     </div>
   );

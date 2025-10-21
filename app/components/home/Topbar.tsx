@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2, Settings, Heart, QrCode } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2, Settings, Heart, QrCode, Layout, Save } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -35,6 +35,8 @@ interface TopbarProps {
   onOpenSettings?: () => void;
   onOpenDonation?: () => void;
   onOpenWeChat?: () => void;
+  onOpenTemplateLibrary?: () => void;
+  onSaveAsTemplate?: () => void;
 }
 
 export default function Topbar({
@@ -58,6 +60,8 @@ export default function Topbar({
   onOpenSettings,
   onOpenDonation,
   onOpenWeChat,
+  onOpenTemplateLibrary,
+  onSaveAsTemplate,
 }: TopbarProps) {
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3' | '16:9' | '21:9' | '9:16'>('3:4');
@@ -244,6 +248,18 @@ export default function Topbar({
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* 模板库按钮 */}
+        {onOpenTemplateLibrary && (
+          <Button
+            variant="outline"
+            onClick={onOpenTemplateLibrary}
+            className="h-10 px-4 border-gray-200 gap-2"
+          >
+            <Layout className="h-4 w-4" />
+            模板
+          </Button>
+        )}
       </div>
 
       {/* 右侧：缩放控制 + 复制 + 下载 */}
@@ -306,6 +322,13 @@ export default function Topbar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            {onSaveAsTemplate && (
+              <DropdownMenuItem onClick={onSaveAsTemplate}>
+                <Save className="h-4 w-4 mr-2" />
+                保存为模板
+              </DropdownMenuItem>
+            )}
+            {onSaveAsTemplate && <DropdownMenuSeparator />}
             {onOpenSettings && (
               <DropdownMenuItem onClick={onOpenSettings}>
                 <Settings className="h-4 w-4 mr-2" />

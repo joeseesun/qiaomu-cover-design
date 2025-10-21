@@ -1,0 +1,276 @@
+/**
+ * 模板管理器
+ * 负责模板的增删改查、应用模板、保存模板等功能
+ */
+
+import { fabric } from 'fabric';
+
+// 模板类型定义
+export interface Template {
+  id: string;
+  name: string;
+  category: TemplateCategory;
+  canvasSize: {
+    width: number;
+    height: number;
+  };
+  canvasJSON: string; // Fabric.js canvas.toJSON() 的 JSON 字符串
+  thumbnail?: string; // 缩略图 base64 或 URL
+  isPreset: boolean; // 是否为预设模板
+  createdAt: number;
+}
+
+// 模板分类
+export type TemplateCategory = 
+  | '文字卡片'
+  | '图文混排'
+  | '九宫格'
+  | '知识分享'
+  | '情绪表达'
+  | '产品展示'
+  | '自定义';
+
+// 模板管理器类
+export class TemplateManager {
+  private static instance: TemplateManager;
+  private templates: Template[] = [];
+  private readonly STORAGE_KEY = 'canvas-templates';
+
+  private constructor() {
+    this.loadFromStorage();
+  }
+
+  // 单例模式
+  static getInstance(): TemplateManager {
+    if (!TemplateManager.instance) {
+      TemplateManager.instance = new TemplateManager();
+    }
+    return TemplateManager.instance;
+  }
+
+  // 从 localStorage 加载模板
+  private loadFromStorage(): void {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored) {
+        this.templates = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('❌ 加载模板失败:', error);
+      this.templates = [];
+    }
+  }
+
+  // 保存到 localStorage
+  private saveToStorage(): void {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.templates));
+    } catch (error) {
+      console.error('❌ 保存模板失败:', error);
+    }
+  }
+
+  // 获取所有模板
+  getAll(): Template[] {
+    return [...this.templates];
+  }
+
+  // 按分类获取模板
+  getByCategory(category: TemplateCategory): Template[] {
+    return this.templates.filter(t => t.category === category);
+  }
+
+  // 获取单个模板
+  getById(id: string): Template | undefined {
+    return this.templates.find(t => t.id === id);
+  }
+
+  // 添加模板
+  add(template: Omit<Template, 'id' | 'createdAt'>): Template {
+    const newTemplate: Template = {
+      ...template,
+      id: `template-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: Date.now(),
+    };
+    
+    this.templates.push(newTemplate);
+    this.saveToStorage();
+    return newTemplate;
+  }
+
+  // 更新模板
+  update(id: string, updates: Partial<Omit<Template, 'id' | 'createdAt'>>): boolean {
+    const index = this.templates.findIndex(t => t.id === id);
+    if (index === -1) return false;
+
+    this.templates[index] = {
+      ...this.templates[index],
+      ...updates,
+    };
+    this.saveToStorage();
+    return true;
+  }
+
+  // 删除模板
+  delete(id: string): boolean {
+    const index = this.templates.findIndex(t => t.id === id);
+    if (index === -1) return false;
+
+    this.templates.splice(index, 1);
+    this.saveToStorage();
+    return true;
+  }
+
+  // 从画布保存为模板
+  async saveFromCanvas(
+    canvas: fabric.Canvas,
+    name: string,
+    category: TemplateCategory = '自定义'
+  ): Promise<Template> {
+    // 获取画布 JSON
+    const canvasJSON = JSON.stringify(canvas.toJSON());
+    
+    // 生成缩略图
+    const thumbnail = await this.generateThumbnail(canvas);
+
+    // 创建模板
+    const template = this.add({
+      name,
+      category,
+      canvasSize: {
+        width: canvas.width || 1242,
+        height: canvas.height || 1660,
+      },
+      canvasJSON,
+      thumbnail,
+      isPreset: false,
+    });
+
+    return template;
+  }
+
+  // 应用模板到画布
+  async applyToCanvas(templateId: string, canvas: fabric.Canvas): Promise<void> {
+    const template = this.getById(templateId);
+    if (!template) {
+      throw new Error('模板不存在');
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        // 清空画布
+        canvas.clear();
+
+        // 设置画布尺寸
+        canvas.setWidth(template.canvasSize.width);
+        canvas.setHeight(template.canvasSize.height);
+
+        // 加载模板 JSON
+        const canvasData = JSON.parse(template.canvasJSON);
+        canvas.loadFromJSON(canvasData, () => {
+          canvas.renderAll();
+          resolve();
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 生成缩略图
+  private async generateThumbnail(canvas: fabric.Canvas): Promise<string> {
+    try {
+      // 使用 canvas.toDataURL 生成缩略图
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 0.8,
+        multiplier: 0.2, // 缩小到 20% 尺寸
+      });
+      return dataURL;
+    } catch (error) {
+      console.error('❌ 生成缩略图失败:', error);
+      return '';
+    }
+  }
+
+  // 从 JSON 生成缩略图（用于预设模板）
+  async generateThumbnailFromJSON(
+    canvasJSON: string,
+    width: number,
+    height: number
+  ): Promise<string> {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined') {
+        resolve('');
+        return;
+      }
+
+      try {
+        // 创建离屏 canvas
+        const offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+
+        const fabricCanvas = new fabric.Canvas(offscreenCanvas);
+        fabricCanvas.setWidth(width);
+        fabricCanvas.setHeight(height);
+
+        // 加载 JSON
+        const canvasData = JSON.parse(canvasJSON);
+        fabricCanvas.loadFromJSON(canvasData, () => {
+          fabricCanvas.renderAll();
+          
+          // 生成缩略图
+          const thumbnail = fabricCanvas.toDataURL({
+            format: 'png',
+            quality: 0.8,
+            multiplier: 0.2,
+          });
+
+          // 清理
+          fabricCanvas.dispose();
+          resolve(thumbnail);
+        });
+      } catch (error) {
+        console.error('❌ 从 JSON 生成缩略图失败:', error);
+        resolve('');
+      }
+    });
+  }
+
+  // 批量添加预设模板
+  addPresetTemplates(templates: Omit<Template, 'id' | 'createdAt'>[]): void {
+    templates.forEach(template => {
+      // 检查是否已存在同名预设模板
+      const exists = this.templates.some(
+        t => t.isPreset && t.name === template.name
+      );
+      if (!exists) {
+        this.add(template);
+      }
+    });
+  }
+
+  // 重置为预设模板（删除所有自定义模板）
+  resetToPresets(): void {
+    this.templates = this.templates.filter(t => t.isPreset);
+    this.saveToStorage();
+  }
+
+  // 获取所有分类
+  getCategories(): TemplateCategory[] {
+    const categories = new Set<TemplateCategory>();
+    this.templates.forEach(t => categories.add(t.category));
+    return Array.from(categories);
+  }
+}
+
+// 导出单例实例
+export function getTemplateManager(): TemplateManager {
+  return TemplateManager.getInstance();
+}
+
