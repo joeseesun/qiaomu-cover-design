@@ -47,41 +47,12 @@ export default function TemplateLibraryDialog({
         }
       });
 
-      // 🆕 每次打开都检查并添加缺失的预设模板
+      // 🆕 每次打开都检查并添加缺失的预设模板（已包含静态缩略图 URL）
       manager.addPresetTemplates(PRESET_TEMPLATES);
 
-      // 为预设模板生成缩略图（强制重新生成）
-      const generateThumbnails = async () => {
-        const updatedTemplates = manager.getAll();
-        console.log('📊 开始生成缩略图，共', updatedTemplates.length, '个模板');
-
-        for (const template of updatedTemplates) {
-          if (template.isPreset) {
-            try {
-              console.log('🖼️ 生成缩略图:', template.name);
-              const thumbnail = await manager.generateThumbnailFromJSON(
-                template.canvasJSON,
-                template.canvasSize.width,
-                template.canvasSize.height,
-                template.name
-              );
-
-              if (thumbnail && thumbnail.startsWith('data:image')) {
-                manager.update(template.id, { thumbnail });
-                console.log('✅ 缩略图生成成功:', template.name, '大小:', thumbnail.length);
-              } else {
-                console.error('❌ 缩略图无效:', template.name);
-              }
-            } catch (error) {
-              console.error('❌ 生成缩略图失败:', template.name, error);
-            }
-          }
-        }
-        setTemplates(manager.getAll());
-        console.log('✅ 所有缩略图生成完成');
-      };
-
-      generateThumbnails();
+      // 更新模板列表
+      setTemplates(manager.getAll());
+      console.log('✅ 预设模板加载完成，共', manager.getAll().length, '个模板');
     }
   }, [open]);
 

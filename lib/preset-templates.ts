@@ -5,6 +5,15 @@
 
 import { Template } from './template-manager';
 
+// 🆕 生成缩略图 URL（从 public/templates/ 目录）
+function getThumbnailUrl(templateName: string): string {
+  const fileName = templateName
+    .replace(/·/g, '-')
+    .replace(/\s+/g, '-')
+    .toLowerCase() + '.png';
+  return `/templates/${fileName}`;
+}
+
 // 预设模板列表
 export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
   // ========== 3:4 竖版（960×1280）==========
@@ -14,6 +23,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 960, height: 1280 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('极简黑白·竖版'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -70,6 +80,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1242, height: 1660 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('引用卡片·蓝色'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -135,6 +146,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1242, height: 1660 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('极简文字·白色'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -173,6 +185,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1242, height: 1660 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('便签纸·粉色'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -234,6 +247,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1242, height: 1660 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('引用卡片·绿色'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -300,6 +314,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1660, height: 1242 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('便签纸·黄色·横版'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -356,6 +371,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1660, height: 1242 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('引用卡片·蓝色·横版'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -422,6 +438,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1242, height: 1242 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('极简文字·白色·方形'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -460,6 +477,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1242, height: 1242 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('便签纸·粉色·方形'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -522,6 +540,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 1280, height: 720 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('极简文字·白色·16:9'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
@@ -561,6 +580,7 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
     category: '文字卡片',
     canvasSize: { width: 720, height: 1280 },
     isPreset: true,
+    thumbnail: getThumbnailUrl('便签纸·黄色·9:16'),
     canvasJSON: JSON.stringify({
       version: '5.3.0',
       objects: [
