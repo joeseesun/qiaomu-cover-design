@@ -93,7 +93,14 @@ async function downloadAndUploadToQiniu(imageUrl: string): Promise<string> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, image, size = '2K' } = body;
+    const {
+      prompt,
+      image,
+      size = '2K',
+      apiKey: customApiKey,
+      apiEndpoint: customEndpoint,
+      modelId: customModelId
+    } = body;
 
     if (!prompt) {
       return NextResponse.json(
@@ -109,21 +116,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 使用自定义配置或默认配置
+    const finalApiKey = customApiKey || ARK_API_KEY;
+    const finalEndpoint = customEndpoint || ARK_ENDPOINT;
+    const finalModelId = customModelId || ARK_MODEL;
+
     console.log('🎨 代理图片转换请求:', {
       prompt: prompt.substring(0, 50) + '...',
       imageCount: Array.isArray(image) ? image.length : 1,
       size,
+      endpoint: finalEndpoint,
+      model: finalModelId,
+      usingCustomConfig: !!(customApiKey || customEndpoint || customModelId)
     });
 
     // 调用火山引擎API
-    const response = await fetch(ARK_ENDPOINT, {
+    const response = await fetch(finalEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ARK_API_KEY}`,
+        'Authorization': `Bearer ${finalApiKey}`,
       },
       body: JSON.stringify({
-        model: ARK_MODEL,
+        model: finalModelId,
         prompt,
         image,
         sequential_image_generation: 'disabled',

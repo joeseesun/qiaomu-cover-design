@@ -21,6 +21,9 @@ import PathPropertiesPanel from './components/home/properties/PathPropertiesPane
 import ConfirmDialog from './components/ui/ConfirmDialog';
 import Toast, { ToastType } from './components/ui/Toast';
 import { HexColorPicker } from 'react-colorful';
+import SettingsDialog, { hasApiKeyConfigured } from './components/home/SettingsDialog';
+import DonationDialog from './components/home/DonationDialog';
+import WeChatDialog from './components/home/WeChatDialog';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -44,6 +47,9 @@ export default function Home() {
   const [showImageUploadDialog, setShowImageUploadDialog] = useState(false);
   const [showShapeDialog, setShowShapeDialog] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showDonationDialog, setShowDonationDialog] = useState(false);
+  const [showWeChatDialog, setShowWeChatDialog] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     message: string;
@@ -171,6 +177,8 @@ export default function Home() {
 
     // 键盘事件：删除选中对象、图层调整、工具快捷键
     const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('⌨️ keydown 事件:', e.key, 'metaKey:', e.metaKey, 'ctrlKey:', e.ctrlKey);
+
       // 检查是否有输入框获得焦点
       const target = e.target as HTMLElement;
       const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
@@ -231,7 +239,8 @@ export default function Home() {
         }
 
         // V - 选择工具(取消当前工具,退出画笔模式和形状绘制模式)
-        if (e.key === 'v' || e.key === 'V') {
+        // 🔑 排除 Cmd/Ctrl+V (粘贴快捷键)
+        if ((e.key === 'v' || e.key === 'V') && !cmdOrCtrl) {
           e.preventDefault();
           // 如果在画笔模式,先退出
           if (managerRef.current.getDrawingMode()) {
@@ -327,6 +336,14 @@ export default function Home() {
 
         if (activeObjects.length > 0 && !isEditing) {
           e.preventDefault();
+
+          // 检查是否配置了 API Key
+          if (!hasApiKeyConfigured()) {
+            setShowSettingsDialog(true);
+            showToast('请先配置 API Key', 'info');
+            return;
+          }
+
           setShowImageToImageDialog(true);
           return;
         }
@@ -358,14 +375,20 @@ export default function Home() {
 
         // 如果输入框获得焦点,不处理粘贴,让浏览器处理
         if (!isInputFocused) {
-          // 🔑 关键修复：只有当内部剪贴板有内容时才阻止默认行为
-          // 这样可以让系统剪贴板的图片通过 window paste 事件处理
-          if (managerRef.current.hasClipboardContent()) {
+          const hasContent = managerRef.current.hasClipboardContent();
+          console.log('🔍 Cmd/Ctrl+V 按下, 内部剪贴板有内容:', hasContent);
+
+          // 如果有内部剪贴板内容，粘贴画布对象
+          if (hasContent) {
+            console.log('✂️ 粘贴画布对象');
             e.preventDefault();
             managerRef.current.paste();
             return;
           }
-          // 否则让 window paste 事件处理（粘贴图片）
+
+          // 🔑 不阻止默认行为，让 paste 事件触发
+          console.log('💡 等待 paste 事件处理图片粘贴');
+          // 不调用 e.preventDefault()，让浏览器触发 paste 事件
         }
       }
 
@@ -409,21 +432,35 @@ export default function Home() {
 
     // 剪贴板粘贴事件：支持粘贴图片
     const handlePaste = async (e: ClipboardEvent) => {
+      console.log('📋 paste 事件触发');
       if (!managerRef.current) return;
 
       const items = e.clipboardData?.items;
-      if (!items) return;
+      if (!items) {
+        console.log('⚠️ 没有剪贴板数据');
+        return;
+      }
+
+      console.log('📋 剪贴板项数量:', items.length);
 
       // 检查是否有图片
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        console.log(`📋 剪贴板项 ${i}:`, item.type);
+
         if (item.type.indexOf('image') !== -1) {
           e.preventDefault();
           const blob = item.getAsFile();
           if (blob) {
             try {
-              console.log('📋 粘贴图片:', blob.type, blob.size, 'bytes');
+              console.log('✅ 找到图片，开始粘贴:', blob.type, blob.size, 'bytes');
+
+              // 显示上传提示
+              setToast({ show: true, message: '上传粘贴图片中...', type: 'info' });
+
               await managerRef.current.addImageFromClipboard(blob);
+
+              // 上传成功提示
               setToast({ show: true, message: '图片已粘贴', type: 'success' });
             } catch (error) {
               console.error('❌ 粘贴图片失败:', error);
@@ -452,17 +489,20 @@ export default function Home() {
     };
 
     window.addEventListener('click', handleGlobalClick);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('paste', handlePaste);
+    // 🔑 使用 capture 阶段监听，优先于浏览器扩展
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('paste', handlePaste, true);
     document.addEventListener('pencil:completed', handlePencilCompleted);
     document.addEventListener('shape:completed', handleShapeCompleted);
+
+    console.log('✅ 事件监听器已注册（使用 capture 阶段），包括 paste 事件');
 
     return () => {
       upperCanvas.removeEventListener('contextmenu', handleCanvasContextMenu);
       managerRef.current?.dispose();
       window.removeEventListener('click', handleGlobalClick);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('paste', handlePaste, true);
       document.removeEventListener('pencil:completed', handlePencilCompleted);
       document.removeEventListener('shape:completed', handleShapeCompleted);
     };
@@ -534,6 +574,12 @@ export default function Home() {
       // 显示图片上传选择对话框
       setShowImageUploadDialog(true);
     } else if (tool === 'ai-image') {
+      // 检查是否配置了 API Key
+      if (!hasApiKeyConfigured()) {
+        setShowSettingsDialog(true);
+        showToast('请先配置 API Key', 'info');
+        return;
+      }
       // 打开 AI 生图对话框
       setShowAIImageDialog(true);
     } else if (tool === 'emoji') {
@@ -818,14 +864,7 @@ export default function Home() {
     }
   };
 
-  // 清理 localStorage
-  const handleClearStorage = () => {
-    if (confirm('确定要清理所有缓存吗？这将删除所有画布数据，此操作不可恢复！')) {
-      localStorage.clear();
-      alert('缓存已清理，页面即将刷新');
-      window.location.reload();
-    }
-  };
+
 
   // 图形属性更新处理函数
   const handleShapeFillColorChange = (color: string) => {
@@ -1058,7 +1097,9 @@ export default function Home() {
         onPanModeToggle={handlePanModeToggle}
         onDownload={handleDownload}
         onShare={handleShare}
-        onClearStorage={handleClearStorage}
+        onOpenSettings={() => setShowSettingsDialog(true)}
+        onOpenDonation={() => setShowDonationDialog(true)}
+        onOpenWeChat={() => setShowWeChatDialog(true)}
       />
 
       {/* 主内容区 */}
@@ -1241,6 +1282,13 @@ export default function Home() {
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
               onClick={() => {
+                // 检查是否配置了 API Key
+                if (!hasApiKeyConfigured()) {
+                  setShowSettingsDialog(true);
+                  showToast('请先配置 API Key', 'info');
+                  setContextMenu(null);
+                  return;
+                }
                 setShowImageToImageDialog(true);
                 setContextMenu(null);
               }}
@@ -1435,6 +1483,24 @@ export default function Home() {
           onClose={() => setToast({ show: false, message: '', type: 'success' })}
         />
       )}
+
+      {/* 设置对话框 */}
+      <SettingsDialog
+        isOpen={showSettingsDialog}
+        onClose={() => setShowSettingsDialog(false)}
+      />
+
+      {/* 打赏对话框 */}
+      <DonationDialog
+        isOpen={showDonationDialog}
+        onClose={() => setShowDonationDialog(false)}
+      />
+
+      {/* 公众号对话框 */}
+      <WeChatDialog
+        isOpen={showWeChatDialog}
+        onClose={() => setShowWeChatDialog(false)}
+      />
     </div>
   );
 }

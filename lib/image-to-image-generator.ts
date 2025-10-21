@@ -7,6 +7,17 @@ export class ImageToImageGenerator {
     this.endpoint = '/api/image-to-image';
   }
 
+  // 从 localStorage 获取配置
+  private getConfig() {
+    if (typeof window === 'undefined') return {};
+
+    return {
+      apiKey: localStorage.getItem('ai_api_key') || undefined,
+      apiEndpoint: localStorage.getItem('ai_api_endpoint') || undefined,
+      modelId: localStorage.getItem('ai_model_id') || undefined,
+    };
+  }
+
   /**
    * 生成图片 - 单张图片输入
    * @param prompt 提示词
@@ -20,6 +31,7 @@ export class ImageToImageGenerator {
     size: '1K' | '2K' | '4K' = '2K'
   ): Promise<string> {
     try {
+      const config = this.getConfig();
       const response = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
@@ -29,6 +41,7 @@ export class ImageToImageGenerator {
           prompt,
           image: imageUrl,
           size,
+          ...config, // 传递自定义配置
         }),
       });
 
@@ -64,6 +77,7 @@ export class ImageToImageGenerator {
     size: '1K' | '2K' | '4K' = '2K'
   ): Promise<string> {
     try {
+      const config = this.getConfig();
       const response = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
@@ -73,6 +87,7 @@ export class ImageToImageGenerator {
           prompt,
           image: imageUrls,
           size,
+          ...config, // 传递自定义配置
         }),
       });
 

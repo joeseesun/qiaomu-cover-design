@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2 } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2, Settings, Heart, QrCode } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -32,7 +32,9 @@ interface TopbarProps {
   onPanModeToggle?: () => void;
   onDownload: () => void;
   onShare: () => void;
-  onClearStorage?: () => void;
+  onOpenSettings?: () => void;
+  onOpenDonation?: () => void;
+  onOpenWeChat?: () => void;
 }
 
 export default function Topbar({
@@ -53,7 +55,9 @@ export default function Topbar({
   onPanModeToggle,
   onDownload,
   onShare,
-  onClearStorage,
+  onOpenSettings,
+  onOpenDonation,
+  onOpenWeChat,
 }: TopbarProps) {
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3' | '16:9' | '21:9' | '9:16'>('3:4');
@@ -295,21 +299,39 @@ export default function Topbar({
         </Button>
 
         {/* 更多菜单 */}
-        {onClearStorage && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onClearStorage} className="text-destructive">
-                <Database className="h-4 w-4 mr-2" />
-                清理缓存
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-10 w-10">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {onOpenSettings && (
+              <DropdownMenuItem onClick={onOpenSettings}>
+                <Settings className="h-4 w-4 mr-2" />
+                设置
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+            )}
+            {onOpenDonation && (
+              <DropdownMenuItem onClick={onOpenDonation}>
+                <Heart className="h-4 w-4 mr-2" />
+                打赏
+              </DropdownMenuItem>
+            )}
+            {onOpenWeChat && (
+              <DropdownMenuItem onClick={onOpenWeChat}>
+                <QrCode className="h-4 w-4 mr-2" />
+                公众号
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => window.open('https://x.com/vista8', '_blank')}>
+              <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              联系作者
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

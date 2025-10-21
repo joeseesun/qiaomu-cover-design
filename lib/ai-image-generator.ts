@@ -2,10 +2,26 @@
 export class AIImageGenerator {
   private apiUrl = '/api/ai-image'; // 使用本地 API 路由，避免 CORS 问题
 
+  // 从 localStorage 获取配置
+  private getConfig() {
+    if (typeof window === 'undefined') return {};
+
+    return {
+      apiKey: localStorage.getItem('ai_api_key') || undefined,
+      apiEndpoint: localStorage.getItem('ai_api_endpoint') || undefined,
+      modelId: localStorage.getItem('ai_model_id') || undefined,
+    };
+  }
+
   // 生成图片
   async generateImage(prompt: string, size: string = '1024x1024'): Promise<string> {
     try {
-      console.log('🎨 开始生成图片...', { prompt, size });
+      const config = this.getConfig();
+      console.log('🎨 开始生成图片...', {
+        prompt,
+        size,
+        hasCustomConfig: !!(config.apiKey || config.apiEndpoint || config.modelName)
+      });
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -15,6 +31,7 @@ export class AIImageGenerator {
         body: JSON.stringify({
           prompt: prompt,
           size: size,
+          ...config, // 传递自定义配置
         }),
       });
 

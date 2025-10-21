@@ -113,11 +113,12 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-gray-700" />
             AI 生成图片
+            <span className="text-xs font-normal text-gray-400 ml-1">（预计10-30s生图）</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -127,7 +128,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
             <label className="text-sm font-medium">
               图片尺寸
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex gap-2 flex-wrap">
               {sizeOptions.map((option) => (
                 <button
                   key={option.value}
@@ -162,16 +163,32 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               rows={5}
-              className="resize-none"
+              className="resize-none placeholder:text-gray-400"
               disabled={isGenerating}
             />
           </div>
 
           {/* 快速提示词 */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              快速提示词（点击使用）
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-muted-foreground">
+                快速提示词（点击使用）
+              </label>
+              {/* 新增按钮 - 移到标题右侧 */}
+              {!isAdding && (
+                <button
+                  onClick={() => {
+                    setIsAdding(true);
+                    setNewPromptText('');
+                  }}
+                  disabled={isGenerating}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:border-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  新增
+                </button>
+              )}
+            </div>
 
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {/* 新增输入框 */}
@@ -182,7 +199,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                     value={newPromptText}
                     onChange={(e) => setNewPromptText(e.target.value)}
                     placeholder="输入新的提示词,按Enter保存,Esc取消"
-                    className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900"
+                    className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900 placeholder:text-gray-400"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleAddPrompt();
@@ -226,7 +243,7 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
                         placeholder="按Enter保存,Esc取消"
-                        className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900"
+                        className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900 placeholder:text-gray-400"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleUpdatePrompt(promptItem.id);
@@ -288,21 +305,6 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                   )}
                 </div>
               ))}
-
-              {/* 新增按钮 - 放在列表最后 */}
-              {!isAdding && (
-                <button
-                  onClick={() => {
-                    setIsAdding(true);
-                    setNewPromptText('');
-                  }}
-                  disabled={isGenerating}
-                  className="w-full px-3 py-2 text-xs text-left border border-dashed border-gray-300 rounded hover:border-gray-900 hover:bg-gray-50 transition-colors text-gray-500 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus className="h-4 w-4 inline mr-2" />
-                  新增提示词
-                </button>
-              )}
             </div>
           </div>
 
@@ -332,11 +334,6 @@ export function AIImageDialog({ open, onOpenChange, onGenerate }: AIImageDialogP
                 </>
               )}
             </Button>
-          </div>
-
-          {/* 提示信息 */}
-          <div className="text-sm text-muted-foreground text-center py-2">
-            💡 点击生成后会立即添加占位图，图片将在后台生成（10-30秒）
           </div>
         </div>
       </DialogContent>

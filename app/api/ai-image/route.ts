@@ -51,9 +51,15 @@ function generateUploadToken(key: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, size = '1024x1024' } = body;
+    const {
+      prompt,
+      size = '1024x1024',
+      apiKey: customApiKey,
+      apiEndpoint: customEndpoint,
+      modelId: customModelId
+    } = body;
 
-    console.log('📥 后端收到请求:', body);
+    console.log('📥 后端收到请求:', { prompt, size, hasCustomConfig: !!(customApiKey || customEndpoint || customModelId) });
 
     if (!prompt) {
       return NextResponse.json(
@@ -62,17 +68,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🎨 后端开始调用 AI 生图 API...', { prompt, size });
+    // 使用自定义配置或默认配置
+    const finalApiKey = customApiKey || API_KEY;
+    const finalEndpoint = customEndpoint || API_URL;
+    const finalModelId = customModelId || MODEL;
+
+    console.log('🎨 后端开始调用 AI 生图 API...', {
+      prompt,
+      size,
+      endpoint: finalEndpoint,
+      model: finalModelId,
+      usingCustomConfig: !!(customApiKey || customEndpoint || customModelId)
+    });
 
     // 1. 调用 AI 生图 API
-    const response = await fetch(API_URL, {
+    const response = await fetch(finalEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${finalApiKey}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: finalModelId,
         prompt: prompt,
         sequential_image_generation: 'disabled',
         response_format: 'url',
