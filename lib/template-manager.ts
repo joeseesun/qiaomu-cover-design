@@ -329,22 +329,28 @@ export class TemplateManager {
   ): Promise<string> {
     return new Promise((resolve) => {
       if (typeof window === 'undefined') {
+        console.log('⚠️ 服务端环境，跳过缩略图生成');
         resolve('');
         return;
       }
 
       try {
+        console.log('🎨 开始生成缩略图:', templateName, `${width}x${height}`);
+
         // 创建离屏 canvas
         const offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = width;
         offscreenCanvas.height = height;
+        console.log('✅ 离屏 canvas 创建成功');
 
         const fabricCanvas = new fabric.Canvas(offscreenCanvas);
         fabricCanvas.setWidth(width);
         fabricCanvas.setHeight(height);
+        console.log('✅ Fabric canvas 初始化成功');
 
         // 加载 JSON
         const canvasData = JSON.parse(canvasJSON);
+        console.log('✅ JSON 解析成功，对象数量:', canvasData.objects?.length || 0);
 
         // 🆕 根据模板名称设置背景色
         const backgroundColorMap: Record<string, string> = {
@@ -367,11 +373,16 @@ export class TemplateManager {
         };
 
         const backgroundColor = templateName ? (backgroundColorMap[templateName] || '#ffffff') : '#ffffff';
+        console.log('🎨 背景色:', backgroundColor);
 
         fabricCanvas.loadFromJSON(canvasData, () => {
+          console.log('✅ loadFromJSON 完成');
+
           // 设置背景色
           fabricCanvas.setBackgroundColor(backgroundColor, () => {
+            console.log('✅ 背景色设置完成');
             fabricCanvas.renderAll();
+            console.log('✅ 渲染完成');
 
             // 生成缩略图
             const thumbnail = fabricCanvas.toDataURL({
@@ -379,6 +390,8 @@ export class TemplateManager {
               quality: 0.8,
               multiplier: 0.2,
             });
+
+            console.log('✅ 缩略图生成成功，长度:', thumbnail.length, '前50字符:', thumbnail.substring(0, 50));
 
             // 清理
             fabricCanvas.dispose();
