@@ -6,10 +6,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Trash2, X } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
 import { getTemplateManager, Template, TemplateCategory } from '@/lib/template-manager';
 import { PRESET_TEMPLATES } from '@/lib/preset-templates';
 
@@ -27,6 +27,7 @@ export default function TemplateLibraryDialog({
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null);
 
   // 加载模板
   useEffect(() => {
@@ -42,14 +43,17 @@ export default function TemplateLibraryDialog({
         for (const template of allTemplates) {
           if (template.isPreset && !template.thumbnail) {
             try {
+              console.log('🖼️ 生成缩略图:', template.name);
               const thumbnail = await manager.generateThumbnailFromJSON(
                 template.canvasJSON,
                 template.canvasSize.width,
-                template.canvasSize.height
+                template.canvasSize.height,
+                template.name
               );
               manager.update(template.id, { thumbnail });
+              console.log('✅ 缩略图生成成功:', template.name);
             } catch (error) {
-              console.error('❌ 生成缩略图失败:', error);
+              console.error('❌ 生成缩略图失败:', template.name, error);
             }
           }
         }
@@ -97,10 +101,16 @@ export default function TemplateLibraryDialog({
     }
   };
 
-  // 应用模板（点击后直接弹出确认对话框）
-  const handleApply = (template: Template) => {
-    if (confirm(`确定要使用「${template.name}」模板吗？\n\n当前画布内容将被替换。`)) {
-      onApplyTemplate(template.id);
+  // 点击模板，显示确认对话框
+  const handleTemplateClick = (template: Template) => {
+    setConfirmTemplate(template);
+  };
+
+  // 确认应用模板
+  const handleConfirmApply = () => {
+    if (confirmTemplate) {
+      onApplyTemplate(confirmTemplate.id);
+      setConfirmTemplate(null);
       onClose();
     }
   };
@@ -109,15 +119,7 @@ export default function TemplateLibraryDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[1000px] max-h-[80vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle className="flex items-center justify-between">
-            <span>模板库</span>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </DialogTitle>
+          <DialogTitle>模板库</DialogTitle>
         </DialogHeader>
 
         <div className="flex h-[600px]">
@@ -168,7 +170,7 @@ export default function TemplateLibraryDialog({
                     <div
                       key={template.id}
                       className="group cursor-pointer"
-                      onClick={() => handleApply(template)}
+                      onClick={() => handleTemplateClick(template)}
                     >
                       {/* 缩略图 */}
                       <div className="relative aspect-[3/4] bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 border border-gray-200 hover:border-blue-400">
@@ -219,6 +221,36 @@ export default function TemplateLibraryDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* 确认对话框 */}
+      {confirmTemplate && (
+        <Dialog open={!!confirmTemplate} onOpenChange={() => setConfirmTemplate(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>使用模板</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-sm text-gray-600 mb-4">
+                确定要使用「<span className="font-semibold text-gray-900">{confirmTemplate.name}</span>」模板吗？
+              </p>
+              <p className="text-sm text-amber-600">
+                ⚠️ 当前画布内容将被替换
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setConfirmTemplate(null)}
+              >
+                取消
+              </Button>
+              <Button onClick={handleConfirmApply}>
+                确定使用
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

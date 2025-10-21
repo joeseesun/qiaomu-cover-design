@@ -301,7 +301,8 @@ export class TemplateManager {
   async generateThumbnailFromJSON(
     canvasJSON: string,
     width: number,
-    height: number
+    height: number,
+    templateName?: string
   ): Promise<string> {
     return new Promise((resolve) => {
       if (typeof window === 'undefined') {
@@ -321,19 +322,34 @@ export class TemplateManager {
 
         // 加载 JSON
         const canvasData = JSON.parse(canvasJSON);
-        fabricCanvas.loadFromJSON(canvasData, () => {
-          fabricCanvas.renderAll();
-          
-          // 生成缩略图
-          const thumbnail = fabricCanvas.toDataURL({
-            format: 'png',
-            quality: 0.8,
-            multiplier: 0.2,
-          });
 
-          // 清理
-          fabricCanvas.dispose();
-          resolve(thumbnail);
+        // 🆕 根据模板名称设置背景色
+        const backgroundColorMap: Record<string, string> = {
+          '便签纸·黄色': '#FFFBEA',
+          '引用卡片·蓝色': '#E3F2FD',
+          '极简文字·白色': '#FFFFFF',
+          '便签纸·粉色': '#FFF0F5',
+          '引用卡片·绿色': '#E8F5E9',
+        };
+
+        const backgroundColor = templateName ? (backgroundColorMap[templateName] || '#ffffff') : '#ffffff';
+
+        fabricCanvas.loadFromJSON(canvasData, () => {
+          // 设置背景色
+          fabricCanvas.setBackgroundColor(backgroundColor, () => {
+            fabricCanvas.renderAll();
+
+            // 生成缩略图
+            const thumbnail = fabricCanvas.toDataURL({
+              format: 'png',
+              quality: 0.8,
+              multiplier: 0.2,
+            });
+
+            // 清理
+            fabricCanvas.dispose();
+            resolve(thumbnail);
+          });
         });
       } catch (error) {
         console.error('❌ 从 JSON 生成缩略图失败:', error);
