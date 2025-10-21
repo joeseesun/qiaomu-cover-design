@@ -84,6 +84,18 @@ export class TemplateManager {
     return this.templates.filter(t => t.category === category);
   }
 
+  // 🆕 按画布尺寸获取模板（根据比例匹配）
+  getByCanvasSize(width: number, height: number): Template[] {
+    // 计算当前画布的比例
+    const currentRatio = width / height;
+
+    return this.templates.filter(t => {
+      const templateRatio = t.canvasSize.width / t.canvasSize.height;
+      // 允许 5% 的误差范围
+      return Math.abs(currentRatio - templateRatio) < 0.05;
+    });
+  }
+
   // 获取单个模板
   getById(id: string): Template | undefined {
     return this.templates.find(t => t.id === id);
@@ -180,11 +192,18 @@ export class TemplateManager {
         // 🆕 从模板数据中移除背景矩形，改用画布背景
         // 根据模板名称设置背景色
         const backgroundColorMap: Record<string, string> = {
+          // 3:4 竖版
           '便签纸·黄色': '#FFFBEA',
           '引用卡片·蓝色': '#E3F2FD',
           '极简文字·白色': '#FFFFFF',
           '便签纸·粉色': '#FFF0F5',
           '引用卡片·绿色': '#E8F5E9',
+          // 4:3 横版
+          '便签纸·黄色·横版': '#FFFBEA',
+          '引用卡片·蓝色·横版': '#E3F2FD',
+          // 1:1 方形
+          '极简文字·白色·方形': '#FFFFFF',
+          '便签纸·粉色·方形': '#FFF0F5',
         };
 
         let backgroundColor = backgroundColorMap[template.name] || '#ffffff'; // 默认白色
@@ -325,11 +344,18 @@ export class TemplateManager {
 
         // 🆕 根据模板名称设置背景色
         const backgroundColorMap: Record<string, string> = {
+          // 3:4 竖版
           '便签纸·黄色': '#FFFBEA',
           '引用卡片·蓝色': '#E3F2FD',
           '极简文字·白色': '#FFFFFF',
           '便签纸·粉色': '#FFF0F5',
           '引用卡片·绿色': '#E8F5E9',
+          // 4:3 横版
+          '便签纸·黄色·横版': '#FFFBEA',
+          '引用卡片·蓝色·横版': '#E3F2FD',
+          // 1:1 方形
+          '极简文字·白色·方形': '#FFFFFF',
+          '便签纸·粉色·方形': '#FFF0F5',
         };
 
         const backgroundColor = templateName ? (backgroundColorMap[templateName] || '#ffffff') : '#ffffff';

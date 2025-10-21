@@ -17,17 +17,20 @@ interface TemplateLibraryDialogProps {
   open: boolean;
   onClose: () => void;
   onApplyTemplate: (templateId: string) => void;
+  currentCanvasSize?: { width: number; height: number }; // 🆕 当前画布尺寸
 }
 
 export default function TemplateLibraryDialog({
   open,
   onClose,
   onApplyTemplate,
+  currentCanvasSize,
 }: TemplateLibraryDialogProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null);
+  const [showAllSizes, setShowAllSizes] = useState(false); // 🆕 是否显示所有尺寸
 
   // 加载模板
   useEffect(() => {
@@ -68,7 +71,16 @@ export default function TemplateLibraryDialog({
   const filteredTemplates = templates.filter(template => {
     const matchCategory = selectedCategory === 'all' || template.category === selectedCategory;
     const matchSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
+
+    // 🆕 如果不显示所有尺寸，则只显示匹配当前画布比例的模板
+    let matchSize = true;
+    if (!showAllSizes && currentCanvasSize) {
+      const currentRatio = currentCanvasSize.width / currentCanvasSize.height;
+      const templateRatio = template.canvasSize.width / template.canvasSize.height;
+      matchSize = Math.abs(currentRatio - templateRatio) < 0.05;
+    }
+
+    return matchCategory && matchSearch && matchSize;
   });
 
   // 获取所有分类
@@ -144,8 +156,8 @@ export default function TemplateLibraryDialog({
 
           {/* 右侧模板展示 */}
           <div className="flex-1 flex flex-col">
-            {/* 搜索栏 */}
-            <div className="p-4 border-b">
+            {/* 搜索栏和筛选 */}
+            <div className="p-4 border-b space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -156,6 +168,24 @@ export default function TemplateLibraryDialog({
                   className="pl-10"
                 />
               </div>
+
+              {/* 🆕 尺寸筛选提示 */}
+              {currentCanvasSize && (
+                <div className="flex items-center justify-between text-sm">
+                  <div className="text-gray-600">
+                    当前画布：{currentCanvasSize.width} × {currentCanvasSize.height}
+                    {!showAllSizes && (
+                      <span className="ml-2 text-blue-600">（仅显示匹配比例）</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowAllSizes(!showAllSizes)}
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
+                    {showAllSizes ? '只看匹配比例' : '显示所有尺寸'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 模板网格 */}

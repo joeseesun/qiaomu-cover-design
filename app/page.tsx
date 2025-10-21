@@ -1626,6 +1626,7 @@ export default function Home() {
         open={showTemplateLibrary}
         onClose={() => setShowTemplateLibrary(false)}
         onApplyTemplate={handleApplyTemplate}
+        currentCanvasSize={canvasSize}
       />
 
       {/* 保存为模板对话框 */}
