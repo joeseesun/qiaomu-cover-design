@@ -23,7 +23,6 @@ export default function SaveTemplateDialog({
   onSave,
 }: SaveTemplateDialogProps) {
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<TemplateCategory>('自定义');
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -31,15 +30,14 @@ export default function SaveTemplateDialog({
       return;
     }
 
-    onSave(name.trim(), category);
+    // 固定使用"自定义"分类
+    onSave(name.trim(), '自定义');
     setName('');
-    setCategory('自定义');
     onClose();
   };
 
   const handleClose = () => {
     setName('');
-    setCategory('自定义');
     onClose();
   };
 
@@ -47,7 +45,7 @@ export default function SaveTemplateDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>保存为模板</DialogTitle>
+          <DialogTitle>另存为模板</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -60,28 +58,10 @@ export default function SaveTemplateDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：简约红色卡片"
               autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+              }}
             />
-          </div>
-
-          {/* 模板分类 */}
-          <div className="space-y-2">
-            <Label>模板分类</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['自定义', '文字卡片', '图文混排', '九宫格', '知识分享', '情绪表达', '产品展示'] as TemplateCategory[]).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                    category === cat
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 

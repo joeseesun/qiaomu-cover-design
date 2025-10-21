@@ -260,18 +260,6 @@ export default function Topbar({
             模板
           </Button>
         )}
-
-        {/* 另存为模板按钮 */}
-        {onSaveAsTemplate && (
-          <Button
-            variant="outline"
-            onClick={onSaveAsTemplate}
-            className="h-10 px-4 border-gray-200 gap-2"
-          >
-            <Save className="h-4 w-4" />
-            另存为模板
-          </Button>
-        )}
       </div>
 
       {/* 右侧：缩放控制 + 复制 + 下载 */}

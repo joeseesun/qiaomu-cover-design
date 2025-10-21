@@ -3,6 +3,7 @@ import { fabric } from 'fabric';
 import { HighlightConfig, CANVAS_WIDTH, CANVAS_HEIGHT } from './types';
 import { QiniuUploader } from './qiniu-uploader';
 import { getImageLibrary } from './image-library';
+import { iconComponentToFabric } from './svg-to-fabric';
 
 export class CanvasManager {
   canvas: fabric.Canvas;
@@ -611,6 +612,54 @@ export class CanvasManager {
         resolve(img);
       }, { crossOrigin: 'anonymous' }); // 允许跨域
     });
+  }
+
+  /**
+   * 添加 SVG 图标到画布
+   * @param IconComponent Lucide 图标组件
+   * @param options 配置选项
+   */
+  async addSVGIcon(IconComponent: any, options: {
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    size?: number;
+  } = {}): Promise<fabric.Group | fabric.Path> {
+    const {
+      fill = '#000000',
+      stroke = '#000000',
+      strokeWidth = 2,
+      size = 60,
+    } = options;
+
+    try {
+      console.log('🎨 开始添加 SVG 图标...');
+
+      // 转换为 Fabric.js 对象
+      const svgObject = await iconComponentToFabric(IconComponent, {
+        width: size,
+        height: size,
+        fill,
+        stroke,
+        strokeWidth,
+        left: this.width / 2,
+        top: this.height / 2,
+      });
+
+      // 标记为 SVG 图标对象
+      (svgObject as any).isSVGIcon = true;
+
+      // 添加到画布
+      this.canvas.add(svgObject);
+      this.canvas.setActiveObject(svgObject);
+      this.canvas.renderAll();
+
+      console.log('✅ SVG 图标添加成功');
+      return svgObject;
+    } catch (error) {
+      console.error('❌ 添加 SVG 图标失败:', error);
+      throw error;
+    }
   }
 
   /**
@@ -3164,8 +3213,12 @@ export class CanvasManager {
           }
         }
 
-        // 对于非图片对象(文本、形状等),使用渲染方式并添加白色背景
-        this.renderObjectToBlob(targetObj, true).then(resolve).catch(reject);
+        // 检查是否是 SVG 图标 - SVG 图标应该保留透明背景
+        const isSVGIcon = (targetObj as any).isSVGIcon === true;
+
+        // SVG 图标和图片使用透明背景，其他对象（文本、形状等）使用白色背景
+        const addBackground = !isSVGIcon;
+        this.renderObjectToBlob(targetObj, addBackground).then(resolve).catch(reject);
       } catch (error) {
         reject(error);
       }

@@ -11,8 +11,7 @@ import Sidebar from './components/home/Sidebar';
 import Canvas from './components/home/Canvas';
 import FontPanel from './components/home/FontPanel';
 import { AIImageDialog } from './components/home/AIImageDialog';
-import ImageLibrary from './components/home/ImageLibrary';
-import ImageUploadDialog from './components/home/ImageUploadDialog';
+import ImageDialog from './components/home/ImageDialog';
 import ShapeDialog from './components/home/ShapeDialog';
 import ImageToImageDialog from './components/home/ImageToImageDialog';
 import KeyboardShortcutsHelp from './components/home/KeyboardShortcutsHelp';
@@ -26,7 +25,11 @@ import DonationDialog from './components/home/DonationDialog';
 import WeChatDialog from './components/home/WeChatDialog';
 import TemplateLibraryDialog from './components/home/TemplateLibraryDialog';
 import SaveTemplateDialog from './components/home/SaveTemplateDialog';
+import IconLibraryDialog from './components/home/IconLibraryDialog';
+import SVGPropertiesPanel from './components/home/properties/SVGPropertiesPanel';
 import { getTemplateManager, TemplateCategory } from '@/lib/template-manager';
+import { IconConfig } from '@/lib/icon-library';
+import { updateSVGColor, updateSVGStrokeWidth } from '@/lib/svg-to-fabric';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,8 +49,7 @@ export default function Home() {
   const [showShapeStrokePicker, setShowShapeStrokePicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAIImageDialog, setShowAIImageDialog] = useState(false);
-  const [showImageLibrary, setShowImageLibrary] = useState(false);
-  const [showImageUploadDialog, setShowImageUploadDialog] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
   const [showShapeDialog, setShowShapeDialog] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
@@ -55,6 +57,7 @@ export default function Home() {
   const [showWeChatDialog, setShowWeChatDialog] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [showIconLibrary, setShowIconLibrary] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     message: string;
@@ -578,9 +581,18 @@ export default function Home() {
       managerRef.current.addText(); // 单行文本
     } else if (tool === 'textbox' && managerRef.current) {
       managerRef.current.addTextbox(); // 多行文本
+    } else if (tool === 'pencil' && managerRef.current) {
+      // 切换画笔模式
+      const isDrawing = managerRef.current.toggleDrawingMode();
+      setActiveTool(isDrawing ? 'pencil' : 'select');
+      setToast({
+        show: true,
+        message: isDrawing ? '画笔模式已启用' : '画笔模式已禁用',
+        type: 'success'
+      });
     } else if (tool === 'image' && managerRef.current) {
-      // 显示图片上传选择对话框
-      setShowImageUploadDialog(true);
+      // 显示图片对话框
+      setShowImageDialog(true);
     } else if (tool === 'ai-image') {
       // 检查是否配置了 API Key
       if (!hasApiKeyConfigured()) {
@@ -596,6 +608,9 @@ export default function Home() {
     } else if (tool === 'shape') {
       // 显示形状选择对话框
       setShowShapeDialog(true);
+    } else if (tool === 'icon') {
+      // 显示图标库对话框
+      setShowIconLibrary(true);
     }
   };
 
@@ -649,19 +664,8 @@ export default function Home() {
   const handleSelectShape = (shapeType: string) => {
     if (!managerRef.current) return;
 
-    // 如果是画笔,切换画笔模式
-    if (shapeType === 'pencil') {
-      const isDrawing = managerRef.current.toggleDrawingMode();
-      setActiveTool(isDrawing ? 'pencil' : 'select');
-      setToast({
-        show: true,
-        message: isDrawing ? '画笔模式已启用' : '画笔模式已禁用',
-        type: 'success'
-      });
-    } else {
-      // 其他形状直接添加
-      managerRef.current.addShape(shapeType);
-    }
+    // 直接添加形状
+    managerRef.current.addShape(shapeType);
   };
 
   // 图片转图片生成（异步模式）
@@ -900,6 +904,31 @@ export default function Home() {
     managerRef.current.updateRectCornerRadius(radius);
   };
 
+  // SVG 图标属性处理
+  const handleSVGFillColorChange = (color: string) => {
+    if (!selectedObject) return;
+    updateSVGColor(selectedObject, color, undefined);
+    managerRef.current?.canvas.renderAll();
+  };
+
+  const handleSVGStrokeColorChange = (color: string) => {
+    if (!selectedObject) return;
+    updateSVGColor(selectedObject, undefined, color);
+    managerRef.current?.canvas.renderAll();
+  };
+
+  const handleSVGStrokeWidthChange = (width: number) => {
+    if (!selectedObject) return;
+    updateSVGStrokeWidth(selectedObject, width);
+    managerRef.current?.canvas.renderAll();
+  };
+
+  const handleSVGScaleChange = (scale: number) => {
+    if (!selectedObject) return;
+    selectedObject.set({ scaleX: scale, scaleY: scale });
+    managerRef.current?.canvas.renderAll();
+  };
+
   // 导出
   const handleDownload = async () => {
     if (!managerRef.current) return;
@@ -1102,6 +1131,24 @@ export default function Home() {
     }
   };
 
+  // 处理图标选择
+  const handleIconSelect = async (iconConfig: IconConfig) => {
+    if (!managerRef.current) return;
+
+    try {
+      await managerRef.current.addSVGIcon(iconConfig.component, {
+        size: 60,
+        fill: '#000000',
+        stroke: '#000000',
+        strokeWidth: 2,
+      });
+      setToast({ show: true, message: '图标已添加', type: 'success' });
+    } catch (error) {
+      console.error('❌ 添加图标失败:', error);
+      setToast({ show: true, message: '添加图标失败', type: 'error' });
+    }
+  };
+
   // 字体面板操作
   const handleFontChange = (fontFamily: string) => {
     managerRef.current?.updateProperty('fontFamily', fontFamily);
@@ -1296,6 +1343,7 @@ export default function Home() {
           // 判断对象类型
           const objectType = selectedObject?.type;
           const shapeType = (selectedObject as any)?.shapeType;
+          const isSVGIcon = (selectedObject as any)?.isSVGIcon;
 
           const isTextObject = objectType === 'i-text' || objectType === 'textbox';
           const isShapeObject = objectType === 'rect' || objectType === 'circle' || objectType === 'triangle';
@@ -1305,6 +1353,20 @@ export default function Home() {
           const isPathShape = objectType === 'path' && ['star', 'heart', 'hexagon'].includes(shapeType);
           const isPathLine = objectType === 'path' && ['arrow'].includes(shapeType);
           const isPathDrawing = objectType === 'path' && !shapeType; // 画笔绘制的路径
+
+          // SVG 图标对象 - 显示 SVG 属性面板
+          if (isSVGIcon) {
+            return (
+              <SVGPropertiesPanel
+                selectedObject={selectedObject}
+                onFillColorChange={handleSVGFillColorChange}
+                onStrokeColorChange={handleSVGStrokeColorChange}
+                onStrokeWidthChange={handleSVGStrokeWidthChange}
+                onOpacityChange={handleObjectOpacityChange}
+                onScaleChange={handleSVGScaleChange}
+              />
+            );
+          }
 
           // 文本对象 - 显示字体面板
           if (isTextObject) {
@@ -1554,20 +1616,12 @@ export default function Home() {
         imageCount={managerRef.current?.canvas.getActiveObjects().length || 0}
       />
 
-      {/* 图片库 */}
-      {showImageLibrary && (
-        <ImageLibrary
-          onClose={() => setShowImageLibrary(false)}
-          onSelectImage={handleSelectImageFromLibrary}
-        />
-      )}
-
-      {/* 图片上传选择对话框 */}
-      <ImageUploadDialog
-        open={showImageUploadDialog}
-        onClose={() => setShowImageUploadDialog(false)}
+      {/* 图片对话框 */}
+      <ImageDialog
+        open={showImageDialog}
+        onClose={() => setShowImageDialog(false)}
         onLocalUpload={handleLocalUpload}
-        onLibrarySelect={() => setShowImageLibrary(true)}
+        onSelectImage={handleSelectImageFromLibrary}
       />
 
       {/* 形状选择对话框 */}
@@ -1634,6 +1688,13 @@ export default function Home() {
         open={showSaveTemplateDialog}
         onClose={() => setShowSaveTemplateDialog(false)}
         onSave={handleSaveAsTemplate}
+      />
+
+      {/* 图标库对话框 */}
+      <IconLibraryDialog
+        open={showIconLibrary}
+        onClose={() => setShowIconLibrary(false)}
+        onSelectIcon={handleIconSelect}
       />
     </div>
   );

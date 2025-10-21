@@ -1,0 +1,31 @@
+feat: 添加Lucide图标库功能并扩充到186个精选图标
+
+## 新功能
+- ✨ 新增图标库对话框，支持186个精选Lucide图标
+- 🎨 按10个分类组织图标（箭头、形状、UI、社交、文件、编辑、媒体、商业、天气、其他）
+- 🔍 支持搜索和分类筛选功能
+- 🎯 实现SVG图标转Fabric.js对象的转换
+- 🎛️ 新增SVG属性面板，支持编辑颜色、描边、大小、透明度
+
+## 技术实现
+- 使用异步渲染方式解决React 19兼容性问题
+- 采用createElement和createRoot进行客户端SVG渲染
+- 修复SVG图标下载时保留透明背景
+- 优化图标分类，每个分类约15-50个常用图标
+
+## 文件变更
+- app/components/home/IconLibraryDialog.tsx (新增)
+- app/components/home/properties/SVGPropertiesPanel.tsx (新增)
+- lib/icon-library.ts (新增，186个图标配置)
+- lib/svg-to-fabric.ts (新增，SVG转换工具)
+- lib/canvas-manager.ts (新增addSVGIcon方法，修复下载透明背景)
+- app/components/home/Sidebar.tsx (新增图标库入口)
+- app/page.tsx (集成图标库功能和属性面板)
+
+## 用户体验
+- 8列网格布局，图标预览清晰
+- 支持中英文关键词搜索
+- 点击即可插入图标到画布
+- 选中图标后可实时编辑属性
+- 下载SVG图标保留透明背景
+

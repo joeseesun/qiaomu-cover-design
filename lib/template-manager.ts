@@ -20,14 +20,14 @@ export interface Template {
   createdAt: number;
 }
 
-// 模板分类
-export type TemplateCategory = 
-  | '文字卡片'
-  | '图文混排'
-  | '九宫格'
-  | '知识分享'
-  | '情绪表达'
-  | '产品展示'
+// 模板分类（按画布尺寸）
+export type TemplateCategory =
+  | '3:4 竖版'
+  | '1:1 方形'
+  | '4:3 横版'
+  | '16:9 横版'
+  | '9:16 竖版'
+  | '21:9 超宽'
   | '自定义';
 
 // 模板管理器类
@@ -409,10 +409,15 @@ export class TemplateManager {
   addPresetTemplates(templates: Omit<Template, 'id' | 'createdAt'>[]): void {
     templates.forEach(template => {
       // 检查是否已存在同名预设模板
-      const exists = this.templates.some(
+      const existing = this.templates.find(
         t => t.isPreset && t.name === template.name
       );
-      if (!exists) {
+
+      if (existing) {
+        // 🆕 如果已存在，更新 thumbnail（确保使用最新的缩略图 URL）
+        this.update(existing.id, { thumbnail: template.thumbnail });
+      } else {
+        // 不存在则添加
         this.add(template);
       }
     });

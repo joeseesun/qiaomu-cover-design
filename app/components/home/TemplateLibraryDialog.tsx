@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Search, Trash2 } from 'lucide-react';
 import { getTemplateManager, Template, TemplateCategory } from '@/lib/template-manager';
 import { PRESET_TEMPLATES } from '@/lib/preset-templates';
+import { fabric } from 'fabric';
 
 interface TemplateLibraryDialogProps {
   open: boolean;
@@ -30,7 +31,147 @@ export default function TemplateLibraryDialog({
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null);
-  const [showAllSizes, setShowAllSizes] = useState(false); // 🆕 是否显示所有尺寸
+  const [showAllSizes, setShowAllSizes] = useState(true); // 默认显示所有尺寸
+  const [isGenerating, setIsGenerating] = useState(false); // 是否正在生成缩略图
+  const [generateProgress, setGenerateProgress] = useState<string[]>([]); // 生成进度日志
+  const [debugMode, setDebugMode] = useState(false); // 调试模式（Ctrl+Option+Command+4）
+
+  // 🆕 清除所有预设模板缓存并重新加载
+  const clearPresetCache = () => {
+    const manager = getTemplateManager();
+
+    // 删除所有预设模板
+    const allTemplates = manager.getAll();
+    allTemplates.forEach(template => {
+      if (template.isPreset) {
+        manager.delete(template.id);
+      }
+    });
+
+    // 🆕 调试：打印 PRESET_TEMPLATES 的前3个缩略图 URL
+    console.log('📋 PRESET_TEMPLATES 的缩略图 URL:');
+    PRESET_TEMPLATES.slice(0, 3).forEach(t => {
+      console.log(`  ${t.name}: ${t.thumbnail}`);
+    });
+
+    // 重新添加预设模板
+    manager.addPresetTemplates(PRESET_TEMPLATES);
+
+    // 刷新列表
+    const reloadedTemplates = manager.getAll();
+    setTemplates(reloadedTemplates);
+
+    // 🆕 调试：打印重新加载后的前3个模板的缩略图 URL
+    console.log('📸 重新加载后的模板缩略图 URL:');
+    reloadedTemplates.slice(0, 3).forEach(t => {
+      console.log(`  ${t.name}: ${t.thumbnail}`);
+    });
+
+    console.log('✅ 预设模板缓存已清除并重新加载');
+    alert('预设模板缓存已清除！请查看缩略图是否正常显示。');
+  };
+
+  // 🆕 生成所有预设模板的缩略图
+  const generateAllThumbnails = async () => {
+    setIsGenerating(true);
+    setGenerateProgress(['🎨 开始生成缩略图...']);
+
+    const manager = getTemplateManager();
+    const presetTemplates = PRESET_TEMPLATES;
+
+    for (const template of presetTemplates) {
+      try {
+        setGenerateProgress(prev => [...prev, `📝 生成: ${template.name}`]);
+
+        // 创建离屏 canvas
+        const offscreenCanvas = document.createElement('canvas');
+        const { width, height } = template.canvasSize;
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+
+        const fabricCanvas = new fabric.Canvas(offscreenCanvas);
+        fabricCanvas.setWidth(width);
+        fabricCanvas.setHeight(height);
+
+        // 背景色映射
+        const backgroundColorMap: Record<string, string> = {
+          '极简黑白·竖版': '#FFFFFF',
+          '引用卡片·蓝色': '#E3F2FD',
+          '极简文字·白色': '#FFFFFF',
+          '便签纸·粉色': '#FFF0F5',
+          '引用卡片·绿色': '#E8F5E9',
+          '便签纸·黄色·横版': '#FFFBEA',
+          '引用卡片·蓝色·横版': '#E3F2FD',
+          '极简文字·白色·方形': '#FFFFFF',
+          '便签纸·粉色·方形': '#FFF0F5',
+          '极简文字·白色·16:9': '#FFFFFF',
+          '便签纸·黄色·9:16': '#FFFBEA',
+        };
+
+        const backgroundColor = backgroundColorMap[template.name] || '#FFFFFF';
+
+        // 加载 JSON 并生成缩略图
+        const canvasData = JSON.parse(template.canvasJSON);
+
+        await new Promise<void>((resolve) => {
+          fabricCanvas.loadFromJSON(canvasData, () => {
+            fabricCanvas.setBackgroundColor(backgroundColor, () => {
+              fabricCanvas.renderAll();
+
+              // 生成缩略图
+              const dataURL = fabricCanvas.toDataURL({
+                format: 'png',
+                quality: 0.8,
+                multiplier: 0.2,
+              });
+
+              setGenerateProgress(prev => [...prev, `✅ 生成完成: ${template.name}`]);
+
+              // 保存到服务器
+              fetch('/api/save-thumbnail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: template.name, dataURL }),
+              })
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    setGenerateProgress(prev => [...prev, `💾 已保存: ${data.fileName}`]);
+
+                    // 🆕 更新 localStorage 中的模板缩略图 URL（添加时间戳强制刷新）
+                    const manager = getTemplateManager();
+                    const existingTemplate = manager.getAll().find(t => t.name === template.name);
+                    if (existingTemplate) {
+                      const fileName = template.name
+                        .replace(/·/g, '-')      // 中文间隔号 → 连字符
+                        .replace(/:/g, '-')      // 冒号 → 连字符（用于 16:9, 9:16 等比例）
+                        .replace(/\s+/g, '-')    // 空格 → 连字符
+                        .toLowerCase() + '.png';
+                      manager.update(existingTemplate.id, {
+                        thumbnail: `/templates/${fileName}?v=${Date.now()}`
+                      });
+                    }
+                  } else {
+                    setGenerateProgress(prev => [...prev, `❌ 保存失败: ${template.name}`]);
+                  }
+                })
+                .catch(err => {
+                  setGenerateProgress(prev => [...prev, `❌ 保存失败: ${err.message}`]);
+                });
+
+              fabricCanvas.dispose();
+              resolve();
+            });
+          });
+        });
+      } catch (error) {
+        setGenerateProgress(prev => [...prev, `❌ 失败: ${template.name} - ${error}`]);
+      }
+    }
+
+    setGenerateProgress(prev => [...prev, '🎉 全部完成！请刷新页面查看缩略图']);
+    setIsGenerating(false);
+  };
 
   // 加载模板
   useEffect(() => {
@@ -39,8 +180,8 @@ export default function TemplateLibraryDialog({
 
       // 🆕 清理旧的预设模板（名称不在新列表中的）
       const presetNames = PRESET_TEMPLATES.map(t => t.name);
-      const allTemplates = manager.getAll();
-      allTemplates.forEach(template => {
+      const existingTemplates = manager.getAll();
+      existingTemplates.forEach(template => {
         if (template.isPreset && !presetNames.includes(template.name)) {
           console.log('🗑️ 删除旧模板:', template.name);
           manager.delete(template.id);
@@ -51,10 +192,33 @@ export default function TemplateLibraryDialog({
       manager.addPresetTemplates(PRESET_TEMPLATES);
 
       // 更新模板列表
-      setTemplates(manager.getAll());
-      console.log('✅ 预设模板加载完成，共', manager.getAll().length, '个模板');
+      const allTemplates = manager.getAll();
+      setTemplates(allTemplates);
+      console.log('✅ 预设模板加载完成，共', allTemplates.length, '个模板');
+
+      // 🆕 调试：打印前3个模板的缩略图 URL
+      allTemplates.slice(0, 3).forEach(t => {
+        console.log(`📸 ${t.name}: ${t.thumbnail?.substring(0, 50)}...`);
+      });
     }
   }, [open]);
+
+  // 监听快捷键 Ctrl + Option + Command + 4 来启用调试模式
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 检测 Ctrl + Option + Command + 4
+      if (e.ctrlKey && e.altKey && e.metaKey && e.key === '4') {
+        e.preventDefault();
+        setDebugMode(prev => !prev);
+        console.log(debugMode ? '🔧 调试模式已关闭' : '🔧 调试模式已启用');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, debugMode]);
 
   // 过滤模板
   const filteredTemplates = templates.filter(template => {
@@ -72,16 +236,16 @@ export default function TemplateLibraryDialog({
     return matchCategory && matchSearch && matchSize;
   });
 
-  // 获取所有分类
+  // 获取所有分类（按画布尺寸，自定义提前）
   const categories: (TemplateCategory | 'all')[] = [
     'all',
-    '文字卡片',
-    '图文混排',
-    '九宫格',
-    '知识分享',
-    '情绪表达',
-    '产品展示',
     '自定义',
+    '3:4 竖版',
+    '1:1 方形',
+    '4:3 横版',
+    '16:9 横版',
+    '9:16 竖版',
+    '21:9 超宽',
   ];
 
   // 删除模板
@@ -120,7 +284,27 @@ export default function TemplateLibraryDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[1000px] max-h-[80vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>模板库</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>模板库</DialogTitle>
+            {/* 调试按钮：只在按下"aaaa"后显示 */}
+            {debugMode && (
+              <div className="flex gap-2">
+                <button
+                  onClick={clearPresetCache}
+                  className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-500"
+                >
+                  🗑️ 清除缓存
+                </button>
+                <button
+                  onClick={generateAllThumbnails}
+                  disabled={isGenerating}
+                  className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? '生成中...' : '🔄 重新生成缩略图'}
+                </button>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="flex h-[600px]">
@@ -192,22 +376,17 @@ export default function TemplateLibraryDialog({
                       onClick={() => handleTemplateClick(template)}
                     >
                       {/* 缩略图 */}
-                      <div className="relative aspect-[3/4] bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 border border-gray-200 hover:border-gray-900">
-                        {template.thumbnail ? (
-                          <img
-                            src={template.thumbnail}
-                            alt={template.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                            {template.name}
-                          </div>
-                        )}
+                      <div className="relative rounded-lg overflow-hidden border border-gray-200 hover:border-gray-900 hover:shadow-xl transition-all duration-200" style={{ aspectRatio: '3/4', backgroundColor: '#f5f5f5' }}>
+                        {/* 图片 */}
+                        <img
+                          src={template.thumbnail || ''}
+                          alt={template.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                        />
 
-                        {/* 悬停遮罩 */}
-                        <div className="absolute inset-0 bg-gray-900 bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-4 py-2 rounded-full shadow-lg">
+                        {/* Hover 遮罩 - 只在 hover 时显示，不影响图片 */}
+                        <div className="absolute inset-x-0 bottom-0 flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ pointerEvents: 'none' }}>
+                          <div className="bg-white px-4 py-2 rounded-full shadow-lg" style={{ pointerEvents: 'auto' }}>
                             <span className="text-sm font-medium text-gray-900">点击使用</span>
                           </div>
                         </div>
@@ -265,6 +444,36 @@ export default function TemplateLibraryDialog({
               </Button>
               <Button onClick={handleConfirmApply}>
                 确定使用
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* 🆕 生成进度对话框 */}
+      {isGenerating && (
+        <Dialog open={isGenerating} onOpenChange={() => {}}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>生成缩略图</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs h-96 overflow-y-auto">
+                {generateProgress.map((log, index) => (
+                  <div key={index}>{log}</div>
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  setIsGenerating(false);
+                  setGenerateProgress([]);
+                  window.location.reload(); // 刷新页面以加载新缩略图
+                }}
+                disabled={generateProgress[generateProgress.length - 1]?.includes('全部完成') === false}
+              >
+                {generateProgress[generateProgress.length - 1]?.includes('全部完成') ? '完成并刷新' : '生成中...'}
               </Button>
             </DialogFooter>
           </DialogContent>

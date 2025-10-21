@@ -18,6 +18,8 @@ import {
   Redo2,
   Sparkles,
   Square,
+  Shapes,
+  Pencil,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -40,10 +42,12 @@ export default function Sidebar({
   const tools = [
     { id: 'text', label: '单行文本', icon: Type },
     { id: 'textbox', label: '多行文本', icon: AlignLeft },
+    { id: 'pencil', label: '画笔', icon: Pencil },
     { id: 'image', label: '图片', icon: Image },
     { id: 'ai-image', label: 'AI 生图', icon: Sparkles },
     { id: 'emoji', label: 'Emoji', icon: Smile },
     { id: 'shape', label: '形状', icon: Square },
+    { id: 'icon', label: '图标库', icon: Shapes },
   ];
 
   return (
