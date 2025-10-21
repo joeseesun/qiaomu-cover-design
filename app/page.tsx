@@ -358,9 +358,14 @@ export default function Home() {
 
         // 如果输入框获得焦点,不处理粘贴,让浏览器处理
         if (!isInputFocused) {
-          e.preventDefault();
-          managerRef.current.paste();
-          return;
+          // 🔑 关键修复：只有当内部剪贴板有内容时才阻止默认行为
+          // 这样可以让系统剪贴板的图片通过 window paste 事件处理
+          if (managerRef.current.hasClipboardContent()) {
+            e.preventDefault();
+            managerRef.current.paste();
+            return;
+          }
+          // 否则让 window paste 事件处理（粘贴图片）
         }
       }
 
@@ -409,6 +414,7 @@ export default function Home() {
       const items = e.clipboardData?.items;
       if (!items) return;
 
+      // 检查是否有图片
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.type.indexOf('image') !== -1) {
@@ -416,9 +422,16 @@ export default function Home() {
           const blob = item.getAsFile();
           if (blob) {
             try {
+              console.log('📋 粘贴图片:', blob.type, blob.size, 'bytes');
               await managerRef.current.addImageFromClipboard(blob);
+              setToast({ show: true, message: '图片已粘贴', type: 'success' });
             } catch (error) {
-              console.error('Failed to paste image:', error);
+              console.error('❌ 粘贴图片失败:', error);
+              setToast({
+                show: true,
+                message: '粘贴图片失败',
+                type: 'error'
+              });
             }
           }
           break;

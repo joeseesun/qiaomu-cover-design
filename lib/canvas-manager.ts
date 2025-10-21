@@ -999,6 +999,11 @@ export class CanvasManager {
     }, ['data', 'selectable', 'evented']);
   }
 
+  // 检查内部剪贴板是否有内容
+  hasClipboardContent(): boolean {
+    return !!this.clipboard;
+  }
+
   // 从剪贴板粘贴对象
   paste() {
     if (!this.clipboard) {
