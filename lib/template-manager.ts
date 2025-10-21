@@ -179,6 +179,18 @@ export class TemplateManager {
 
         canvas.loadFromJSON(canvasData, () => {
           console.log('✅ JSON 加载完成');
+
+          // 🆕 修复加载后的对象，确保所有必要属性都存在
+          const objects = canvas.getObjects();
+          objects.forEach((obj: any) => {
+            if (obj.type === 'text' || obj.type === 'i-text' || obj.type === 'textbox') {
+              // 确保文本对象有 styles 属性
+              if (!obj.styles) {
+                obj.styles = {};
+              }
+            }
+          });
+
           canvas.renderAll();
           console.log('✅ 画布渲染完成');
 
