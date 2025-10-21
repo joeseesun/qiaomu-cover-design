@@ -1,7 +1,7 @@
 // 颜色选择器
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
+import { getRecentColors, addRecentColor } from '@/lib/recent-colors';
 
 interface ColorPickerProps {
   color: string;
@@ -28,11 +29,26 @@ const PRESET_COLORS = [
 
 export default function ColorPicker({ color, onChange, label, compact = false, disabled = false }: ColorPickerProps) {
   const [inputValue, setInputValue] = useState(color);
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+
+  // 加载最近使用的颜色
+  useEffect(() => {
+    setRecentColors(getRecentColors());
+  }, []);
+
+  const handleColorChange = (newColor: string) => {
+    onChange(newColor);
+    setInputValue(newColor);
+
+    // 添加到最近使用
+    addRecentColor(newColor);
+    setRecentColors(getRecentColors());
+  };
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
     if (/^#[0-9A-F]{6}$/i.test(value)) {
-      onChange(value);
+      handleColorChange(value);
     }
   };
 
@@ -75,6 +91,28 @@ export default function ColorPicker({ color, onChange, label, compact = false, d
               />
             </div>
 
+            {/* 最近使用的颜色 */}
+            {recentColors.length > 0 && (
+              <div className="space-y-3">
+                <label className="text-xs text-muted-foreground">最近使用</label>
+                <div className="grid grid-cols-10 gap-2.5">
+                  {recentColors.map((recentColor, index) => (
+                    <button
+                      key={`${recentColor}-${index}`}
+                      onClick={() => handleColorChange(recentColor)}
+                      className={`w-7 h-7 rounded border transition-all hover:scale-110 ${
+                        color.toUpperCase() === recentColor.toUpperCase()
+                          ? 'border-primary ring-2 ring-primary/20'
+                          : 'border-border/30'
+                      }`}
+                      style={{ backgroundColor: recentColor }}
+                      title={recentColor}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 预设颜色 */}
             <div className="space-y-3">
               <label className="text-xs text-muted-foreground">预设颜色</label>
@@ -82,10 +120,7 @@ export default function ColorPicker({ color, onChange, label, compact = false, d
                 {PRESET_COLORS.map((presetColor) => (
                   <button
                     key={presetColor}
-                    onClick={() => {
-                      onChange(presetColor);
-                      setInputValue(presetColor);
-                    }}
+                    onClick={() => handleColorChange(presetColor)}
                     className={`w-7 h-7 rounded border transition-all hover:scale-110 ${
                       color.toUpperCase() === presetColor.toUpperCase()
                         ? 'border-primary ring-2 ring-primary/20'
@@ -104,10 +139,7 @@ export default function ColorPicker({ color, onChange, label, compact = false, d
               <input
                 type="color"
                 value={color}
-                onChange={(e) => {
-                  onChange(e.target.value);
-                  setInputValue(e.target.value);
-                }}
+                onChange={(e) => handleColorChange(e.target.value)}
                 className="w-full h-10 rounded-md border cursor-pointer"
               />
             </div>
