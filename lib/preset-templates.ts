@@ -23,7 +23,9 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
           width: 1242,
           height: 1660,
           fill: '#FF6B6B',
-          selectable: true,
+          selectable: false,  // 🆕 背景不可选择，避免干扰画布背景切换
+          evented: false,     // 🆕 不响应事件
+          data: { isBackground: true },  // 🆕 标记为背景层
         },
         {
           type: 'text',
@@ -76,7 +78,9 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
               { offset: 1, color: '#764ba2' },
             ],
           },
-          selectable: true,
+          selectable: false,  // 🆕 背景不可选择
+          evented: false,     // 🆕 不响应事件
+          data: { isBackground: true },  // 🆕 标记为背景层
         },
         {
           type: 'text',
@@ -124,7 +128,9 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
           width: 1242,
           height: 1660,
           fill: '#FFFFFF',
-          selectable: true,
+          selectable: false,  // 🆕 背景不可选择
+          evented: false,     // 🆕 不响应事件
+          data: { isBackground: true },  // 🆕 标记为背景层
         },
         {
           type: 'rect',
@@ -177,7 +183,9 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
           width: 1242,
           height: 1660,
           fill: '#F7F9FC',
-          selectable: true,
+          selectable: false,  // 🆕 背景不可选择
+          evented: false,     // 🆕 不响应事件
+          data: { isBackground: true },  // 🆕 标记为背景层
         },
         {
           type: 'rect',
@@ -315,7 +323,9 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
           width: 1242,
           height: 1660,
           fill: '#FFD93D',
-          selectable: true,
+          selectable: false,  // 🆕 背景不可选择
+          evented: false,     // 🆕 不响应事件
+          data: { isBackground: true },  // 🆕 标记为背景层
         },
         {
           type: 'text',
@@ -350,7 +360,9 @@ export const PRESET_TEMPLATES: Omit<Template, 'id' | 'createdAt'>[] = [
           width: 1242,
           height: 1660,
           fill: '#FFB6C1',
-          selectable: true,
+          selectable: false,  // 🆕 背景不可选择
+          evented: false,     // 🆕 不响应事件
+          data: { isBackground: true },  // 🆕 标记为背景层
         },
         {
           type: 'text',
