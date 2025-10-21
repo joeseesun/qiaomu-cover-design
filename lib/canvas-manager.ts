@@ -2788,7 +2788,30 @@ export class CanvasManager {
 
   // 导出为 JSON
   toJSON() {
-    return JSON.stringify(this.canvas.toJSON());
+    try {
+      // 确保 canvas 已初始化
+      if (!this.canvas) {
+        throw new Error('Canvas 未初始化');
+      }
+
+      // 确保 canvas 有 _objects 属性
+      if (!this.canvas._objects) {
+        console.warn('⚠️ Canvas._objects 未初始化，返回空画布 JSON');
+        return JSON.stringify({
+          version: '5.3.0',
+          objects: [],
+        });
+      }
+
+      return JSON.stringify(this.canvas.toJSON());
+    } catch (error) {
+      console.error('❌ toJSON 失败:', error);
+      // 返回一个空的有效 JSON
+      return JSON.stringify({
+        version: '5.3.0',
+        objects: [],
+      });
+    }
   }
 
   // 从 JSON 加载
