@@ -182,17 +182,44 @@ export class TemplateManager {
 
           // 🆕 修复加载后的对象，确保所有必要属性都存在
           const objects = canvas.getObjects();
-          objects.forEach((obj: any) => {
+          const objectsToReplace: Array<{ oldObj: any; newObj: any }> = [];
+
+          objects.forEach((obj: any, index: number) => {
             if (obj.type === 'text' || obj.type === 'i-text' || obj.type === 'textbox') {
               // 确保文本对象有 styles 属性
               if (!obj.styles) {
                 obj.styles = {};
               }
+
+              // 🆕 如果是普通 text，转换为可编辑的 IText
+              if (obj.type === 'text') {
+                console.log(`🔄 将 text 对象转换为 IText:`, obj.text);
+                const itext = new fabric.IText(obj.text || '', {
+                  left: obj.left,
+                  top: obj.top,
+                  fontSize: obj.fontSize,
+                  fontFamily: obj.fontFamily,
+                  fontWeight: obj.fontWeight,
+                  fontStyle: obj.fontStyle,
+                  fill: obj.fill,
+                  textAlign: obj.textAlign,
+                  selectable: obj.selectable !== false,
+                  evented: obj.evented !== false,
+                });
+
+                objectsToReplace.push({ oldObj: obj, newObj: itext });
+              }
             }
           });
 
+          // 替换对象
+          objectsToReplace.forEach(({ oldObj, newObj }) => {
+            canvas.remove(oldObj);
+            canvas.add(newObj);
+          });
+
           canvas.renderAll();
-          console.log('✅ 画布渲染完成');
+          console.log('✅ 画布渲染完成，已转换 text 为 IText');
 
           // 等待多帧确保完全渲染
           requestAnimationFrame(() => {
