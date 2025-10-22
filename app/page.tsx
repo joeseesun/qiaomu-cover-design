@@ -1072,6 +1072,33 @@ export default function Home() {
     }
   };
 
+  // AI 修图（图片转换）
+  const handleAIImageTransform = async (imageUrl: string, prompt: string) => {
+    if (!managerRef.current || !imageToImageGeneratorRef.current) return;
+
+    try {
+      console.log('🎨 开始 AI 修图...', { imageUrl, prompt });
+
+      // 调用 API 生成新图片
+      const generatedImageUrl = await imageToImageGeneratorRef.current.generateFromSingleImage(
+        prompt,
+        imageUrl,
+        '2K' // 默认使用 2K 尺寸
+      );
+
+      console.log('✅ AI 修图成功:', generatedImageUrl);
+
+      // 替换当前图片
+      await managerRef.current.replaceSelectedImage(generatedImageUrl);
+      console.log('✅ 图片已替换为 AI 修图版本');
+
+      setToast({ show: true, message: 'AI 修图成功!', type: 'success' });
+    } catch (error) {
+      console.error('❌ AI 修图失败:', error);
+      throw error;
+    }
+  };
+
   // 导出
   const handleDownload = async () => {
     if (!managerRef.current) return;
@@ -1554,6 +1581,7 @@ export default function Home() {
                 onRemoveBackground={handleRemoveBackground}
                 onRemoveBackgroundLocal={handleRemoveBackgroundLocal}
                 onOpenSettings={() => setShowSettingsDialog(true)}
+                onAIImageTransform={handleAIImageTransform}
               />
             );
           }
