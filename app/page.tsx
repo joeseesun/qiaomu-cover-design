@@ -978,7 +978,7 @@ export default function Home() {
     managerRef.current.setImageSaturation(value);
   };
 
-  // 去背景（Remove.bg API）
+  // 去背景（Remove.bg API - 异步模式，不删除原图）
   const handleRemoveBackground = async (imageUrl: string) => {
     if (!managerRef.current) return;
 
@@ -991,8 +991,15 @@ export default function Home() {
 
       console.log('🎨 开始去除背景...', imageUrl);
 
+      // 1. 立即添加占位图到画布（不删除原图）
+      console.log('🎨 添加占位图到画布...');
+      const placeholderImage = await managerRef.current.addAIPlaceholder('2048x2048');
+
+      // 2. 异步去背景（不阻塞UI）
+      console.log('🚀 开始异步去背景...', { imageUrl });
+
       // 调用后端 API
-      const response = await fetch('/api/remove-bg', {
+      fetch('/api/remove-bg', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1001,44 +1008,66 @@ export default function Home() {
           imageUrl,
           apiKey,
         }),
-      });
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '去背景失败');
+          }
+          return response.json();
+        })
+        .then(async (result) => {
+          console.log('✅ 去背景成功:', result.url);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || '去背景失败');
-      }
+          // 添加到图片库
+          const library = getImageLibrary();
+          const fileName = result.url.split('/').pop() || 'no-bg.png';
+          const isNew = library.addImage(result.url, fileName);
+          console.log('📚 去背景图片已保存到图库:', fileName, '是否新图片:', isNew);
 
-      const result = await response.json();
-      console.log('✅ 去背景成功:', result.url);
+          // 替换占位图
+          await managerRef.current?.replaceAIPlaceholder(placeholderImage, result.url);
+          console.log('✅ 去背景图片已生成并添加到画布');
+          setToast({ show: true, message: '去背景成功!', type: 'success' });
+        })
+        .catch((error) => {
+          console.error('❌ 去背景失败:', error);
+          managerRef.current?.removeAIPlaceholder(placeholderImage);
+          setToast({
+            show: true,
+            message: error instanceof Error ? error.message : '去背景失败',
+            type: 'error'
+          });
+        });
 
-      // 添加到图片库
-      const library = getImageLibrary();
-      const fileName = result.url.split('/').pop() || 'no-bg.png';
-      const isNew = library.addImage(result.url, fileName);
-      console.log('📚 去背景图片已保存到图库:', fileName, '是否新图片:', isNew);
-
-      // 替换当前图片
-      await managerRef.current.replaceSelectedImage(result.url);
-      console.log('✅ 图片已替换为去背景版本');
+      // 立即返回，不等待去背景完成
+      console.log('💡 占位图已添加，图片正在后台去背景...');
     } catch (error) {
-      console.error('❌ 去背景失败:', error);
+      console.error('❌ 添加占位图失败:', error);
       throw error;
     }
   };
 
-  // 本地去背景（@imgly/background-removal）
+  // 本地去背景（@imgly/background-removal - 异步模式，不删除原图）
   const handleRemoveBackgroundLocal = async (imageUrl: string) => {
     if (!managerRef.current) return;
 
     try {
       console.log('🎨 开始本地去除背景...', imageUrl);
 
+      // 1. 立即添加占位图到画布（不删除原图）
+      console.log('🎨 添加占位图到画布...');
+      const placeholderImage = await managerRef.current.addAIPlaceholder('2048x2048');
+
+      // 2. 异步去背景（不阻塞UI）
+      console.log('🚀 开始异步本地去背景...', { imageUrl });
+
       // 动态导入 removeBackground（避免 SSR 问题）
       const { removeBackground } = await import('@imgly/background-removal');
 
       // 调用本地 AI 去背景
       // 使用官方 CDN: https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/
-      const blob = await removeBackground(imageUrl, {
+      removeBackground(imageUrl, {
         publicPath: 'https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/',
         debug: true,
         model: 'isnet_fp16', // 使用默认模型 (medium, ~80MB)
@@ -1046,28 +1075,42 @@ export default function Home() {
           const progress = Math.round((current / total) * 100);
           console.log(`📊 处理进度 [${key}]: ${progress}%`);
         },
-      });
+      })
+        .then(async (blob) => {
+          console.log('✅ 本地去背景成功，大小:', (blob.size / 1024).toFixed(2), 'KB');
 
-      console.log('✅ 本地去背景成功，大小:', (blob.size / 1024).toFixed(2), 'KB');
+          // 上传到七牛云
+          const qiniuUploader = managerRef.current!.qiniuUploader;
+          const file = new File([blob], 'local-no-bg.png', { type: 'image/png' });
+          const qiniuUrl = await qiniuUploader.uploadFile(file);
 
-      // 上传到七牛云
-      const qiniuUploader = managerRef.current.qiniuUploader;
-      const file = new File([blob], 'local-no-bg.png', { type: 'image/png' });
-      const qiniuUrl = await qiniuUploader.uploadFile(file);
+          console.log('✅ 上传到七牛云成功:', qiniuUrl);
 
-      console.log('✅ 上传到七牛云成功:', qiniuUrl);
+          // 添加到图片库
+          const library = getImageLibrary();
+          const fileName = qiniuUrl.split('/').pop() || 'local-no-bg.png';
+          const isNew = library.addImage(qiniuUrl, fileName);
+          console.log('📚 去背景图片已保存到图库:', fileName, '是否新图片:', isNew);
 
-      // 添加到图片库
-      const library = getImageLibrary();
-      const fileName = qiniuUrl.split('/').pop() || 'local-no-bg.png';
-      const isNew = library.addImage(qiniuUrl, fileName);
-      console.log('📚 去背景图片已保存到图库:', fileName, '是否新图片:', isNew);
+          // 替换占位图
+          await managerRef.current?.replaceAIPlaceholder(placeholderImage, qiniuUrl);
+          console.log('✅ 去背景图片已生成并添加到画布');
+          setToast({ show: true, message: '免费去背景成功!', type: 'success' });
+        })
+        .catch((error) => {
+          console.error('❌ 本地去背景失败:', error);
+          managerRef.current?.removeAIPlaceholder(placeholderImage);
+          setToast({
+            show: true,
+            message: error instanceof Error ? error.message : '本地去背景失败',
+            type: 'error'
+          });
+        });
 
-      // 替换当前图片
-      await managerRef.current.replaceSelectedImage(qiniuUrl);
-      console.log('✅ 图片已替换为去背景版本');
+      // 立即返回，不等待去背景完成
+      console.log('💡 占位图已添加，图片正在后台去背景...');
     } catch (error) {
-      console.error('❌ 本地去背景失败:', error);
+      console.error('❌ 添加占位图失败:', error);
       throw error;
     }
   };
