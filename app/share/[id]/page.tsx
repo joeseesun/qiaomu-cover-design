@@ -55,48 +55,31 @@ export default async function SharePage({
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
-        {/* 标题区域 */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
-            {data.title}
-          </h1>
-          <p className="text-gray-500 text-sm sm:text-base">
-            由乔木画布生成 · {new Date(data.createdAt).toLocaleDateString('zh-CN')}
-          </p>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 sm:p-8">
+      <div className="w-full max-w-3xl">
+        {/* 图片区域 - 完全匹配画布边框 */}
+        <div className="relative w-full mb-8" style={{ aspectRatio: '1/1' }}>
+          <Image
+            src={data.imageUrl}
+            alt={data.title}
+            fill
+            className="object-contain"
+            priority
+            unoptimized
+          />
         </div>
-        
-        {/* 图片区域 */}
-        <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 mb-8">
-          <div className="relative w-full" style={{ aspectRatio: '1/1' }}>
-            <Image
-              src={data.imageUrl}
-              alt={data.title}
-              fill
-              className="object-contain rounded-lg"
-              priority
-              unoptimized
-            />
-          </div>
-        </div>
-        
-        {/* CTA 按钮 */}
+
+        {/* CTA 按钮 - 黑灰渐变 */}
         <div className="text-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition shadow-lg hover:shadow-xl text-sm sm:text-base"
+            className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-gray-900 to-gray-700 text-white font-medium rounded-lg hover:from-gray-800 hover:to-gray-600 transition-all shadow-lg hover:shadow-xl"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             创建我的海报
           </Link>
-        </div>
-        
-        {/* 底部品牌 */}
-        <div className="text-center mt-12 text-sm text-gray-400">
-          Powered by 乔木画布
         </div>
       </div>
     </div>
