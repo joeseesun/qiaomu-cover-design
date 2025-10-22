@@ -55,20 +55,21 @@ export default async function SharePage({
   }
   
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center py-8">
-      <div className="w-full max-w-3xl px-4 sm:px-8">
-        {/* 图片区域 - 完全撑满，只有阴影 */}
-        <div className="relative w-full mb-8 shadow-2xl" style={{ aspectRatio: '1/1' }}>
-          <Image
-            src={data.imageUrl}
-            alt={data.title}
-            fill
-            className="object-contain"
-            priority
-            unoptimized
-          />
-        </div>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* 图片区域 - 完全撑满浏览器窗口 */}
+      <div className="relative w-full h-screen shadow-2xl">
+        <Image
+          src={data.imageUrl}
+          alt={data.title}
+          fill
+          className="object-contain"
+          priority
+          unoptimized
+        />
+      </div>
 
+      {/* 按钮和链接区域 */}
+      <div className="px-4 sm:px-8 py-8">
         {/* CTA 按钮 - 黑灰渐变 */}
         <div className="text-center mb-8">
           <Link
