@@ -16,6 +16,12 @@ export class CanvasManager {
   private saveHistoryTimer: NodeJS.Timeout | null = null;
   private qiniuUploader: QiniuUploader;
 
+  // 图片裁剪相关
+  private isCropping: boolean = false;
+  private croppingImage: fabric.Image | null = null;
+  private cropRect: fabric.Rect | null = null;
+  private cropOverlay: fabric.Rect[] = [];
+
   constructor(element: HTMLCanvasElement, width = CANVAS_WIDTH, height = CANVAS_HEIGHT) {
     this.width = width;
     this.height = height;
@@ -137,6 +143,14 @@ export class CanvasManager {
 
     // 监听形状绘制的鼠标事件
     this.setupShapeDrawingEvents();
+
+    // 监听图片双击事件，进入裁剪模式
+    this.canvas.on('mouse:dblclick', (e) => {
+      const target = e.target;
+      if (target && target.type === 'image' && !this.isCropping) {
+        this.enterCropMode(target as fabric.Image);
+      }
+    });
   }
 
   // 防止编辑时滚动
@@ -1966,40 +1980,98 @@ export class CanvasManager {
 
   // 设置背景色
   setBackgroundColor(color: string) {
-    this.canvas.setBackgroundColor(color, () => this.canvas.renderAll());
+    // 清除背景图片
+    this.canvas.setBackgroundImage(null as any, () => {
+      // 设置纯色背景
+      this.canvas.setBackgroundColor(color, () => this.canvas.renderAll());
+    });
   }
 
   // 设置渐变背景
   setBackgroundGradient(gradientCSS: string) {
-    // 解析CSS渐变字符串
+    let gradient: fabric.Gradient | null = null;
+
+    // 尝试解析线性渐变
     // 例如: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-    const match = gradientCSS.match(/linear-gradient\((\d+)deg,\s*([^,]+)\s+\d+%,\s*([^)]+)\s+\d+%\)/);
+    const linearMatch = gradientCSS.match(/linear-gradient\(\s*(\d+(?:\.\d+)?)deg,\s*(.+)\)/);
 
-    if (match) {
-      const angle = parseInt(match[1]);
-      const color1 = match[2].trim();
-      const color2 = match[3].trim();
+    if (linearMatch) {
+      const angle = parseFloat(linearMatch[1]);
+      const colorStopsStr = linearMatch[2];
 
-      // 将角度转换为Fabric.js的坐标
-      const angleRad = (angle - 90) * Math.PI / 180;
-      const coords = {
-        x1: this.width / 2 - Math.cos(angleRad) * this.width / 2,
-        y1: this.height / 2 - Math.sin(angleRad) * this.height / 2,
-        x2: this.width / 2 + Math.cos(angleRad) * this.width / 2,
-        y2: this.height / 2 + Math.sin(angleRad) * this.height / 2,
-      };
+      // 解析颜色停止点
+      const colorStops = this.parseColorStops(colorStopsStr);
 
-      const gradient = new fabric.Gradient({
-        type: 'linear',
-        coords: coords,
-        colorStops: [
-          { offset: 0, color: color1 },
-          { offset: 1, color: color2 },
-        ],
-      });
+      if (colorStops.length >= 2) {
+        // 将角度转换为Fabric.js的坐标
+        const angleRad = (angle - 90) * Math.PI / 180;
+        const coords = {
+          x1: this.width / 2 - Math.cos(angleRad) * this.width / 2,
+          y1: this.height / 2 - Math.sin(angleRad) * this.height / 2,
+          x2: this.width / 2 + Math.cos(angleRad) * this.width / 2,
+          y2: this.height / 2 + Math.sin(angleRad) * this.height / 2,
+        };
 
-      this.canvas.setBackgroundColor(gradient as any, () => this.canvas.renderAll());
+        gradient = new fabric.Gradient({
+          type: 'linear',
+          coords: coords,
+          colorStops: colorStops,
+        });
+      }
     }
+
+    // 尝试解析径向渐变
+    // 例如: "radial-gradient(circle 311px at 8.6% 27.9%, rgba(62,147,252,0.57) 12.9%, rgba(239,183,192,0.44) 91.2%)"
+    const radialMatch = gradientCSS.match(/radial-gradient\([^,]+,\s*(.+)\)/);
+
+    if (radialMatch && !gradient) {
+      const colorStopsStr = radialMatch[1];
+      const colorStops = this.parseColorStops(colorStopsStr);
+
+      if (colorStops.length >= 2) {
+        // 径向渐变：从中心向外
+        gradient = new fabric.Gradient({
+          type: 'radial',
+          coords: {
+            x1: this.width / 2,
+            y1: this.height / 2,
+            x2: this.width / 2,
+            y2: this.height / 2,
+            r1: 0,
+            r2: Math.max(this.width, this.height) / 2,
+          },
+          colorStops: colorStops,
+        });
+      }
+    }
+
+    if (gradient) {
+      // 清除背景图片
+      this.canvas.setBackgroundImage(null as any, () => {
+        // 设置渐变背景
+        this.canvas.setBackgroundColor(gradient as any, () => this.canvas.renderAll());
+      });
+    }
+  }
+
+  // 解析颜色停止点
+  private parseColorStops(colorStopsStr: string): Array<{ offset: number; color: string }> {
+    const stops: Array<{ offset: number; color: string }> = [];
+
+    // 匹配 rgba(...) 或 rgb(...) 或 #hex 颜色
+    const regex = /(rgba?\([^)]+\)|#[0-9a-fA-F]{3,6})\s+([\d.]+)%/g;
+    let match;
+
+    while ((match = regex.exec(colorStopsStr)) !== null) {
+      // 限制 offset 在 0-1 范围内
+      const offset = Math.min(1, Math.max(0, parseFloat(match[2]) / 100));
+      stops.push({
+        color: match[1],
+        offset: offset,
+      });
+    }
+
+    return stops;
   }
 
   // 设置图片背景
@@ -3538,6 +3610,453 @@ export class CanvasManager {
   // 销毁画布
   dispose() {
     this.canvas.dispose();
+  }
+
+  // ==================== 图片处理功能 ====================
+
+  /**
+   * 设置图片圆角
+   * @param radius 圆角半径（像素值）
+   */
+  setImageBorderRadius(radius: number) {
+    const activeObj = this.canvas.getActiveObject();
+
+    if (!activeObj || activeObj.type !== 'image') {
+      return;
+    }
+
+    const image = activeObj as fabric.Image;
+
+    if (radius === 0) {
+      // 移除圆角
+      image.clipPath = undefined;
+    } else {
+      // 创建圆角裁剪路径
+      const width = image.width || 100;
+      const height = image.height || 100;
+
+      const clipPath = new fabric.Rect({
+        width: width,
+        height: height,
+        rx: radius,
+        ry: radius,
+        top: -height / 2,
+        left: -width / 2,
+      });
+      image.clipPath = clipPath;
+    }
+
+    // 强制标记对象为 dirty，确保重新渲染
+    image.dirty = true;
+    this.canvas.requestRenderAll();
+    this.saveHistory();
+  }
+
+  /**
+   * 翻转图片（水平）
+   */
+  flipImageHorizontal() {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    activeObj.set('flipX', !activeObj.flipX);
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 翻转图片（垂直）
+   */
+  flipImageVertical() {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    activeObj.set('flipY', !activeObj.flipY);
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 设置图片阴影
+   */
+  setImageShadow(shadow: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number }) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    if (shadow.enabled) {
+      activeObj.shadow = new fabric.Shadow({
+        color: shadow.color,
+        blur: shadow.blur,
+        offsetX: shadow.offsetX,
+        offsetY: shadow.offsetY,
+      });
+    } else {
+      activeObj.shadow = undefined;
+    }
+
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 设置图片边框
+   */
+  setImageStroke(stroke: { enabled: boolean; color: string; width: number; style?: 'solid' | 'dashed' }) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    if (stroke.enabled) {
+      activeObj.set({
+        stroke: stroke.color,
+        strokeWidth: stroke.width,
+        strokeDashArray: stroke.style === 'dashed' ? [10, 5] : undefined,
+      });
+    } else {
+      activeObj.set({
+        stroke: undefined,
+        strokeWidth: 0,
+        strokeDashArray: undefined,
+      });
+    }
+
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 应用图片滤镜
+   */
+  applyImageFilter(filterType: string, value?: number) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    const image = activeObj as fabric.Image;
+
+    // 重置滤镜
+    if (filterType === 'reset') {
+      image.filters = [];
+      image.applyFilters();
+      this.canvas.renderAll();
+      return;
+    }
+
+    // 快速滤镜（一键应用）
+    const quickFilters: { [key: string]: any } = {
+      grayscale: new fabric.Image.filters.Grayscale(),
+      sepia: new fabric.Image.filters.Sepia(),
+      invert: new fabric.Image.filters.Invert(),
+      blur: new fabric.Image.filters.Blur({ blur: 0.3 }),
+      sharpen: new fabric.Image.filters.Convolute({
+        matrix: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+      }),
+      emboss: new fabric.Image.filters.Convolute({
+        matrix: [1, 1, 1, 1, 0.7, -1, -1, -1, -1],
+      }),
+    };
+
+    if (quickFilters[filterType]) {
+      image.filters = [quickFilters[filterType]];
+      image.applyFilters();
+      this.canvas.renderAll();
+    }
+  }
+
+  /**
+   * 设置图片亮度
+   */
+  setImageBrightness(value: number) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    const image = activeObj as fabric.Image;
+
+    // 移除旧的亮度滤镜
+    image.filters = (image.filters || []).filter(
+      (f: any) => !(f instanceof fabric.Image.filters.Brightness)
+    );
+
+    // 添加新的亮度滤镜
+    if (value !== 0) {
+      image.filters?.push(new fabric.Image.filters.Brightness({ brightness: value }));
+    }
+
+    image.applyFilters();
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 设置图片对比度
+   */
+  setImageContrast(value: number) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    const image = activeObj as fabric.Image;
+
+    // 移除旧的对比度滤镜
+    image.filters = (image.filters || []).filter(
+      (f: any) => !(f instanceof fabric.Image.filters.Contrast)
+    );
+
+    // 添加新的对比度滤镜
+    if (value !== 0) {
+      image.filters?.push(new fabric.Image.filters.Contrast({ contrast: value }));
+    }
+
+    image.applyFilters();
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 设置图片饱和度
+   */
+  setImageSaturation(value: number) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'image') return;
+
+    const image = activeObj as fabric.Image;
+
+    // 移除旧的饱和度滤镜
+    image.filters = (image.filters || []).filter(
+      (f: any) => !(f instanceof fabric.Image.filters.Saturation)
+    );
+
+    // 添加新的饱和度滤镜
+    if (value !== 0) {
+      image.filters?.push(new fabric.Image.filters.Saturation({ saturation: value }));
+    }
+
+    image.applyFilters();
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 进入图片裁剪模式
+   */
+  private enterCropMode(image: fabric.Image) {
+    console.log('✂️ 进入裁剪模式');
+
+    this.isCropping = true;
+    this.croppingImage = image;
+
+    // 禁用画布选择
+    this.canvas.selection = false;
+
+    // 禁用图片的控制点
+    image.set({
+      hasControls: false,
+      hasBorders: false,
+      lockMovementX: true,
+      lockMovementY: true,
+      selectable: false,
+    });
+
+    // 创建裁剪框（初始大小为图片的 80%）
+    const imgWidth = (image.width || 100) * (image.scaleX || 1);
+    const imgHeight = (image.height || 100) * (image.scaleY || 1);
+    const cropWidth = imgWidth * 0.8;
+    const cropHeight = imgHeight * 0.8;
+
+    this.cropRect = new fabric.Rect({
+      left: (image.left || 0) - cropWidth / 2,
+      top: (image.top || 0) - cropHeight / 2,
+      width: cropWidth,
+      height: cropHeight,
+      fill: 'transparent',
+      stroke: '#0066FF',
+      strokeWidth: 2,
+      strokeDashArray: [5, 5],
+      selectable: true,
+      hasControls: true,
+      hasBorders: true,
+      lockRotation: true,
+    });
+
+    // 创建半透明遮罩（4个矩形覆盖裁剪框外的区域）
+    this.createCropOverlay(image, this.cropRect);
+
+    // 添加裁剪框到画布
+    this.canvas.add(this.cropRect);
+    this.cropOverlay.forEach(rect => this.canvas.add(rect));
+
+    // 设置裁剪框为活动对象
+    this.canvas.setActiveObject(this.cropRect);
+    this.canvas.renderAll();
+
+    // 监听裁剪框移动/缩放，更新遮罩
+    this.cropRect.on('moving', () => this.updateCropOverlay());
+    this.cropRect.on('scaling', () => this.updateCropOverlay());
+    this.cropRect.on('modified', () => this.updateCropOverlay());
+
+    // 监听键盘事件
+    this.setupCropKeyboardListeners();
+
+    console.log('✅ 裁剪模式已启动');
+  }
+
+  /**
+   * 创建裁剪遮罩
+   */
+  private createCropOverlay(image: fabric.Image, cropRect: fabric.Rect) {
+    const canvasWidth = this.width;
+    const canvasHeight = this.height;
+
+    // 清空旧遮罩
+    this.cropOverlay.forEach(rect => this.canvas.remove(rect));
+    this.cropOverlay = [];
+
+    // 上遮罩
+    this.cropOverlay.push(new fabric.Rect({
+      left: 0,
+      top: 0,
+      width: canvasWidth,
+      height: cropRect.top || 0,
+      fill: 'rgba(0, 0, 0, 0.5)',
+      selectable: false,
+      evented: false,
+    }));
+
+    // 下遮罩
+    this.cropOverlay.push(new fabric.Rect({
+      left: 0,
+      top: (cropRect.top || 0) + (cropRect.height || 0) * (cropRect.scaleY || 1),
+      width: canvasWidth,
+      height: canvasHeight - ((cropRect.top || 0) + (cropRect.height || 0) * (cropRect.scaleY || 1)),
+      fill: 'rgba(0, 0, 0, 0.5)',
+      selectable: false,
+      evented: false,
+    }));
+
+    // 左遮罩
+    this.cropOverlay.push(new fabric.Rect({
+      left: 0,
+      top: cropRect.top || 0,
+      width: cropRect.left || 0,
+      height: (cropRect.height || 0) * (cropRect.scaleY || 1),
+      fill: 'rgba(0, 0, 0, 0.5)',
+      selectable: false,
+      evented: false,
+    }));
+
+    // 右遮罩
+    this.cropOverlay.push(new fabric.Rect({
+      left: (cropRect.left || 0) + (cropRect.width || 0) * (cropRect.scaleX || 1),
+      top: cropRect.top || 0,
+      width: canvasWidth - ((cropRect.left || 0) + (cropRect.width || 0) * (cropRect.scaleX || 1)),
+      height: (cropRect.height || 0) * (cropRect.scaleY || 1),
+      fill: 'rgba(0, 0, 0, 0.5)',
+      selectable: false,
+      evented: false,
+    }));
+  }
+
+  /**
+   * 更新裁剪遮罩
+   */
+  private updateCropOverlay() {
+    if (!this.cropRect || !this.croppingImage) return;
+
+    this.createCropOverlay(this.croppingImage, this.cropRect);
+    this.cropOverlay.forEach(rect => this.canvas.add(rect));
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 设置裁剪模式的键盘监听
+   */
+  private setupCropKeyboardListeners() {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!this.isCropping) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.applyCrop();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.cancelCrop();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    // 保存监听器引用，以便后续移除
+    (this as any)._cropKeyboardListener = handleKeyDown;
+  }
+
+  /**
+   * 应用裁剪
+   */
+  private applyCrop() {
+    if (!this.cropRect || !this.croppingImage) return;
+
+    console.log('✂️ 应用裁剪');
+
+    const image = this.croppingImage;
+    const cropX = (this.cropRect.left || 0) - (image.left || 0) + ((this.cropRect.width || 0) * (this.cropRect.scaleX || 1)) / 2;
+    const cropY = (this.cropRect.top || 0) - (image.top || 0) + ((this.cropRect.height || 0) * (this.cropRect.scaleY || 1)) / 2;
+    const cropWidth = (this.cropRect.width || 0) * (this.cropRect.scaleX || 1);
+    const cropHeight = (this.cropRect.height || 0) * (this.cropRect.scaleY || 1);
+
+    // 使用 clipPath 实现裁剪
+    const clipPath = new fabric.Rect({
+      width: cropWidth / (image.scaleX || 1),
+      height: cropHeight / (image.scaleY || 1),
+      left: cropX / (image.scaleX || 1),
+      top: cropY / (image.scaleY || 1),
+      originX: 'center',
+      originY: 'center',
+    });
+
+    image.clipPath = clipPath;
+
+    this.exitCropMode();
+    this.saveHistory();
+  }
+
+  /**
+   * 取消裁剪
+   */
+  private cancelCrop() {
+    console.log('❌ 取消裁剪');
+    this.exitCropMode();
+  }
+
+  /**
+   * 退出裁剪模式
+   */
+  private exitCropMode() {
+    if (!this.croppingImage) return;
+
+    console.log('🚪 退出裁剪模式');
+
+    // 恢复图片的控制点
+    this.croppingImage.set({
+      hasControls: true,
+      hasBorders: true,
+      lockMovementX: false,
+      lockMovementY: false,
+      selectable: true,
+    });
+
+    // 移除裁剪框和遮罩
+    if (this.cropRect) {
+      this.canvas.remove(this.cropRect);
+      this.cropRect = null;
+    }
+
+    this.cropOverlay.forEach(rect => this.canvas.remove(rect));
+    this.cropOverlay = [];
+
+    // 恢复画布选择
+    this.canvas.selection = true;
+
+    // 移除键盘监听
+    if ((this as any)._cropKeyboardListener) {
+      document.removeEventListener('keydown', (this as any)._cropKeyboardListener);
+      delete (this as any)._cropKeyboardListener;
+    }
+
+    this.isCropping = false;
+    this.croppingImage = null;
+
+    this.canvas.renderAll();
+    console.log('✅ 已退出裁剪模式');
   }
 }
 

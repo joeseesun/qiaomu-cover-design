@@ -83,6 +83,8 @@ export default function FontPanel({
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#FFFFFF');
   const [showCanvasColorPicker, setShowCanvasColorPicker] = useState(false);
   const [uploadedBackgroundImage, setUploadedBackgroundImage] = useState<string | null>(null);
+  const [showAllGradients, setShowAllGradients] = useState(false);
+  const [showAllSolidColors, setShowAllSolidColors] = useState(false);
 
   // 字号输入框的本地状态
   const [fontSizeInput, setFontSizeInput] = useState<string>('');
@@ -600,7 +602,23 @@ export default function FontPanel({
         <TabsContent value="canvas" className="px-8 py-6 space-y-6">
           {/* 纯色背景选择器 */}
           <div>
-            <label className="text-sm font-semibold mb-3 block">纯色背景</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-semibold">纯色背景</label>
+              <button
+                onClick={() => setShowAllSolidColors(!showAllSolidColors)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                {showAllSolidColors ? '收起' : '展开'}
+                <svg
+                  className={`w-3 h-3 transition-transform ${showAllSolidColors ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
             <div className="grid grid-cols-6 gap-2">
               {/* 第一个是自定义颜色选择器 */}
               <div className="relative">
@@ -621,6 +639,7 @@ export default function FontPanel({
                         onChange={(color) => {
                           setCanvasBackgroundColor(color);
                           setCanvasBackgroundType('solid');
+                          setUploadedBackgroundImage(null); // 清除背景图片
                           onCanvasBackgroundChange?.('solid', color);
                         }}
                       />
@@ -630,52 +649,141 @@ export default function FontPanel({
               </div>
 
               {/* 预设颜色 */}
-              {['#F5F5F5', '#E8E8E8', '#FFE5E5', '#FFF4E5', '#FFFBE5',
-                '#E5F9FF', '#E5F0FF', '#F0E5FF', '#FFE5F5', '#E5FFE5', '#1A1A1A'].map((color) => (
-                <button
-                  key={color}
-                  onClick={() => {
-                    setCanvasBackgroundColor(color);
-                    setCanvasBackgroundType('solid');
-                    onCanvasBackgroundChange?.('solid', color);
-                  }}
-                  className={`w-full aspect-square rounded-md border-2 hover:border-primary transition-colors ${
-                    canvasBackgroundColor === color && canvasBackgroundType === 'solid'
-                      ? 'border-primary ring-2 ring-primary/20'
-                      : 'border-border'
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+              {(() => {
+                const allColors = [
+                  // 第一行（原有 + 新增）
+                  '#FFFFFF', // 纯白
+                  '#F5F5F5', // 浅灰
+                  '#E8E8E8', // 灰色
+                  '#1A1A1A', // 深黑
+                  '#000000', // 纯黑
+                  // 第二行（暖色系）
+                  '#FFE5E5', // 浅粉
+                  '#FFB3BA', // 粉红
+                  '#FFDFBA', // 浅橙
+                  '#FFF4E5', // 米黄
+                  '#FFFACD', // 柠檬黄
+                  '#FFFBE5', // 浅黄
+                  // 第三行（冷色系）
+                  '#E5F9FF', // 浅蓝
+                  '#BAE1FF', // 天蓝
+                  '#E5F0FF', // 淡蓝
+                  '#BAFFC9', // 薄荷绿
+                  '#E5FFE5', // 浅绿
+                  '#F0E5FF', // 淡紫
+                  // 第四行（鲜艳色）
+                  '#FFE5F5', // 浅粉紫
+                  '#FF6B9D', // 玫瑰红
+                  '#FF9999', // 珊瑚红
+                  '#FFB84D', // 橙色
+                  '#FFE066', // 金黄
+                  '#67E8F9', // 青色
+                  // 第五行（深色系）
+                  '#7DD3FC', // 亮蓝
+                  '#6EE7B7', // 翠绿
+                  '#A7F3D0', // 薄荷
+                  '#C77DFF', // 紫色
+                  '#9D84FF', // 淡紫
+                  '#FF6B6B', // 红色
+                ];
+
+                const displayColors = showAllSolidColors ? allColors : allColors.slice(0, 11);
+
+                return displayColors.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => {
+                      setCanvasBackgroundColor(color);
+                      setCanvasBackgroundType('solid');
+                      setUploadedBackgroundImage(null); // 清除背景图片
+                      onCanvasBackgroundChange?.('solid', color);
+                    }}
+                    className={`w-full aspect-square rounded-md border-2 hover:border-primary transition-colors ${
+                      canvasBackgroundColor === color && canvasBackgroundType === 'solid'
+                        ? 'border-primary ring-2 ring-primary/20'
+                        : 'border-border'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ));
+              })()}
             </div>
           </div>
 
           {/* 渐变背景 */}
           <div>
-            <label className="text-sm font-semibold mb-3 block">渐变背景</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                // 柔和浅色渐变
-                'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-                'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-                'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-                'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
-                'linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%)',
-                'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)',
-                'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',
-                'linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%)',
-                'linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)',
-              ].map((gradient, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setCanvasBackgroundType('solid'); // 设置为solid类型以便替换
-                    onCanvasBackgroundChange?.('gradient', gradient);
-                  }}
-                  className="h-16 rounded-md border-2 border-border hover:border-primary transition-colors"
-                  style={{ background: gradient }}
-                />
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-semibold">渐变背景</label>
+              <button
+                onClick={() => setShowAllGradients(!showAllGradients)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                {showAllGradients ? '收起' : '展开'}
+                <svg
+                  className={`w-3 h-3 transition-transform ${showAllGradients ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(() => {
+                const allGradients = [
+                  // 第一行（新增的特殊渐变）
+                  'radial-gradient(circle 311px at 8.6% 27.9%, rgba(62,147,252,0.57) 12.9%, rgba(239,183,192,0.44) 91.2%)',
+                  'linear-gradient(109.6deg, rgba(254,253,205,1) 11.2%, rgba(163,230,255,1) 91.1%)',
+                  'radial-gradient(circle farthest-corner at 3.2% 49.6%, rgba(80,12,139,0.87) 0%, rgba(161,10,144,0.72) 83.6%)',
+                  'radial-gradient(circle 1292px at -13.6% 51.7%, rgba(0,56,68,1) 0%, rgba(163,217,185,1) 51.5%, rgba(255,252,247,1) 88.6%)',
+                  // 第二行（新增的特殊渐变）
+                  'linear-gradient(89.5deg, rgba(131,204,255,1) 0.4%, rgba(66,144,251,1) 100.3%)',
+                  'linear-gradient(174.2deg, rgba(255,244,228,1) 7.1%, rgba(240,246,238,1) 67.4%)',
+                  'radial-gradient(circle 918px at 13.1% 25.5%, rgba(249,107,107,1) 0%, rgba(247,231,172,1) 48.9%, rgba(173,247,172,1) 90%)',
+                  'linear-gradient(107.7deg, rgba(235,230,44,0.55) 8.4%, rgba(252,152,15,1) 90.3%)',
+                  // 第三行（原有渐变）
+                  'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)',
+                  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  'linear-gradient(135deg, #0575e6 0%, #021b79 100%)',
+                  'linear-gradient(135deg, #56ccf2 0%, #2f80ed 100%)',
+                  // 第四行（原有渐变）
+                  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                  'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                  'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                  'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
+                  // 第五行（原有渐变）
+                  'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+                  'linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%)',
+                  'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)',
+                  'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',
+                  // 第六行（原有渐变）
+                  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                  // 第七行（原有渐变）
+                  'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+                  'linear-gradient(135deg, #a8caba 0%, #5d4157 100%)',
+                  'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+                  'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+                ];
+
+                const displayGradients = showAllGradients ? allGradients : allGradients.slice(0, 8);
+
+                return displayGradients.map((gradient, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setCanvasBackgroundType('solid');
+                      setUploadedBackgroundImage(null); // 清除背景图片
+                      onCanvasBackgroundChange?.('gradient', gradient);
+                    }}
+                    className="h-16 rounded-lg border-2 border-border hover:border-primary transition-colors"
+                    style={{ background: gradient }}
+                  />
+                ));
+              })()}
             </div>
           </div>
 
@@ -692,8 +800,17 @@ export default function FontPanel({
                       alt="背景预览"
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-sm">当前背景</span>
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => {
+                          setUploadedBackgroundImage(null);
+                          setCanvasBackgroundType('solid');
+                          onCanvasBackgroundChange?.('solid', '#FFFFFF');
+                        }}
+                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded-md transition-colors"
+                      >
+                        删除
+                      </button>
                     </div>
                   </div>
                 ) : (

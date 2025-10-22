@@ -27,6 +27,7 @@ import TemplateLibraryDialog from './components/home/TemplateLibraryDialog';
 import SaveTemplateDialog from './components/home/SaveTemplateDialog';
 import IconLibraryDialog from './components/home/IconLibraryDialog';
 import SVGPropertiesPanel from './components/home/properties/SVGPropertiesPanel';
+import ImagePropertiesPanel from './components/properties/ImagePropertiesPanel';
 import { getTemplateManager, TemplateCategory } from '@/lib/template-manager';
 import { IconConfig } from '@/lib/icon-library';
 import { updateSVGColor, updateSVGStrokeWidth } from '@/lib/svg-to-fabric';
@@ -928,6 +929,53 @@ export default function Home() {
     managerRef.current?.canvas.renderAll();
   };
 
+  // ==================== 图片处理 ====================
+
+  const handleImageBorderRadiusChange = (radius: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.setImageBorderRadius(radius);
+  };
+
+  const handleImageFlipHorizontal = () => {
+    if (!managerRef.current) return;
+    managerRef.current.flipImageHorizontal();
+  };
+
+  const handleImageFlipVertical = () => {
+    if (!managerRef.current) return;
+    managerRef.current.flipImageVertical();
+  };
+
+  const handleImageShadowChange = (shadow: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number }) => {
+    if (!managerRef.current) return;
+    managerRef.current.setImageShadow(shadow);
+  };
+
+  const handleImageStrokeChange = (stroke: { enabled: boolean; color: string; width: number; style?: 'solid' | 'dashed' }) => {
+    if (!managerRef.current) return;
+    managerRef.current.setImageStroke(stroke);
+  };
+
+  const handleImageFilterChange = (filterType: string, value?: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.applyImageFilter(filterType, value);
+  };
+
+  const handleImageBrightnessChange = (value: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.setImageBrightness(value);
+  };
+
+  const handleImageContrastChange = (value: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.setImageContrast(value);
+  };
+
+  const handleImageSaturationChange = (value: number) => {
+    if (!managerRef.current) return;
+    managerRef.current.setImageSaturation(value);
+  };
+
   // 导出
   const handleDownload = async () => {
     if (!managerRef.current) return;
@@ -1345,6 +1393,7 @@ export default function Home() {
           const isSVGIcon = (selectedObject as any)?.isSVGIcon;
 
           const isTextObject = objectType === 'i-text' || objectType === 'textbox';
+          const isImageObject = objectType === 'image';
           const isShapeObject = objectType === 'rect' || objectType === 'circle' || objectType === 'triangle';
           const isLineObject = objectType === 'line';
 
@@ -1387,6 +1436,25 @@ export default function Home() {
                 onUnderlineChange={handleUnderlineChange}
                 onBorderChange={handleBorderChange}
                 onCanvasBackgroundChange={handleCanvasBackgroundChange}
+              />
+            );
+          }
+
+          // 图片对象 - 显示图片属性面板
+          if (isImageObject) {
+            return (
+              <ImagePropertiesPanel
+                selectedObject={selectedObject}
+                onOpacityChange={handleObjectOpacityChange}
+                onBorderRadiusChange={handleImageBorderRadiusChange}
+                onFlipHorizontal={handleImageFlipHorizontal}
+                onFlipVertical={handleImageFlipVertical}
+                onShadowChange={handleImageShadowChange}
+                onStrokeChange={handleImageStrokeChange}
+                onFilterChange={handleImageFilterChange}
+                onBrightnessChange={handleImageBrightnessChange}
+                onContrastChange={handleImageContrastChange}
+                onSaturationChange={handleImageSaturationChange}
               />
             );
           }
