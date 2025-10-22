@@ -55,9 +55,9 @@ export default async function SharePage({
   }
   
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* 图片区域 - 完全撑满浏览器窗口 */}
-      <div className="relative w-full h-screen shadow-2xl">
+    <div className="min-h-screen bg-white">
+      {/* 图片区域 - 从顶部开始，完全撑满 */}
+      <div className="relative w-full h-screen">
         <Image
           src={data.imageUrl}
           alt={data.title}
