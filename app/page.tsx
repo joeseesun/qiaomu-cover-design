@@ -1072,29 +1072,54 @@ export default function Home() {
     }
   };
 
-  // AI 修图（图片转换）
+  // AI 改图（图片转换 - 异步模式，不删除原图）
   const handleAIImageTransform = async (imageUrl: string, prompt: string) => {
     if (!managerRef.current || !imageToImageGeneratorRef.current) return;
 
-    try {
-      console.log('🎨 开始 AI 修图...', { imageUrl, prompt });
+    // 检查是否配置了 API Key
+    if (!hasApiKeyConfigured()) {
+      setShowSettingsDialog(true);
+      setToast({ show: true, message: '请先配置 API Key', type: 'info' });
+      throw new Error('未配置 API Key');
+    }
 
-      // 调用 API 生成新图片
-      const generatedImageUrl = await imageToImageGeneratorRef.current.generateFromSingleImage(
+    try {
+      // 1. 立即添加占位图到画布（不删除原图）
+      console.log('🎨 添加占位图到画布...');
+      const placeholderImage = await managerRef.current.addAIPlaceholder('2048x2048');
+
+      // 2. 异步生成图片（不阻塞UI）
+      console.log('🚀 开始异步生成图片...', { imageUrl, prompt });
+
+      imageToImageGeneratorRef.current.generateFromSingleImage(
         prompt,
         imageUrl,
-        '2K' // 默认使用 2K 尺寸
-      );
+        '2K'
+      )
+        .then(async (generatedImageUrl) => {
+          console.log('✅ AI 改图成功:', generatedImageUrl);
 
-      console.log('✅ AI 修图成功:', generatedImageUrl);
+          // 替换占位图为真实图片
+          await managerRef.current?.replaceAIPlaceholder(placeholderImage, generatedImageUrl);
+          console.log('✅ 图片已生成并添加到画布');
 
-      // 替换当前图片
-      await managerRef.current.replaceSelectedImage(generatedImageUrl);
-      console.log('✅ 图片已替换为 AI 修图版本');
+          setToast({ show: true, message: 'AI 改图成功!', type: 'success' });
+        })
+        .catch((error) => {
+          // 生成失败，移除占位图并提示
+          console.error('❌ AI 改图失败:', error);
+          managerRef.current?.removeAIPlaceholder(placeholderImage);
+          setToast({
+            show: true,
+            message: error instanceof Error ? error.message : 'AI 改图失败',
+            type: 'error'
+          });
+        });
 
-      setToast({ show: true, message: 'AI 修图成功!', type: 'success' });
+      // 立即返回，不等待生成完成
+      console.log('💡 占位图已添加，图片正在后台生成...');
     } catch (error) {
-      console.error('❌ AI 修图失败:', error);
+      console.error('❌ 添加占位图失败:', error);
       throw error;
     }
   };

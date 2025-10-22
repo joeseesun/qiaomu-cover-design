@@ -440,11 +440,12 @@ export default function ImagePropertiesPanel({
             )}
           </div>
 
-          {/* AI 修图 */}
+          {/* AI 改图 */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">AI修图</h3>
+            <h3 className="text-sm font-semibold mb-4">AI改图</h3>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {/* 输入框 */}
               <input
                 type="text"
                 value={aiPrompt}
@@ -465,8 +466,8 @@ export default function ImagePropertiesPanel({
                         setAiPrompt(''); // 清空输入框
                       }
                     } catch (error) {
-                      console.error('AI 修图失败:', error);
-                      alert(error instanceof Error ? error.message : 'AI 修图失败');
+                      console.error('AI 改图失败:', error);
+                      alert(error instanceof Error ? error.message : 'AI 改图失败');
                     } finally {
                       setIsTransforming(false);
                     }
@@ -476,6 +477,117 @@ export default function ImagePropertiesPanel({
                 disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
+
+              {/* 快捷按钮 */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
+                    if (!imageUrl) {
+                      alert('无法获取图片 URL');
+                      return;
+                    }
+                    setIsTransforming(true);
+                    try {
+                      if (onAIImageTransform) {
+                        await onAIImageTransform(imageUrl, 'cartoon style, vibrant colors, clean lines, animated look');
+                      }
+                    } catch (error) {
+                      console.error('AI 改图失败:', error);
+                      alert(error instanceof Error ? error.message : 'AI 改图失败');
+                    } finally {
+                      setIsTransforming(false);
+                    }
+                  }}
+                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
+                  className="w-full text-xs"
+                >
+                  变卡通风格
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
+                    if (!imageUrl) {
+                      alert('无法获取图片 URL');
+                      return;
+                    }
+                    setIsTransforming(true);
+                    try {
+                      if (onAIImageTransform) {
+                        await onAIImageTransform(imageUrl, 'white background, simple, clean edges');
+                      }
+                    } catch (error) {
+                      console.error('AI 改图失败:', error);
+                      alert(error instanceof Error ? error.message : 'AI 改图失败');
+                    } finally {
+                      setIsTransforming(false);
+                    }
+                  }}
+                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
+                  className="w-full text-xs"
+                >
+                  换白色背景
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
+                    if (!imageUrl) {
+                      alert('无法获取图片 URL');
+                      return;
+                    }
+                    setIsTransforming(true);
+                    try {
+                      if (onAIImageTransform) {
+                        await onAIImageTransform(imageUrl, 'watercolor painting style, soft colors, artistic brush strokes');
+                      }
+                    } catch (error) {
+                      console.error('AI 改图失败:', error);
+                      alert(error instanceof Error ? error.message : 'AI 改图失败');
+                    } finally {
+                      setIsTransforming(false);
+                    }
+                  }}
+                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
+                  className="w-full text-xs"
+                >
+                  水彩画风格
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
+                    if (!imageUrl) {
+                      alert('无法获取图片 URL');
+                      return;
+                    }
+                    setIsTransforming(true);
+                    try {
+                      if (onAIImageTransform) {
+                        await onAIImageTransform(imageUrl, 'minimalist style, simple composition, clean aesthetic');
+                      }
+                    } catch (error) {
+                      console.error('AI 改图失败:', error);
+                      alert(error instanceof Error ? error.message : 'AI 改图失败');
+                    } finally {
+                      setIsTransforming(false);
+                    }
+                  }}
+                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
+                  className="w-full text-xs"
+                >
+                  极简风格
+                </Button>
+              </div>
 
               {isTransforming && (
                 <div className="flex items-center justify-center text-xs text-gray-500">
