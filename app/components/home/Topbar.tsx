@@ -337,11 +337,16 @@ export default function Topbar({
           disabled={isSharing}
         >
           {isSharing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              生成中...
+            </>
           ) : (
-            <Share2 className="h-4 w-4" />
+            <>
+              <Share2 className="h-4 w-4" />
+              分享
+            </>
           )}
-          分享
         </Button>
 
         {/* 更多菜单 */}

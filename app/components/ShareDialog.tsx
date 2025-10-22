@@ -30,8 +30,8 @@ export default function ShareDialog({ shareUrl, onClose }: ShareDialogProps) {
         {/* 标题 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Share2 className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+              <Share2 className="w-5 h-5 text-gray-700" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900">分享成功</h3>
           </div>
@@ -53,15 +53,15 @@ export default function ShareDialog({ shareUrl, onClose }: ShareDialogProps) {
               type="text"
               value={shareUrl}
               readOnly
-              className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
               onClick={(e) => e.currentTarget.select()}
             />
             <button
               onClick={handleCopy}
               className={`px-4 py-3 rounded-lg transition flex items-center gap-2 font-medium whitespace-nowrap ${
                 copied
-                  ? 'bg-green-600 text-white'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
               }`}
             >
               {copied ? (
@@ -78,13 +78,13 @@ export default function ShareDialog({ shareUrl, onClose }: ShareDialogProps) {
             </button>
           </div>
         </div>
-        
+
         {/* 提示 */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-700">
             ✨ 链接已自动复制到剪贴板！分享给好友查看你的作品吧~
           </p>
-          <p className="text-xs text-blue-600 mt-2">
+          <p className="text-xs text-gray-500 mt-2">
             💡 链接有效期 60 天
           </p>
         </div>

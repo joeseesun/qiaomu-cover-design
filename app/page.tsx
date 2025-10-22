@@ -34,7 +34,6 @@ import { updateSVGColor, updateSVGStrokeWidth } from '@/lib/svg-to-fabric';
 import { fabric } from 'fabric';
 import { getImageLibrary } from '@/lib/image-library';
 import ShareDialog from './components/ShareDialog';
-import ShareTitleDialog from './components/ShareTitleDialog';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -80,7 +79,6 @@ export default function Home() {
   const imageToImageGeneratorRef = useRef<ImageToImageGenerator | null>(null);
 
   // 分享功能状态
-  const [showShareTitleDialog, setShowShareTitleDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [isSharing, setIsSharing] = useState(false);
@@ -1207,16 +1205,10 @@ export default function Home() {
     }
   };
 
-  // 分享功能 - 第一步：显示标题输入对话框
-  const handleShareClick = () => {
-    setShowShareTitleDialog(true);
-  };
-
-  // 分享功能 - 第二步：创建分享
-  const handleShareConfirm = async (title: string) => {
+  // 分享功能 - 直接创建分享
+  const handleShareClick = async () => {
     if (!managerRef.current) return;
 
-    setShowShareTitleDialog(false);
     setIsSharing(true);
 
     try {
@@ -1231,7 +1223,16 @@ export default function Home() {
       const imageUrl = await qiniuUploader.uploadFile(file);
       console.log('✅ 上传成功:', imageUrl);
 
-      // 3. 创建分享
+      // 3. 生成默认标题（格式：我的海报-20250122）
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).replace(/\//g, '');
+      const title = `我的海报-${dateStr}`;
+
+      // 4. 创建分享
       console.log('🔗 创建分享链接...');
       const response = await fetch('/api/share/create', {
         method: 'POST',
@@ -1249,11 +1250,11 @@ export default function Home() {
       const data = await response.json();
       console.log('✅ 分享创建成功:', data.url);
 
-      // 4. 显示分享链接
+      // 5. 显示分享链接
       setShareUrl(data.url);
       setShowShareDialog(true);
 
-      // 5. 自动复制到剪贴板
+      // 6. 自动复制到剪贴板
       await navigator.clipboard.writeText(data.url);
       setToast({ show: true, message: '分享链接已复制!', type: 'success' });
     } catch (error) {
@@ -2029,14 +2030,6 @@ export default function Home() {
         onClose={() => setShowIconLibrary(false)}
         onSelectIcon={handleIconSelect}
       />
-
-      {/* 分享标题输入对话框 */}
-      {showShareTitleDialog && (
-        <ShareTitleDialog
-          onConfirm={handleShareConfirm}
-          onCancel={() => setShowShareTitleDialog(false)}
-        />
-      )}
 
       {/* 分享成功对话框 */}
       {showShareDialog && (
