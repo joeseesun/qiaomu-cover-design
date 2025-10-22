@@ -3238,11 +3238,22 @@ export class CanvasManager {
   // 导出为 Blob
   async toBlob(): Promise<Blob> {
     return new Promise((resolve, reject) => {
-      this.canvas.getElement().toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Failed to create blob'))),
-        'image/png',
-        1.0
-      );
+      try {
+        // 使用 toDataURL 然后转换为 Blob（更可靠）
+        const dataURL = this.canvas.toDataURL({
+          format: 'png',
+          quality: 1.0,
+          multiplier: 1,
+        });
+
+        // 将 DataURL 转换为 Blob
+        fetch(dataURL)
+          .then(res => res.blob())
+          .then(blob => resolve(blob))
+          .catch(error => reject(error));
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
