@@ -53,18 +53,9 @@ export class CanvasManager {
         this.saveLastUsedColor('pencilStroke', path.stroke as string);
       }
 
-      // 自动选中刚创建的路径
-      this.canvas.setActiveObject(path);
-      this.canvas.renderAll();
-
-      // 自动退出画笔模式，切换回选择工具
-      this.disableDrawingMode();
-
-      // 触发自定义事件，通知page.tsx切换工具
-      const event = new CustomEvent('pencil:completed');
-      document.dispatchEvent(event);
-
-      console.log('✅ 已自动选中路径并退出画笔模式');
+      // 🆕 保持画笔模式，不自动退出
+      // 用户可以继续画下一笔
+      console.log('✅ 画笔路径已创建，保持画笔模式');
     });
 
     // 全局监听滚动,在任何时候都立即恢复

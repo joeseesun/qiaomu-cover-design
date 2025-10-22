@@ -236,14 +236,14 @@ export default function Home() {
           return;
         }
 
-        // P - 画笔工具
+        // P - 画笔工具（持久化模式）
         if (e.key === 'p' || e.key === 'P') {
           e.preventDefault();
-          const isDrawing = managerRef.current.toggleDrawingMode();
-          setActiveTool(isDrawing ? 'pencil' : 'select');
+          managerRef.current.enableDrawingMode();
+          setActiveTool('pencil');
           setToast({
             show: true,
-            message: isDrawing ? '画笔模式已启用' : '画笔模式已禁用',
+            message: '画笔模式已启用 (按 V 或 ESC 退出)',
             type: 'success'
           });
           return;
@@ -487,12 +487,6 @@ export default function Home() {
       }
     };
 
-    // 监听画笔完成事件
-    const handlePencilCompleted = () => {
-      console.log('🎨 收到画笔完成事件，切换回选择工具');
-      setActiveTool('select');
-    };
-
     // 监听形状绘制完成事件
     const handleShapeCompleted = () => {
       console.log('🎨 收到形状绘制完成事件，切换回选择工具');
@@ -503,7 +497,6 @@ export default function Home() {
     // 🔑 使用 capture 阶段监听，优先于浏览器扩展
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('paste', handlePaste, true);
-    document.addEventListener('pencil:completed', handlePencilCompleted);
     document.addEventListener('shape:completed', handleShapeCompleted);
 
     console.log('✅ 事件监听器已注册（使用 capture 阶段），包括 paste 事件');
@@ -514,7 +507,6 @@ export default function Home() {
       window.removeEventListener('click', handleGlobalClick);
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('paste', handlePaste, true);
-      document.removeEventListener('pencil:completed', handlePencilCompleted);
       document.removeEventListener('shape:completed', handleShapeCompleted);
     };
   }, []); // 空依赖数组，只在组件挂载时执行一次
@@ -582,14 +574,21 @@ export default function Home() {
     } else if (tool === 'textbox' && managerRef.current) {
       managerRef.current.addTextbox(); // 多行文本
     } else if (tool === 'pencil' && managerRef.current) {
-      // 切换画笔模式
-      const isDrawing = managerRef.current.toggleDrawingMode();
-      setActiveTool(isDrawing ? 'pencil' : 'select');
+      // 🆕 启用画笔模式（持久化，不会自动退出）
+      managerRef.current.enableDrawingMode();
       setToast({
         show: true,
-        message: isDrawing ? '画笔模式已启用' : '画笔模式已禁用',
+        message: '画笔模式已启用 (按 V 或 ESC 退出)',
         type: 'success'
       });
+    } else if (tool === 'select' && managerRef.current) {
+      // 🆕 切换到选择模式，退出画笔/形状绘制模式
+      if (managerRef.current.getDrawingMode()) {
+        managerRef.current.disableDrawingMode();
+      }
+      if (managerRef.current.getShapeDrawingMode()) {
+        managerRef.current.exitShapeDrawingMode();
+      }
     } else if (tool === 'image' && managerRef.current) {
       // 显示图片对话框
       setShowImageDialog(true);
