@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy, Share2, X } from 'lucide-react';
+import { Copy, ExternalLink, Share2, X } from 'lucide-react';
 
 interface ShareDialogProps {
   shareUrl: string;
@@ -10,11 +10,15 @@ interface ShareDialogProps {
 
 export default function ShareDialog({ shareUrl, onClose }: ShareDialogProps) {
   const [copied, setCopied] = useState(true); // 默认已复制（自动复制）
-  
+
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleView = () => {
+    window.open(shareUrl, '_blank', 'noopener,noreferrer');
   };
   
   return (
@@ -56,26 +60,23 @@ export default function ShareDialog({ shareUrl, onClose }: ShareDialogProps) {
               className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
               onClick={(e) => e.currentTarget.select()}
             />
-            <button
-              onClick={handleCopy}
-              className={`px-4 py-3 rounded-lg transition flex items-center gap-2 font-medium whitespace-nowrap ${
-                copied
-                  ? 'bg-gray-800 text-white'
-                  : 'bg-gray-900 text-white hover:bg-gray-800'
-              }`}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  已复制
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  复制
-                </>
-              )}
-            </button>
+            {copied ? (
+              <button
+                onClick={handleView}
+                className="px-4 py-3 rounded-lg transition flex items-center gap-2 font-medium whitespace-nowrap bg-gray-800 text-white hover:bg-gray-700"
+              >
+                <ExternalLink className="w-4 h-4" />
+                去查看
+              </button>
+            ) : (
+              <button
+                onClick={handleCopy}
+                className="px-4 py-3 rounded-lg transition flex items-center gap-2 font-medium whitespace-nowrap bg-gray-900 text-white hover:bg-gray-800"
+              >
+                <Copy className="w-4 h-4" />
+                复制
+              </button>
+            )}
           </div>
         </div>
 

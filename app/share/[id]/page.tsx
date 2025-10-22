@@ -57,20 +57,20 @@ export default async function SharePage({
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-3xl">
-        {/* 图片区域 - 完全匹配画布边框 */}
-        <div className="relative w-full mb-8" style={{ aspectRatio: '1/1' }}>
+        {/* 图片区域 - 带阴影 */}
+        <div className="relative w-full mb-8 p-[5px] bg-white rounded-lg shadow-2xl" style={{ aspectRatio: '1/1' }}>
           <Image
             src={data.imageUrl}
             alt={data.title}
             fill
-            className="object-contain"
+            className="object-contain rounded-lg"
             priority
             unoptimized
           />
         </div>
 
         {/* CTA 按钮 - 黑灰渐变 */}
-        <div className="text-center">
+        <div className="text-center mb-8">
           <Link
             href="/"
             className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-gray-900 to-gray-700 text-white font-medium rounded-lg hover:from-gray-800 hover:to-gray-600 transition-all shadow-lg hover:shadow-xl"
@@ -80,6 +80,18 @@ export default async function SharePage({
             </svg>
             创建我的海报
           </Link>
+        </div>
+
+        {/* 底部链接 */}
+        <div className="text-center">
+          <a
+            href="https://x.com/vista8/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 transition"
+          >
+            @乔木画布
+          </a>
         </div>
       </div>
     </div>
