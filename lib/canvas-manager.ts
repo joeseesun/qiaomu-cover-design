@@ -14,7 +14,7 @@ export class CanvasManager {
   private isUndoRedoing: boolean = false;
   private isLoadingTemplate: boolean = false; // 🆕 标记是否正在加载模板
   private saveHistoryTimer: NodeJS.Timeout | null = null;
-  private qiniuUploader: QiniuUploader;
+  public qiniuUploader: QiniuUploader; // 改为 public，允许外部访问
 
   // 图片裁剪相关
   private isCropping: boolean = false;
@@ -3824,6 +3824,66 @@ export class CanvasManager {
 
     image.applyFilters();
     this.canvas.renderAll();
+  }
+
+  /**
+   * 替换当前选中的图片
+   */
+  replaceSelectedImage(newImageUrl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const activeObj = this.canvas.getActiveObject();
+      if (!activeObj || activeObj.type !== 'image') {
+        reject(new Error('没有选中的图片对象'));
+        return;
+      }
+
+      const oldImg = activeObj as fabric.Image;
+
+      // 加载新图片
+      fabric.Image.fromURL(newImageUrl, (newImg) => {
+        if (!newImg) {
+          reject(new Error('加载新图片失败'));
+          return;
+        }
+
+        // 保持原图片的所有属性
+        newImg.set({
+          left: oldImg.left,
+          top: oldImg.top,
+          scaleX: oldImg.scaleX,
+          scaleY: oldImg.scaleY,
+          angle: oldImg.angle,
+          opacity: oldImg.opacity,
+          flipX: oldImg.flipX,
+          flipY: oldImg.flipY,
+          shadow: oldImg.shadow,
+          stroke: oldImg.stroke,
+          strokeWidth: oldImg.strokeWidth,
+          strokeDashArray: oldImg.strokeDashArray,
+          clipPath: oldImg.clipPath,
+          filters: oldImg.filters,
+        });
+
+        // 应用滤镜
+        if (newImg.filters && newImg.filters.length > 0) {
+          newImg.applyFilters();
+        }
+
+        // 移除旧图片
+        this.canvas.remove(oldImg);
+
+        // 添加新图片
+        this.canvas.add(newImg);
+        this.canvas.setActiveObject(newImg);
+        this.canvas.renderAll();
+
+        // 保存历史
+        this.saveHistory();
+
+        console.log('✅ 图片已替换');
+        resolve();
+      });
+    });
   }
 
   /**

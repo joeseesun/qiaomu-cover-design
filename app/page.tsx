@@ -31,6 +31,8 @@ import ImagePropertiesPanel from './components/properties/ImagePropertiesPanel';
 import { getTemplateManager, TemplateCategory } from '@/lib/template-manager';
 import { IconConfig } from '@/lib/icon-library';
 import { updateSVGColor, updateSVGStrokeWidth } from '@/lib/svg-to-fabric';
+import { fabric } from 'fabric';
+import { getImageLibrary } from '@/lib/image-library';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -976,6 +978,100 @@ export default function Home() {
     managerRef.current.setImageSaturation(value);
   };
 
+  // 去背景（Remove.bg API）
+  const handleRemoveBackground = async (imageUrl: string) => {
+    if (!managerRef.current) return;
+
+    try {
+      // 获取 API Key
+      const apiKey = localStorage.getItem('removebg_api_key');
+      if (!apiKey) {
+        throw new Error('请先在设置中配置 Remove.bg API Key');
+      }
+
+      console.log('🎨 开始去除背景...', imageUrl);
+
+      // 调用后端 API
+      const response = await fetch('/api/remove-bg', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl,
+          apiKey,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '去背景失败');
+      }
+
+      const result = await response.json();
+      console.log('✅ 去背景成功:', result.url);
+
+      // 添加到图片库
+      const library = getImageLibrary();
+      const fileName = result.url.split('/').pop() || 'no-bg.png';
+      const isNew = library.addImage(result.url, fileName);
+      console.log('📚 去背景图片已保存到图库:', fileName, '是否新图片:', isNew);
+
+      // 替换当前图片
+      await managerRef.current.replaceSelectedImage(result.url);
+      console.log('✅ 图片已替换为去背景版本');
+    } catch (error) {
+      console.error('❌ 去背景失败:', error);
+      throw error;
+    }
+  };
+
+  // 本地去背景（@imgly/background-removal）
+  const handleRemoveBackgroundLocal = async (imageUrl: string) => {
+    if (!managerRef.current) return;
+
+    try {
+      console.log('🎨 开始本地去除背景...', imageUrl);
+
+      // 动态导入 removeBackground（避免 SSR 问题）
+      const { removeBackground } = await import('@imgly/background-removal');
+
+      // 调用本地 AI 去背景
+      // 使用官方 CDN: https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/
+      const blob = await removeBackground(imageUrl, {
+        publicPath: 'https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/',
+        debug: true,
+        model: 'isnet_fp16', // 使用默认模型 (medium, ~80MB)
+        progress: (key: string, current: number, total: number) => {
+          const progress = Math.round((current / total) * 100);
+          console.log(`📊 处理进度 [${key}]: ${progress}%`);
+        },
+      });
+
+      console.log('✅ 本地去背景成功，大小:', (blob.size / 1024).toFixed(2), 'KB');
+
+      // 上传到七牛云
+      const qiniuUploader = managerRef.current.qiniuUploader;
+      const file = new File([blob], 'local-no-bg.png', { type: 'image/png' });
+      const qiniuUrl = await qiniuUploader.uploadFile(file);
+
+      console.log('✅ 上传到七牛云成功:', qiniuUrl);
+
+      // 添加到图片库
+      const library = getImageLibrary();
+      const fileName = qiniuUrl.split('/').pop() || 'local-no-bg.png';
+      const isNew = library.addImage(qiniuUrl, fileName);
+      console.log('📚 去背景图片已保存到图库:', fileName, '是否新图片:', isNew);
+
+      // 替换当前图片
+      await managerRef.current.replaceSelectedImage(qiniuUrl);
+      console.log('✅ 图片已替换为去背景版本');
+    } catch (error) {
+      console.error('❌ 本地去背景失败:', error);
+      throw error;
+    }
+  };
+
   // 导出
   const handleDownload = async () => {
     if (!managerRef.current) return;
@@ -1455,6 +1551,9 @@ export default function Home() {
                 onBrightnessChange={handleImageBrightnessChange}
                 onContrastChange={handleImageContrastChange}
                 onSaturationChange={handleImageSaturationChange}
+                onRemoveBackground={handleRemoveBackground}
+                onRemoveBackgroundLocal={handleRemoveBackgroundLocal}
+                onOpenSettings={() => setShowSettingsDialog(true)}
               />
             );
           }
