@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FlipHorizontal, FlipVertical } from 'lucide-react';
+import { FlipHorizontal, FlipVertical, Plus, Pencil, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { hasRemoveBgApiKeyConfigured } from '@/app/components/home/SettingsDialog';
+import { getAITransformPromptsManager, AITransformPrompt } from '@/lib/ai-transform-prompts';
 
 interface ImagePropertiesPanelProps {
   selectedObject: any;
@@ -49,9 +50,62 @@ export default function ImagePropertiesPanel({
   const [aiPrompt, setAiPrompt] = useState('');
   const [isTransforming, setIsTransforming] = useState(false);
 
+  // 快捷提示词相关状态
+  const [showQuickPrompts, setShowQuickPrompts] = useState(false);
+  const [quickPrompts, setQuickPrompts] = useState<AITransformPrompt[]>([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newPromptText, setNewPromptText] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
   // 基础属性状态
   const [opacity, setOpacity] = useState(100);
   const [borderRadiusPercent, setBorderRadiusPercent] = useState(0); // 改为百分比
+
+  // 加载快捷提示词
+  useEffect(() => {
+    const manager = getAITransformPromptsManager();
+    setQuickPrompts(manager.getAll());
+  }, []);
+
+  // 添加快速提示词
+  const handleAddPrompt = () => {
+    if (!newPromptText.trim()) return;
+    const manager = getAITransformPromptsManager();
+    manager.add(newPromptText);
+    setQuickPrompts(manager.getAll());
+    setNewPromptText('');
+    setIsAdding(false);
+  };
+
+  // 更新快速提示词
+  const handleUpdatePrompt = (id: string) => {
+    if (!editingText.trim()) return;
+    const manager = getAITransformPromptsManager();
+    manager.update(id, editingText);
+    setQuickPrompts(manager.getAll());
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  // 删除快速提示词
+  const handleDeletePrompt = (id: string) => {
+    const manager = getAITransformPromptsManager();
+    manager.delete(id);
+    setQuickPrompts(manager.getAll());
+  };
+
+  // 开始编辑
+  const startEdit = (promptItem: AITransformPrompt) => {
+    setEditingId(promptItem.id);
+    setEditingText(promptItem.text);
+  };
+
+  // 取消编辑
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
 
   // 同步 selectedObject 的属性到 state
   useEffect(() => {
@@ -442,16 +496,30 @@ export default function ImagePropertiesPanel({
 
           {/* AI 改图 */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">AI改图</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">AI改图</h3>
+              <button
+                type="button"
+                onClick={() => setShowQuickPrompts(!showQuickPrompts)}
+                className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                快捷提示词
+                {showQuickPrompts ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </div>
 
             <div className="space-y-3">
-              {/* 输入框 */}
-              <input
-                type="text"
+              {/* Textarea 输入框 */}
+              <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
                 onKeyDown={async (e) => {
-                  if (e.key === 'Enter' && aiPrompt.trim() && !isTransforming) {
+                  if (e.key === 'Enter' && !e.shiftKey && aiPrompt.trim() && !isTransforming) {
+                    e.preventDefault();
                     // 获取图片 URL
                     const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
                     if (!imageUrl) {
@@ -475,119 +543,175 @@ export default function ImagePropertiesPanel({
                 }}
                 placeholder="输入提示词，回车生成..."
                 disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
               />
 
-              {/* 快捷按钮 */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
-                    if (!imageUrl) {
-                      alert('无法获取图片 URL');
-                      return;
-                    }
-                    setIsTransforming(true);
-                    try {
-                      if (onAIImageTransform) {
-                        await onAIImageTransform(imageUrl, 'cartoon style, vibrant colors, clean lines, animated look');
-                      }
-                    } catch (error) {
-                      console.error('AI 改图失败:', error);
-                      alert(error instanceof Error ? error.message : 'AI 改图失败');
-                    } finally {
-                      setIsTransforming(false);
-                    }
-                  }}
-                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
-                  className="w-full text-xs"
-                >
-                  变卡通风格
-                </Button>
+              {/* 快捷提示词列表（折叠/展开） */}
+              {showQuickPrompts && (
+                <div className="space-y-2">
+                  {/* 新增按钮 */}
+                  {!isAdding && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdding(true);
+                        setNewPromptText('');
+                      }}
+                      disabled={isTransforming}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:border-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      新增
+                    </button>
+                  )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
-                    if (!imageUrl) {
-                      alert('无法获取图片 URL');
-                      return;
-                    }
-                    setIsTransforming(true);
-                    try {
-                      if (onAIImageTransform) {
-                        await onAIImageTransform(imageUrl, 'white background, simple, clean edges');
-                      }
-                    } catch (error) {
-                      console.error('AI 改图失败:', error);
-                      alert(error instanceof Error ? error.message : 'AI 改图失败');
-                    } finally {
-                      setIsTransforming(false);
-                    }
-                  }}
-                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
-                  className="w-full text-xs"
-                >
-                  换白色背景
-                </Button>
+                  {/* 提示词列表容器 */}
+                  <div className="max-h-[200px] overflow-y-auto space-y-2">
+                    {/* 新增输入框 */}
+                    {isAdding && (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={newPromptText}
+                          onChange={(e) => setNewPromptText(e.target.value)}
+                          placeholder="输入新的提示词,按Enter保存,Esc取消"
+                          className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900 placeholder:text-gray-400"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddPrompt();
+                            }
+                            if (e.key === 'Escape') {
+                              setIsAdding(false);
+                              setNewPromptText('');
+                            }
+                          }}
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={handleAddPrompt}
+                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
+                          >
+                            保存
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAdding(false);
+                              setNewPromptText('');
+                            }}
+                            className="p-1 text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
-                    if (!imageUrl) {
-                      alert('无法获取图片 URL');
-                      return;
-                    }
-                    setIsTransforming(true);
-                    try {
-                      if (onAIImageTransform) {
-                        await onAIImageTransform(imageUrl, 'watercolor painting style, soft colors, artistic brush strokes');
-                      }
-                    } catch (error) {
-                      console.error('AI 改图失败:', error);
-                      alert(error instanceof Error ? error.message : 'AI 改图失败');
-                    } finally {
-                      setIsTransforming(false);
-                    }
-                  }}
-                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
-                  className="w-full text-xs"
-                >
-                  水彩画风格
-                </Button>
+                    {/* 提示词列表 */}
+                    {quickPrompts.map((promptItem) => (
+                      <div key={promptItem.id} className="group relative">
+                        {editingId === promptItem.id ? (
+                          // 编辑模式
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                              placeholder="按Enter保存,Esc取消"
+                              className="w-full px-3 py-2 pr-20 text-xs border border-gray-300 rounded bg-gray-50 focus:outline-none focus:border-gray-900 placeholder:text-gray-400"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleUpdatePrompt(promptItem.id);
+                                }
+                                if (e.key === 'Escape') cancelEdit();
+                              }}
+                            />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdatePrompt(promptItem.id)}
+                                className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-800"
+                              >
+                                保存
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEdit}
+                                className="p-1 text-gray-500 hover:text-gray-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // 显示模式
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
+                                if (!imageUrl) {
+                                  alert('无法获取图片 URL');
+                                  return;
+                                }
+                                setIsTransforming(true);
+                                try {
+                                  if (onAIImageTransform) {
+                                    await onAIImageTransform(imageUrl, promptItem.text);
+                                  }
+                                } catch (error) {
+                                  console.error('AI 改图失败:', error);
+                                  alert(error instanceof Error ? error.message : 'AI 改图失败');
+                                } finally {
+                                  setIsTransforming(false);
+                                }
+                              }}
+                              disabled={isTransforming}
+                              className="w-full text-left px-3 py-2 pr-20 text-xs border border-gray-200 rounded hover:border-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed truncate"
+                            >
+                              {promptItem.text}
+                            </button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const imageUrl = selectedObject?._element?.src || selectedObject?.getSrc?.();
-                    if (!imageUrl) {
-                      alert('无法获取图片 URL');
-                      return;
-                    }
-                    setIsTransforming(true);
-                    try {
-                      if (onAIImageTransform) {
-                        await onAIImageTransform(imageUrl, 'minimalist style, simple composition, clean aesthetic');
-                      }
-                    } catch (error) {
-                      console.error('AI 改图失败:', error);
-                      alert(error instanceof Error ? error.message : 'AI 改图失败');
-                    } finally {
-                      setIsTransforming(false);
-                    }
-                  }}
-                  disabled={isTransforming || isRemovingBg || isRemovingBgLocal}
-                  className="w-full text-xs"
-                >
-                  极简风格
-                </Button>
-              </div>
+                            {/* Hover时显示的编辑/删除按钮 */}
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-1 bg-white">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEdit(promptItem);
+                                }}
+                                disabled={isTransforming}
+                                className="p-1.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
+                                title="编辑"
+                              >
+                                <Pencil className="h-3.5 w-3.5 text-gray-600" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePrompt(promptItem.id);
+                                }}
+                                disabled={isTransforming}
+                                className="p-1.5 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 disabled:opacity-50"
+                                title="删除"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {isTransforming && (
                 <div className="flex items-center justify-center text-xs text-gray-500">
