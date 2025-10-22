@@ -33,6 +33,8 @@ import { IconConfig } from '@/lib/icon-library';
 import { updateSVGColor, updateSVGStrokeWidth } from '@/lib/svg-to-fabric';
 import { fabric } from 'fabric';
 import { getImageLibrary } from '@/lib/image-library';
+import ShareDialog from './components/ShareDialog';
+import ShareTitleDialog from './components/ShareTitleDialog';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,6 +78,12 @@ export default function Home() {
   const [showImageToImageDialog, setShowImageToImageDialog] = useState(false);
   const aiImageGeneratorRef = useRef<AIImageGenerator | null>(null);
   const imageToImageGeneratorRef = useRef<ImageToImageGenerator | null>(null);
+
+  // 分享功能状态
+  const [showShareTitleDialog, setShowShareTitleDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
 
   // 初始化 - 只在组件挂载时执行一次
   useEffect(() => {
@@ -1185,7 +1193,7 @@ export default function Home() {
     }
   };
 
-  const handleShare = async () => {
+  const handleCopy = async () => {
     if (!managerRef.current) return;
 
     try {
@@ -1196,6 +1204,67 @@ export default function Home() {
       setToast({ show: true, message: '已复制到剪贴板', type: 'success' });
     } catch (error) {
       setToast({ show: true, message: '复制失败，请使用下载功能', type: 'error' });
+    }
+  };
+
+  // 分享功能 - 第一步：显示标题输入对话框
+  const handleShareClick = () => {
+    setShowShareTitleDialog(true);
+  };
+
+  // 分享功能 - 第二步：创建分享
+  const handleShareConfirm = async (title: string) => {
+    if (!managerRef.current) return;
+
+    setShowShareTitleDialog(false);
+    setIsSharing(true);
+
+    try {
+      // 1. 生成画布图片
+      console.log('🎨 开始生成分享图片...');
+      const blob = await managerRef.current.toBlob();
+
+      // 2. 上传到七牛云
+      console.log('☁️ 上传到七牛云...');
+      const qiniuUploader = managerRef.current.qiniuUploader;
+      const file = new File([blob], `share-${Date.now()}.png`, { type: 'image/png' });
+      const imageUrl = await qiniuUploader.uploadFile(file);
+      console.log('✅ 上传成功:', imageUrl);
+
+      // 3. 创建分享
+      console.log('🔗 创建分享链接...');
+      const response = await fetch('/api/share/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl,
+          title,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('创建分享失败');
+      }
+
+      const data = await response.json();
+      console.log('✅ 分享创建成功:', data.url);
+
+      // 4. 显示分享链接
+      setShareUrl(data.url);
+      setShowShareDialog(true);
+
+      // 5. 自动复制到剪贴板
+      await navigator.clipboard.writeText(data.url);
+      setToast({ show: true, message: '分享链接已复制!', type: 'success' });
+    } catch (error) {
+      console.error('❌ 分享失败:', error);
+      setToast({
+        show: true,
+        message: error instanceof Error ? error.message : '分享失败',
+        type: 'error'
+      });
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -1498,7 +1567,9 @@ export default function Home() {
         onZoomReset={handleZoomReset}
         onPanModeToggle={handlePanModeToggle}
         onDownload={handleDownload}
-        onShare={handleShare}
+        onCopy={handleCopy}
+        onShare={handleShareClick}
+        isSharing={isSharing}
         onOpenSettings={() => setShowSettingsDialog(true)}
         onOpenDonation={() => setShowDonationDialog(true)}
         onOpenWeChat={() => setShowWeChatDialog(true)}
@@ -1958,6 +2029,22 @@ export default function Home() {
         onClose={() => setShowIconLibrary(false)}
         onSelectIcon={handleIconSelect}
       />
+
+      {/* 分享标题输入对话框 */}
+      {showShareTitleDialog && (
+        <ShareTitleDialog
+          onConfirm={handleShareConfirm}
+          onCancel={() => setShowShareTitleDialog(false)}
+        />
+      )}
+
+      {/* 分享成功对话框 */}
+      {showShareDialog && (
+        <ShareDialog
+          shareUrl={shareUrl}
+          onClose={() => setShowShareDialog(false)}
+        />
+      )}
     </div>
   );
 }

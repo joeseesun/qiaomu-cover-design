@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2, Settings, Heart, QrCode, Layout, Save } from 'lucide-react';
+import { Menu, Download, Copy, Plus, ZoomIn, ZoomOut, Pencil, Trash2, Check, X, Database, ChevronDown, Palette, Hand, MousePointer2, Settings, Heart, QrCode, Layout, Save, Share2, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface TopbarProps {
@@ -31,7 +31,9 @@ interface TopbarProps {
   onZoomReset: () => void;
   onPanModeToggle?: () => void;
   onDownload: () => void;
+  onCopy?: () => void;
   onShare: () => void;
+  isSharing?: boolean;
   onOpenSettings?: () => void;
   onOpenDonation?: () => void;
   onOpenWeChat?: () => void;
@@ -56,7 +58,9 @@ export default function Topbar({
   onZoomReset,
   onPanModeToggle,
   onDownload,
+  onCopy,
   onShare,
+  isSharing = false,
   onOpenSettings,
   onOpenDonation,
   onOpenWeChat,
@@ -317,13 +321,27 @@ export default function Topbar({
           </button>
         </div>
 
-        <Button className="h-10 px-6 py-2 gap-2 shadow-sm" onClick={onShare}>
-          <Copy className="h-4 w-4" />
-          复制
-        </Button>
+        {onCopy && (
+          <Button className="h-10 px-6 py-2 gap-2 shadow-sm" onClick={onCopy}>
+            <Copy className="h-4 w-4" />
+            复制
+          </Button>
+        )}
         <Button className="h-10 px-6 py-2 gap-2 shadow-sm" onClick={onDownload}>
           <Download className="h-4 w-4" />
           下载
+        </Button>
+        <Button
+          className="h-10 px-6 py-2 gap-2 shadow-sm"
+          onClick={onShare}
+          disabled={isSharing}
+        >
+          {isSharing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Share2 className="h-4 w-4" />
+          )}
+          分享
         </Button>
 
         {/* 更多菜单 */}
