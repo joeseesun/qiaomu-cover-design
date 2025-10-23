@@ -34,6 +34,7 @@ import { updateSVGColor, updateSVGStrokeWidth } from '@/lib/svg-to-fabric';
 import { fabric } from 'fabric';
 import { getImageLibrary } from '@/lib/image-library';
 import ShareDialog from './components/ShareDialog';
+import ShareMaterialDialog from './components/home/ShareMaterialDialog';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -62,6 +63,7 @@ export default function Home() {
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [showIconLibrary, setShowIconLibrary] = useState(false);
+  const [showShareMaterialDialog, setShowShareMaterialDialog] = useState(false); // 🆕 分享素材对话框
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     message: string;
@@ -1485,6 +1487,66 @@ export default function Home() {
     }
   };
 
+  // 🆕 处理分享素材
+  const handleShareMaterial = async (name: string) => {
+    if (!managerRef.current) return;
+
+    const activeObject = managerRef.current.canvas.getActiveObject();
+    if (!activeObject || activeObject.type !== 'image') {
+      setToast({ show: true, message: '请选择一个图片', type: 'error' });
+      return;
+    }
+
+    try {
+      setToast({ show: true, message: '正在上传素材...', type: 'info' });
+
+      // 导出图片为 base64
+      const imageObj = activeObject as fabric.Image;
+      const dataURL = imageObj.toDataURL({
+        format: 'png',
+        quality: 1,
+      });
+
+      // 上传到七牛云
+      const base64Data = dataURL.split(',')[1];
+      const uploadResponse = await fetch('/api/qiniu/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64: base64Data,
+          filename: `material-${Date.now()}.png`,
+        }),
+      });
+
+      const uploadData = await uploadResponse.json();
+      if (!uploadData.success) {
+        throw new Error('上传图片失败');
+      }
+
+      // 创建共享素材
+      const createResponse = await fetch('/api/materials/public/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          imageUrl: uploadData.url,
+          width: imageObj.width || 0,
+          height: imageObj.height || 0,
+        }),
+      });
+
+      const createData = await createResponse.json();
+      if (createData.success) {
+        setToast({ show: true, message: '素材已分享', type: 'success' });
+      } else {
+        throw new Error('创建共享素材失败');
+      }
+    } catch (error) {
+      console.error('❌ 分享素材失败:', error);
+      setToast({ show: true, message: '分享素材失败', type: 'error' });
+    }
+  };
+
   // 字体面板操作
   const handleFontChange = (fontFamily: string) => {
     managerRef.current?.updateProperty('fontFamily', fontFamily);
@@ -1857,6 +1919,19 @@ export default function Home() {
               <span className="text-xs text-gray-400">⌘⇧D</span>
             </button>
 
+            {/* 🆕 分享素材（仅图片） */}
+            {selectedObject?.type === 'image' && (
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                onClick={() => {
+                  setShowShareMaterialDialog(true);
+                  setContextMenu(null);
+                }}
+              >
+                <span>分享素材</span>
+              </button>
+            )}
+
             <div className="h-px bg-gray-200 my-1" />
 
             {/* 形状专属选项 */}
@@ -2057,6 +2132,13 @@ export default function Home() {
         open={showIconLibrary}
         onClose={() => setShowIconLibrary(false)}
         onSelectIcon={handleIconSelect}
+      />
+
+      {/* 🆕 分享素材对话框 */}
+      <ShareMaterialDialog
+        open={showShareMaterialDialog}
+        onClose={() => setShowShareMaterialDialog(false)}
+        onShare={handleShareMaterial}
       />
 
       {/* 分享成功对话框 */}

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Upload, Image as ImageIcon, Search, Loader2, X, Download, ExternalLink, Shuffle } from 'lucide-react';
+import { Upload, Image as ImageIcon, Search, Loader2, X, Download, ExternalLink, Shuffle, Share2, Trash2 } from 'lucide-react';
 import { getImageLibrary, ImageLibraryItem } from '@/lib/image-library';
 import { searchPhotos, getRandomPhotos, UnsplashPhoto, getPhotoDownloadUrl } from '@/lib/unsplash-api';
 
@@ -43,13 +43,18 @@ export default function ImageDialog({
   onLocalUpload,
   onSelectImage,
 }: ImageDialogProps) {
-  const [activeTab, setActiveTab] = useState<'upload' | 'library' | 'search'>('search');
+  const [activeTab, setActiveTab] = useState<'upload' | 'library' | 'search' | 'shared'>('search');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // 图库相关
   const [libraryImages, setLibraryImages] = useState<ImageLibraryItem[]>([]);
   const [libraryPage, setLibraryPage] = useState(1);
   const LIBRARY_PER_PAGE = 15;
+
+  // 🆕 共享素材相关
+  const [sharedMaterials, setSharedMaterials] = useState<any[]>([]);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
+  const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
 
   // 搜索相关
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +80,29 @@ export default function ImageDialog({
     if (open && activeTab === 'library') {
       loadLibrary();
       setLibraryPage(1); // 重置到第一页
+    }
+  }, [open, activeTab]);
+
+  // 🆕 加载共享素材
+  const loadSharedMaterials = async () => {
+    setIsLoadingShared(true);
+    try {
+      const response = await fetch('/api/materials/public/list');
+      const data = await response.json();
+      if (data.success) {
+        setSharedMaterials(data.materials || []);
+      }
+    } catch (error) {
+      console.error('❌ 加载共享素材失败:', error);
+    } finally {
+      setIsLoadingShared(false);
+    }
+  };
+
+  // 初始加载共享素材
+  useEffect(() => {
+    if (open && activeTab === 'shared') {
+      loadSharedMaterials();
     }
   }, [open, activeTab]);
 
@@ -219,6 +247,43 @@ export default function ImageDialog({
     }
   };
 
+  // 🆕 选择共享素材
+  const handleSelectSharedMaterial = (imageUrl: string) => {
+    onSelectImage(imageUrl);
+    onClose();
+  };
+
+  // 🆕 删除共享素材（需要输入"我确认"）
+  const handleDeleteSharedMaterial = async (materialId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const confirmation = prompt('此操作不可恢复，请输入"我确认"以继续：');
+    if (confirmation !== '我确认') {
+      return;
+    }
+
+    setDeletingMaterialId(materialId);
+    try {
+      const response = await fetch(`/api/materials/public/${materialId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // 刷新列表
+        await loadSharedMaterials();
+        alert('素材已删除');
+      } else {
+        alert('删除失败');
+      }
+    } catch (error) {
+      console.error('❌ 删除共享素材失败:', error);
+      alert('删除失败');
+    } finally {
+      setDeletingMaterialId(null);
+    }
+  };
+
   // 删除图库图片
   const handleDeleteLibraryImage = (url: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -255,18 +320,22 @@ export default function ImageDialog({
       <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
         <DialogTitle className="sr-only">插入图片</DialogTitle>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
-          <TabsList className="mx-6 mt-6 mb-0 grid grid-cols-3 w-auto border-b rounded-none bg-transparent">
-            <TabsTrigger value="upload" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              <span>本地上传</span>
+          <TabsList className="mx-6 mt-6 mb-0 grid grid-cols-4 w-auto border-b rounded-none bg-transparent">
+            <TabsTrigger value="search" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              <span>网络搜图</span>
+            </TabsTrigger>
+            <TabsTrigger value="shared" className="flex items-center gap-2">
+              <Share2 className="h-4 w-4" />
+              <span>共享素材</span>
             </TabsTrigger>
             <TabsTrigger value="library" className="flex items-center gap-2">
               <ImageIcon className="h-4 w-4" />
               <span>图库选择</span>
             </TabsTrigger>
-            <TabsTrigger value="search" className="flex items-center gap-2">
-              <Search className="h-4 w-4" />
-              <span>网络搜图</span>
+            <TabsTrigger value="upload" className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              <span>本地上传</span>
             </TabsTrigger>
           </TabsList>
 
@@ -286,6 +355,60 @@ export default function ImageDialog({
                 💡 上传的图片会自动保存到图库
               </p>
             </button>
+          </TabsContent>
+
+          {/* 🆕 共享素材 Tab */}
+          <TabsContent value="shared" className="flex-1 flex flex-col">
+            {isLoadingShared ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+                  <p className="text-sm text-muted-foreground">加载中...</p>
+                </div>
+              </div>
+            ) : sharedMaterials.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-6">
+                <Share2 className="h-16 w-16 mb-4 opacity-20" />
+                <p className="text-lg">暂无共享素材</p>
+                <p className="text-sm mt-2">选中图片后右键「分享素材」即可分享</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {sharedMaterials.map((material) => (
+                    <div
+                      key={material.id}
+                      className="group relative aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-primary cursor-pointer transition-all"
+                      onClick={() => handleSelectSharedMaterial(material.imageUrl)}
+                    >
+                      <img
+                        src={material.imageUrl}
+                        alt={material.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {/* 素材名称 */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                        <p className="text-white text-xs truncate">{material.name}</p>
+                      </div>
+                      {/* 删除按钮 */}
+                      <button
+                        onClick={(e) => handleDeleteSharedMaterial(material.id, e)}
+                        disabled={deletingMaterialId === material.id}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                        title="删除（需输入确认）"
+                      >
+                        {deletingMaterialId === material.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* 图库选择 Tab */}
