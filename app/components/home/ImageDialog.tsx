@@ -55,6 +55,11 @@ export default function ImageDialog({
   const [sharedMaterials, setSharedMaterials] = useState<any[]>([]);
   const [isLoadingShared, setIsLoadingShared] = useState(false);
   const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
+  const [sharedPage, setSharedPage] = useState(1);
+  const [sharedTotalPages, setSharedTotalPages] = useState(0);
+  const [sharedTotal, setSharedTotal] = useState(0);
+  const [sharedSearchQuery, setSharedSearchQuery] = useState('');
+  const SHARED_PER_PAGE = 20;
 
   // 搜索相关
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,14 +88,22 @@ export default function ImageDialog({
     }
   }, [open, activeTab]);
 
-  // 🆕 加载共享素材
-  const loadSharedMaterials = async () => {
+  // 🆕 加载共享素材（支持分页和搜索）
+  const loadSharedMaterials = async (page = 1, search = '') => {
     setIsLoadingShared(true);
     try {
-      const response = await fetch('/api/materials/public/list');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: SHARED_PER_PAGE.toString(),
+        search,
+      });
+      const response = await fetch(`/api/materials/public/list?${params}`);
       const data = await response.json();
       if (data.success) {
         setSharedMaterials(data.materials || []);
+        setSharedTotal(data.total || 0);
+        setSharedTotalPages(data.totalPages || 0);
+        setSharedPage(page);
       }
     } catch (error) {
       console.error('❌ 加载共享素材失败:', error);
@@ -102,9 +115,18 @@ export default function ImageDialog({
   // 初始加载共享素材
   useEffect(() => {
     if (open && activeTab === 'shared') {
-      loadSharedMaterials();
+      setSharedPage(1);
+      setSharedSearchQuery('');
+      loadSharedMaterials(1, '');
     }
   }, [open, activeTab]);
+
+  // 🆕 共享素材搜索处理
+  const handleSharedSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSharedPage(1);
+    loadSharedMaterials(1, sharedSearchQuery);
+  };
 
   // 初始加载随机图片和最近搜索
   useEffect(() => {
@@ -270,8 +292,8 @@ export default function ImageDialog({
 
       const data = await response.json();
       if (data.success) {
-        // 刷新列表
-        await loadSharedMaterials();
+        // 刷新当前页（保持搜索条件）
+        await loadSharedMaterials(sharedPage, sharedSearchQuery);
         alert('素材已删除');
       } else {
         alert('删除失败');
@@ -359,6 +381,43 @@ export default function ImageDialog({
 
           {/* 🆕 共享素材 Tab */}
           <TabsContent value="shared" className="flex-1 flex flex-col">
+            {/* 搜索框 */}
+            <div className="px-6 pt-6 pb-4">
+              <form onSubmit={handleSharedSearch} className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="搜索素材名称..."
+                  value={sharedSearchQuery}
+                  onChange={(e) => setSharedSearchQuery(e.target.value)}
+                  className="flex-1"
+                />
+                <Button type="submit" disabled={isLoadingShared}>
+                  <Search className="h-4 w-4 mr-2" />
+                  搜索
+                </Button>
+                {sharedSearchQuery && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSharedSearchQuery('');
+                      setSharedPage(1);
+                      loadSharedMaterials(1, '');
+                    }}
+                  >
+                    清除
+                  </Button>
+                )}
+              </form>
+              {/* 显示总数 */}
+              {sharedTotal > 0 && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  共 {sharedTotal} 个素材
+                  {sharedSearchQuery && ` · 搜索"${sharedSearchQuery}"`}
+                </p>
+              )}
+            </div>
+
             {isLoadingShared ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
@@ -369,45 +428,76 @@ export default function ImageDialog({
             ) : sharedMaterials.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-6">
                 <Share2 className="h-16 w-16 mb-4 opacity-20" />
-                <p className="text-lg">暂无共享素材</p>
-                <p className="text-sm mt-2">选中图片后右键「分享素材」即可分享</p>
+                <p className="text-lg">
+                  {sharedSearchQuery ? '未找到匹配的素材' : '暂无共享素材'}
+                </p>
+                <p className="text-sm mt-2">
+                  {sharedSearchQuery ? '尝试其他关键词' : '选中图片后右键「分享素材」即可分享'}
+                </p>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {sharedMaterials.map((material) => (
-                    <div
-                      key={material.id}
-                      className="group relative aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-primary cursor-pointer transition-all"
-                      onClick={() => handleSelectSharedMaterial(material.imageUrl)}
-                    >
-                      <img
-                        src={material.imageUrl}
-                        alt={material.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      {/* 素材名称 */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                        <p className="text-white text-xs truncate">{material.name}</p>
-                      </div>
-                      {/* 删除按钮 */}
-                      <button
-                        onClick={(e) => handleDeleteSharedMaterial(material.id, e)}
-                        disabled={deletingMaterialId === material.id}
-                        className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
-                        title="删除（需输入确认）"
+              <>
+                <div className="flex-1 overflow-y-auto px-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {sharedMaterials.map((material) => (
+                      <div
+                        key={material.id}
+                        className="group relative aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-primary cursor-pointer transition-all"
+                        onClick={() => handleSelectSharedMaterial(material.imageUrl)}
                       >
-                        {deletingMaterialId === material.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
+                        <img
+                          src={material.imageUrl}
+                          alt={material.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {/* 素材名称 */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <p className="text-white text-xs truncate">{material.name}</p>
+                        </div>
+                        {/* 删除按钮 */}
+                        <button
+                          onClick={(e) => handleDeleteSharedMaterial(material.id, e)}
+                          disabled={deletingMaterialId === material.id}
+                          className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                          title="删除（需输入确认）"
+                        >
+                          {deletingMaterialId === material.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                {/* 分页控件 */}
+                {sharedTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 px-6 py-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadSharedMaterials(sharedPage - 1, sharedSearchQuery)}
+                      disabled={sharedPage === 1 || isLoadingShared}
+                    >
+                      上一页
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      第 {sharedPage} / {sharedTotalPages} 页
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadSharedMaterials(sharedPage + 1, sharedSearchQuery)}
+                      disabled={sharedPage === sharedTotalPages || isLoadingShared}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
 
