@@ -28,13 +28,15 @@ export default function TemplateLibraryDialog({
   currentCanvasSize,
 }: TemplateLibraryDialogProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all'>('all');
+  const [publicTemplates, setPublicTemplates] = useState<Template[]>([]); // 🆕 网友分享的模板
+  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all' | '网友分享'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null);
   const [showAllSizes, setShowAllSizes] = useState(true); // 默认显示所有尺寸
   const [isGenerating, setIsGenerating] = useState(false); // 是否正在生成缩略图
   const [generateProgress, setGenerateProgress] = useState<string[]>([]); // 生成进度日志
   const [debugMode, setDebugMode] = useState(false); // 调试模式（Ctrl+Option+Command+4）
+  const [isLoadingPublic, setIsLoadingPublic] = useState(false); // 🆕 是否正在加载公开模板
 
   // 🆕 清除所有预设模板缓存并重新加载
   const clearPresetCache = () => {
@@ -200,8 +202,29 @@ export default function TemplateLibraryDialog({
       allTemplates.slice(0, 3).forEach(t => {
         console.log(`📸 ${t.name}: ${t.thumbnail?.substring(0, 50)}...`);
       });
+
+      // 🆕 加载公开模板
+      loadPublicTemplates();
     }
   }, [open]);
+
+  // 🆕 加载公开模板
+  const loadPublicTemplates = async () => {
+    setIsLoadingPublic(true);
+    try {
+      const response = await fetch('/api/templates/public/list');
+      const data = await response.json();
+
+      if (data.success) {
+        setPublicTemplates(data.templates || []);
+        console.log('✅ 加载公开模板成功，数量:', data.templates?.length || 0);
+      }
+    } catch (error) {
+      console.error('❌ 加载公开模板失败:', error);
+    } finally {
+      setIsLoadingPublic(false);
+    }
+  };
 
   // 监听快捷键 Ctrl + Option + Command + 4 来启用调试模式
   useEffect(() => {
@@ -221,25 +244,36 @@ export default function TemplateLibraryDialog({
   }, [open, debugMode]);
 
   // 过滤模板
-  const filteredTemplates = templates.filter(template => {
-    const matchCategory = selectedCategory === 'all' || template.category === selectedCategory;
-    const matchSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // 🆕 如果不显示所有尺寸，则只显示匹配当前画布比例的模板
-    let matchSize = true;
-    if (!showAllSizes && currentCanvasSize) {
-      const currentRatio = currentCanvasSize.width / currentCanvasSize.height;
-      const templateRatio = template.canvasSize.width / template.canvasSize.height;
-      matchSize = Math.abs(currentRatio - templateRatio) < 0.05;
+  const filteredTemplates = (() => {
+    // 🆕 如果选择「网友分享」，显示公开模板
+    if (selectedCategory === '网友分享') {
+      return publicTemplates.filter(template =>
+        template.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
 
-    return matchCategory && matchSearch && matchSize;
-  });
+    // 否则显示本地模板
+    return templates.filter(template => {
+      const matchCategory = selectedCategory === 'all' || template.category === selectedCategory;
+      const matchSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // 🆕 如果不显示所有尺寸，则只显示匹配当前画布比例的模板
+      let matchSize = true;
+      if (!showAllSizes && currentCanvasSize) {
+        const currentRatio = currentCanvasSize.width / currentCanvasSize.height;
+        const templateRatio = template.canvasSize.width / template.canvasSize.height;
+        matchSize = Math.abs(currentRatio - templateRatio) < 0.05;
+      }
+
+      return matchCategory && matchSearch && matchSize;
+    });
+  })();
 
   // 获取所有分类（按画布尺寸，自定义提前）
-  const categories: (TemplateCategory | 'all')[] = [
+  const categories: (TemplateCategory | 'all' | '网友分享')[] = [
     'all',
     '自定义',
+    '网友分享', // 🆕 新增网友分享分类
     '3:4 竖版',
     '1:1 方形',
     '4:3 横版',
@@ -311,19 +345,31 @@ export default function TemplateLibraryDialog({
           {/* 左侧分类导航 */}
           <div className="w-48 border-r bg-gray-50 p-4 overflow-y-auto">
             <div className="space-y-1">
-              {categories.map(category => (
-                <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedCategory === category
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {category === 'all' ? '全部模板' : category}
-                </button>
-              ))}
+              {categories.map(category => {
+                // 🆕 计算每个分类的模板数量
+                const count = category === '网友分享'
+                  ? publicTemplates.length
+                  : category === 'all'
+                  ? templates.length
+                  : templates.filter(t => t.category === category).length;
+
+                return (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
+                      selectedCategory === category
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span>{category === 'all' ? '全部模板' : category}</span>
+                    <span className={`text-xs ${selectedCategory === category ? 'text-gray-300' : 'text-gray-400'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -363,9 +409,17 @@ export default function TemplateLibraryDialog({
 
             {/* 模板网格 */}
             <div className="flex-1 overflow-y-auto p-4">
-              {filteredTemplates.length === 0 ? (
+              {/* 🆕 加载状态 */}
+              {selectedCategory === '网友分享' && isLoadingPublic ? (
                 <div className="flex items-center justify-center h-full text-gray-400">
-                  暂无模板
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+                    <div>加载中...</div>
+                  </div>
+                </div>
+              ) : filteredTemplates.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  {selectedCategory === '网友分享' ? '暂无公开模板' : '暂无模板'}
                 </div>
               ) : (
                 <div className="grid grid-cols-5 gap-4">
@@ -391,8 +445,8 @@ export default function TemplateLibraryDialog({
                           </div>
                         </div>
 
-                        {/* 删除按钮（仅自定义模板） */}
-                        {!template.isPreset && (
+                        {/* 删除按钮（仅自定义模板，网友分享的模板不显示） */}
+                        {!template.isPreset && selectedCategory !== '网友分享' && (
                           <button
                             onClick={(e) => handleDelete(template.id, e)}
                             className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"

@@ -17,6 +17,7 @@ export interface Template {
   canvasJSON: string; // Fabric.js canvas.toJSON() 的 JSON 字符串
   thumbnail?: string; // 缩略图 base64 或 URL
   isPreset: boolean; // 是否为预设模板
+  isPublic?: boolean; // 是否公开分享
   createdAt: number;
 }
 
@@ -141,11 +142,12 @@ export class TemplateManager {
   async saveFromCanvas(
     canvas: fabric.Canvas,
     name: string,
-    category: TemplateCategory = '自定义'
+    category: TemplateCategory = '自定义',
+    isPublic: boolean = false
   ): Promise<Template> {
     // 获取画布 JSON
     const canvasJSON = JSON.stringify(canvas.toJSON());
-    
+
     // 生成缩略图
     const thumbnail = await this.generateThumbnail(canvas);
 
@@ -160,6 +162,7 @@ export class TemplateManager {
       canvasJSON,
       thumbnail,
       isPreset: false,
+      isPublic,
     });
 
     return template;

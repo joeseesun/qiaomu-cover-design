@@ -1426,13 +1426,41 @@ export default function Home() {
   };
 
   // 保存为模板
-  const handleSaveAsTemplate = async (name: string, category: TemplateCategory) => {
+  const handleSaveAsTemplate = async (name: string, category: TemplateCategory, isPublic: boolean) => {
     if (!managerRef.current) return;
 
     try {
       const templateManager = getTemplateManager();
-      await templateManager.saveFromCanvas(managerRef.current.canvas, name, category);
-      setToast({ show: true, message: '模板保存成功', type: 'success' });
+      const template = await templateManager.saveFromCanvas(managerRef.current.canvas, name, category, isPublic);
+
+      // 如果选择公开分享，上传到云端
+      if (isPublic) {
+        try {
+          const response = await fetch('/api/templates/public/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: template.name,
+              category: template.category,
+              canvasSize: template.canvasSize,
+              canvasJSON: template.canvasJSON,
+              thumbnail: template.thumbnail,
+            }),
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            setToast({ show: true, message: '模板已保存并公开分享', type: 'success' });
+          } else {
+            setToast({ show: true, message: '模板已保存，但公开分享失败', type: 'warning' });
+          }
+        } catch (error) {
+          console.error('❌ 上传公开模板失败:', error);
+          setToast({ show: true, message: '模板已保存，但公开分享失败', type: 'warning' });
+        }
+      } else {
+        setToast({ show: true, message: '模板保存成功', type: 'success' });
+      }
     } catch (error) {
       console.error('❌ 保存模板失败:', error);
       setToast({ show: true, message: '保存模板失败', type: 'error' });

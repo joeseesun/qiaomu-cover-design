@@ -14,7 +14,7 @@ import { TemplateCategory } from '@/lib/template-manager';
 interface SaveTemplateDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (name: string, category: TemplateCategory) => void;
+  onSave: (name: string, category: TemplateCategory, isPublic: boolean) => void;
 }
 
 export default function SaveTemplateDialog({
@@ -23,6 +23,7 @@ export default function SaveTemplateDialog({
   onSave,
 }: SaveTemplateDialogProps) {
   const [name, setName] = useState('');
+  const [isPublic, setIsPublic] = useState(true); // 默认勾选
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -31,13 +32,15 @@ export default function SaveTemplateDialog({
     }
 
     // 固定使用"自定义"分类
-    onSave(name.trim(), '自定义');
+    onSave(name.trim(), '自定义', isPublic);
     setName('');
+    setIsPublic(true); // 重置为默认勾选
     onClose();
   };
 
   const handleClose = () => {
     setName('');
+    setIsPublic(true); // 重置为默认勾选
     onClose();
   };
 
@@ -62,6 +65,25 @@ export default function SaveTemplateDialog({
                 if (e.key === 'Enter') handleSave();
               }}
             />
+          </div>
+
+          {/* 公开分享 */}
+          <div className="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              id="public-share"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+            />
+            <div className="flex-1">
+              <Label htmlFor="public-share" className="cursor-pointer font-normal">
+                公开分享
+              </Label>
+              <p className="text-xs text-gray-500 mt-1">
+                勾选后，其他用户可以在「网友分享」中看到并使用此模板
+              </p>
+            </div>
           </div>
         </div>
 
