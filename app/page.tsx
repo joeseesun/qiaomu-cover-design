@@ -146,7 +146,8 @@ export default function Home() {
       if (target) {
         managerRef.current!.canvas.setActiveObject(target);
         managerRef.current!.canvas.renderAll();
-        setContextMenu({ x: e.clientX, y: e.clientY });
+        // 使用 pageX/pageY 而不是 clientX/clientY，避免高 DPI 屏幕缩放问题
+        setContextMenu({ x: e.pageX, y: e.pageY });
         console.log('✅ 显示菜单');
       } else {
         setContextMenu(null);
@@ -780,13 +781,14 @@ export default function Home() {
     const pointer = managerRef.current.canvas.getPointer(e.nativeEvent);
     const target = managerRef.current.canvas.findTarget(e.nativeEvent as any, false);
 
-    console.log('🖱️ 右键点击:', { target: target?.type, pointer, clientX: e.clientX, clientY: e.clientY });
+    console.log('🖱️ 右键点击:', { target: target?.type, pointer, pageX: e.pageX, pageY: e.pageY });
 
     if (target) {
       // 如果点击了对象,选中它并显示菜单
       managerRef.current.canvas.setActiveObject(target);
       managerRef.current.canvas.renderAll();
-      setContextMenu({ x: e.clientX, y: e.clientY });
+      // 使用 pageX/pageY 而不是 clientX/clientY，避免高 DPI 屏幕缩放问题
+      setContextMenu({ x: e.pageX, y: e.pageY });
       console.log('✅ 菜单应该显示了');
     } else {
       // 点击空白区域,关闭菜单
