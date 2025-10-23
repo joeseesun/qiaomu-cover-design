@@ -1534,6 +1534,46 @@ export default function Home() {
     }
   };
 
+  // 🆕 复制图片到剪贴板
+  const handleCopyImageToClipboard = async () => {
+    if (!managerRef.current) return;
+
+    const activeObject = managerRef.current.canvas.getActiveObject();
+    if (!activeObject || activeObject.type !== 'image') {
+      setToast({ show: true, message: '请选择一个图片', type: 'error' });
+      return;
+    }
+
+    try {
+      setToast({ show: true, message: '正在复制...', type: 'info' });
+
+      const imageObj = activeObject as fabric.Image;
+
+      // 导出图片为 blob
+      const dataURL = imageObj.toDataURL({
+        format: 'png',
+        quality: 1,
+        enableRetinaScaling: false,
+      });
+
+      // 将 base64 转换为 blob
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
+
+      // 复制到剪贴板
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob,
+        }),
+      ]);
+
+      setToast({ show: true, message: '已复制到剪贴板', type: 'success' });
+    } catch (error) {
+      console.error('❌ 复制到剪贴板失败:', error);
+      setToast({ show: true, message: '复制失败，请重试', type: 'error' });
+    }
+  };
+
   // 字体面板操作
   const handleFontChange = (fontFamily: string) => {
     managerRef.current?.updateProperty('fontFamily', fontFamily);
@@ -1906,17 +1946,28 @@ export default function Home() {
               <span className="text-xs text-gray-400">⌘⇧D</span>
             </button>
 
-            {/* 🆕 分享素材（仅图片） */}
+            {/* 🆕 图片专属选项 */}
             {selectedObject?.type === 'image' && (
-              <button
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                onClick={() => {
-                  setShowShareMaterialDialog(true);
-                  setContextMenu(null);
-                }}
-              >
-                <span>分享素材</span>
-              </button>
+              <>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                  onClick={() => {
+                    handleCopyImageToClipboard();
+                    setContextMenu(null);
+                  }}
+                >
+                  <span>复制到剪贴板</span>
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                  onClick={() => {
+                    setShowShareMaterialDialog(true);
+                    setContextMenu(null);
+                  }}
+                >
+                  <span>分享素材</span>
+                </button>
+              </>
             )}
 
             <div className="h-px bg-gray-200 my-1" />
