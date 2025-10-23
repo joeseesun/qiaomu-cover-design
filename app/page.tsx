@@ -1498,38 +1498,25 @@ export default function Home() {
     }
 
     try {
-      setToast({ show: true, message: '正在上传素材...', type: 'info' });
+      setToast({ show: true, message: '正在分享素材...', type: 'info' });
 
-      // 导出图片为 base64
       const imageObj = activeObject as fabric.Image;
-      const dataURL = imageObj.toDataURL({
-        format: 'png',
-        quality: 1,
-      });
 
-      // 上传到七牛云
-      const base64Data = dataURL.split(',')[1];
-      const uploadResponse = await fetch('/api/qiniu/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base64: base64Data,
-          filename: `material-${Date.now()}.png`,
-        }),
-      });
+      // 获取图片的原始 URL（如果有的话）
+      const imageSrc = (imageObj as any).getSrc?.() || (imageObj as any)._originalElement?.src;
 
-      const uploadData = await uploadResponse.json();
-      if (!uploadData.success) {
-        throw new Error('上传图片失败');
+      if (!imageSrc) {
+        setToast({ show: true, message: '无法获取图片源', type: 'error' });
+        return;
       }
 
-      // 创建共享素材
+      // 直接使用图片 URL 创建共享素材
       const createResponse = await fetch('/api/materials/public/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          imageUrl: uploadData.url,
+          imageUrl: imageSrc,
           width: imageObj.width || 0,
           height: imageObj.height || 0,
         }),
