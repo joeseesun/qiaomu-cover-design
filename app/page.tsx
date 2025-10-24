@@ -212,6 +212,18 @@ export default function Home() {
 
       // 工具快捷键(不需要Cmd/Ctrl修饰键,但要避免在输入框中触发)
       if (!isInputFocused && managerRef.current) {
+        // Enter - 进入文本编辑模式（仅当选中文本对象时）
+        if (e.key === 'Enter') {
+          const activeObject = managerRef.current.canvas.getActiveObject();
+          if (activeObject && (activeObject.type === 'i-text' || activeObject.type === 'textbox')) {
+            e.preventDefault();
+            // 进入编辑模式
+            (activeObject as any).enterEditing();
+            (activeObject as any).selectAll();
+            return;
+          }
+        }
+
         // T - 文本工具
         if (e.key === 't' || e.key === 'T') {
           e.preventDefault();
