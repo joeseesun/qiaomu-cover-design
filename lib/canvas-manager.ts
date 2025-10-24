@@ -147,7 +147,19 @@ export class CanvasManager {
     // 监听图片双击事件，进入裁剪模式
     this.canvas.on('mouse:dblclick', (e) => {
       const target = e.target;
+      // 只有直接点击图片时才进入裁剪模式
+      // 如果点击的是文本对象（即使文本在图片上），不触发图片裁剪
       if (target && target.type === 'image' && !this.isCropping) {
+        // 检查是否点击在文本对象上
+        const pointer = this.canvas.getPointer(e.e);
+        const clickedObject = this.canvas.findTarget(e.e as any, false);
+
+        // 如果点击的对象是文本类型，不进入裁剪模式
+        if (clickedObject && (clickedObject.type === 'i-text' || clickedObject.type === 'textbox')) {
+          console.log('🚫 点击了文本对象，不进入图片裁剪模式');
+          return;
+        }
+
         this.enterCropMode(target as fabric.Image);
       }
     });
@@ -3359,17 +3371,95 @@ export class CanvasManager {
   // 下载选中对象为图片
   async downloadObject(obj?: fabric.Object, filename?: string) {
     try {
-      const blob = await this.exportObjectToBlob(obj);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = filename || `object-${Date.now()}.png`;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
+      // 如果没有传入对象，使用当前选中的对象
+      const targetObj = obj || this.canvas.getActiveObject();
+      if (!targetObj) {
+        throw new Error('没有选中的对象');
+      }
+
+      // 检查是否是多选（ActiveSelection）
+      if (targetObj.type === 'activeSelection') {
+        console.log('📦 检测到多选对象，导出为合并图片');
+        // 多选对象：导出整个选区为一张图片
+        const blob = await this.exportSelectionToBlob(targetObj as fabric.ActiveSelection);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename || `selection-${Date.now()}.png`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // 单个对象：使用原有逻辑
+        const blob = await this.exportObjectToBlob(targetObj);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename || `object-${Date.now()}.png`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('❌ 下载对象失败:', error);
       throw error;
     }
+  }
+
+  // 导出多选对象为 Blob
+  private async exportSelectionToBlob(selection: fabric.ActiveSelection): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      try {
+        // 获取选区的边界框
+        const boundingRect = selection.getBoundingRect();
+        const padding = 20; // 添加一些内边距
+
+        // 创建临时画布
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = boundingRect.width + padding * 2;
+        tempCanvas.height = boundingRect.height + padding * 2;
+
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('无法创建canvas context'));
+          return;
+        }
+
+        // 设置白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // 保存当前状态
+        ctx.save();
+
+        // 移动到中心位置
+        ctx.translate(
+          padding - boundingRect.left,
+          padding - boundingRect.top
+        );
+
+        // 渲染选区中的所有对象
+        const objects = (selection as any)._objects || [];
+        objects.forEach((obj: fabric.Object) => {
+          obj.render(ctx);
+        });
+
+        ctx.restore();
+
+        // 转换为Blob
+        tempCanvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   // 生成缩略图
