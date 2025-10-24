@@ -2125,26 +2125,27 @@ export default function Home() {
               <span>置于底层</span>
               <span className="text-xs text-gray-400">⌘⇧[</span>
             </button>
+                </>
               )}
             </div>
 
             {/* 填充颜色选择器 */}
             {!isLocked && showShapeFillPicker && (
-            <div
-              className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
-              style={{ left: contextMenu.x + 180, top: contextMenu.y }}
-            >
-              <HexColorPicker
-                color={(selectedObject as any).fill || '#3b82f6'}
-                onChange={(color) => {
-                  if (selectedObject) {
-                    selectedObject.set('fill', color);
-                    managerRef.current?.canvas.renderAll();
-                  }
-                }}
-              />
-            </div>
-          )}
+              <div
+                className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
+                style={{ left: contextMenu.x + 180, top: contextMenu.y }}
+              >
+                <HexColorPicker
+                  color={(selectedObject as any).fill || '#3b82f6'}
+                  onChange={(color) => {
+                    if (selectedObject) {
+                      selectedObject.set('fill', color);
+                      managerRef.current?.canvas.renderAll();
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             {/* 边框颜色选择器 */}
             {!isLocked && showShapeStrokePicker && (
