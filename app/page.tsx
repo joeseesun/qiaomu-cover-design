@@ -146,7 +146,9 @@ export default function Home() {
       // 从上到下查找鼠标位置的对象（包括锁定的对象）
       for (let i = allObjects.length - 1; i >= 0; i--) {
         const obj = allObjects[i];
-        if (obj.containsPoint(pointer)) {
+        // 创建 Fabric.js Point 对象
+        const point = new fabric.Point(pointer.x, pointer.y);
+        if (obj.containsPoint(point)) {
           target = obj;
           break;
         }
