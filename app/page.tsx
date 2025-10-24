@@ -139,15 +139,31 @@ export default function Home() {
       e.stopPropagation();
 
       const pointer = managerRef.current!.canvas.getPointer(e);
-      const target = managerRef.current!.canvas.findTarget(e as any, false);
+      // 使用 skipGroup: false 来查找所有对象，包括锁定的对象
+      const allObjects = managerRef.current!.canvas.getObjects();
+      let target = null;
 
-      console.log('🖱️ 右键点击:', { target: target?.type, pointer });
+      // 从上到下查找鼠标位置的对象（包括锁定的对象）
+      for (let i = allObjects.length - 1; i >= 0; i--) {
+        const obj = allObjects[i];
+        if (obj.containsPoint(pointer)) {
+          target = obj;
+          break;
+        }
+      }
+
+      console.log('🖱️ 右键点击:', { target: target?.type, locked: (target as any)?.locked, pointer });
 
       if (target) {
-        managerRef.current!.canvas.setActiveObject(target);
-        managerRef.current!.canvas.renderAll();
+        // 如果对象未锁定，设置为选中状态
+        if (!(target as any).locked) {
+          managerRef.current!.canvas.setActiveObject(target);
+          managerRef.current!.canvas.renderAll();
+        }
         // 使用 pageX/pageY 而不是 clientX/clientY，避免高 DPI 屏幕缩放问题
         setContextMenu({ x: e.pageX, y: e.pageY });
+        // 保存右键点击的对象（用于锁定对象的菜单）
+        (setContextMenu as any).clickedObject = target;
         console.log('✅ 显示菜单');
       } else {
         setContextMenu(null);
@@ -357,6 +373,21 @@ export default function Home() {
         } else {
           // Cmd/Ctrl + Z = 撤销
           managerRef.current.undo();
+        }
+        return;
+      }
+
+      // 锁定/解锁快捷键 Cmd/Ctrl + Shift + L
+      if (cmdOrCtrl && e.shiftKey && e.key === 'l' && managerRef.current) {
+        e.preventDefault();
+        const activeObject = managerRef.current.canvas.getActiveObject();
+        if (activeObject) {
+          const isLocked = managerRef.current.toggleLock(activeObject);
+          setToast({
+            show: true,
+            message: isLocked ? '对象已锁定' : '对象已解锁',
+            type: 'success'
+          });
         }
         return;
       }
@@ -1908,22 +1939,47 @@ export default function Home() {
       </div>
 
       {/* 右键菜单 */}
-      {contextMenu && selectedObject && (
-        <>
-          {/* 背景遮罩，点击关闭菜单 */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => {
-              setContextMenu(null);
-              setShowShapeFillPicker(false);
-              setShowShapeStrokePicker(false);
-            }}
-          />
-          {/* 菜单 */}
-          <div
-            className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
+      {contextMenu && (selectedObject || (setContextMenu as any).clickedObject) && (() => {
+        // 获取右键点击的对象（可能是锁定的对象）
+        const clickedObject = (setContextMenu as any).clickedObject || selectedObject;
+        const isLocked = (clickedObject as any)?.locked === true;
+
+        return (
+          <>
+            {/* 背景遮罩，点击关闭菜单 */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => {
+                setContextMenu(null);
+                setShowShapeFillPicker(false);
+                setShowShapeStrokePicker(false);
+              }}
+            />
+            {/* 菜单 */}
+            <div
+              className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              {/* 🔒 如果对象已锁定，只显示解锁选项 */}
+              {isLocked ? (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+                  onClick={() => {
+                    managerRef.current?.unlockObject(clickedObject);
+                    setToast({
+                      show: true,
+                      message: '对象已解锁',
+                      type: 'success'
+                    });
+                    setContextMenu(null);
+                  }}
+                >
+                  <span>🔒 解锁对象</span>
+                  <span className="text-xs text-gray-400">⌘⇧L</span>
+                </button>
+              ) : (
+                // 未锁定对象显示完整菜单
+                <>
             {/* AI图片转换 */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
@@ -1983,6 +2039,25 @@ export default function Home() {
                 </button>
               </>
             )}
+
+            <div className="h-px bg-gray-200 my-1" />
+
+            {/* 🔒 锁定/解锁选项 */}
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+              onClick={() => {
+                const isLocked = managerRef.current?.toggleLock(selectedObject);
+                setToast({
+                  show: true,
+                  message: isLocked ? '对象已锁定' : '对象已解锁',
+                  type: 'success'
+                });
+                setContextMenu(null);
+              }}
+            >
+              <span>{(selectedObject as any).locked ? '🔒 解锁对象' : '🔓 锁定对象'}</span>
+              <span className="text-xs text-gray-400">⌘⇧L</span>
+            </button>
 
             <div className="h-px bg-gray-200 my-1" />
 
@@ -2050,10 +2125,11 @@ export default function Home() {
               <span>置于底层</span>
               <span className="text-xs text-gray-400">⌘⇧[</span>
             </button>
-          </div>
+              )}
+            </div>
 
-          {/* 填充颜色选择器 */}
-          {showShapeFillPicker && (
+            {/* 填充颜色选择器 */}
+            {!isLocked && showShapeFillPicker && (
             <div
               className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
               style={{ left: contextMenu.x + 180, top: contextMenu.y }}
@@ -2070,25 +2146,26 @@ export default function Home() {
             </div>
           )}
 
-          {/* 边框颜色选择器 */}
-          {showShapeStrokePicker && (
-            <div
-              className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
-              style={{ left: contextMenu.x + 180, top: contextMenu.y + 40 }}
-            >
-              <HexColorPicker
-                color={(selectedObject as any).stroke || '#1e40af'}
-                onChange={(color) => {
-                  if (selectedObject) {
-                    selectedObject.set('stroke', color);
-                    managerRef.current?.canvas.renderAll();
-                  }
-                }}
-              />
-            </div>
-          )}
-        </>
-      )}
+            {/* 边框颜色选择器 */}
+            {!isLocked && showShapeStrokePicker && (
+              <div
+                className="fixed z-50 bg-white rounded-lg shadow-lg p-3"
+                style={{ left: contextMenu.x + 180, top: contextMenu.y + 40 }}
+              >
+                <HexColorPicker
+                  color={(selectedObject as any).stroke || '#1e40af'}
+                  onChange={(color) => {
+                    if (selectedObject) {
+                      selectedObject.set('stroke', color);
+                      managerRef.current?.canvas.renderAll();
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* AI 生图对话框 */}
       <AIImageDialog

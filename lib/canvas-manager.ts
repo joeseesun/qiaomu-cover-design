@@ -22,6 +22,9 @@ export class CanvasManager {
   private cropRect: fabric.Rect | null = null;
   private cropOverlay: fabric.Rect[] = [];
 
+  // 锁定对象相关
+  private lockIcons: Map<fabric.Object, fabric.Text> = new Map(); // 存储对象和锁定图标的映射
+
   constructor(element: HTMLCanvasElement, width = CANVAS_WIDTH, height = CANVAS_HEIGHT) {
     this.width = width;
     this.height = height;
@@ -162,6 +165,16 @@ export class CanvasManager {
 
         this.enterCropMode(target as fabric.Image);
       }
+    });
+
+    // 监听鼠标移动，显示/隐藏锁定图标
+    this.canvas.on('mouse:move', (e) => {
+      this.handleLockIconVisibility(e);
+    });
+
+    // 监听鼠标离开画布，隐藏所有锁定图标
+    this.canvas.on('mouse:out', () => {
+      this.hideAllLockIcons();
     });
   }
 
@@ -4218,6 +4231,167 @@ export class CanvasManager {
 
     this.canvas.renderAll();
     console.log('✅ 已退出裁剪模式');
+  }
+
+  // ==================== 锁定功能 ====================
+
+  /**
+   * 锁定对象
+   */
+  lockObject(obj?: fabric.Object): void {
+    const target = obj || this.canvas.getActiveObject();
+    if (!target) {
+      console.warn('⚠️ 没有选中的对象');
+      return;
+    }
+
+    // 设置锁定属性
+    target.set({
+      selectable: false,      // 无法选中
+      evented: false,         // 无法触发事件
+      lockMovementX: true,    // 锁定水平移动
+      lockMovementY: true,    // 锁定垂直移动
+      lockRotation: true,     // 锁定旋转
+      lockScalingX: true,     // 锁定水平缩放
+      lockScalingY: true,     // 锁定垂直缩放
+      hasControls: false,     // 隐藏控制点
+      hasBorders: false,      // 隐藏边框
+    });
+
+    // 添加自定义属性标记为已锁定
+    (target as any).locked = true;
+
+    // 取消选中
+    this.canvas.discardActiveObject();
+    this.canvas.renderAll();
+
+    console.log('🔒 对象已锁定');
+  }
+
+  /**
+   * 解锁对象
+   */
+  unlockObject(obj?: fabric.Object): void {
+    const target = obj || this.canvas.getActiveObject();
+    if (!target) {
+      console.warn('⚠️ 没有选中的对象');
+      return;
+    }
+
+    // 恢复可选中和可编辑
+    target.set({
+      selectable: true,
+      evented: true,
+      lockMovementX: false,
+      lockMovementY: false,
+      lockRotation: false,
+      lockScalingX: false,
+      lockScalingY: false,
+      hasControls: true,
+      hasBorders: true,
+    });
+
+    // 移除锁定标记
+    (target as any).locked = false;
+
+    // 移除锁定图标（如果存在）
+    const lockIcon = this.lockIcons.get(target);
+    if (lockIcon) {
+      this.canvas.remove(lockIcon);
+      this.lockIcons.delete(target);
+    }
+
+    this.canvas.renderAll();
+    console.log('🔓 对象已解锁');
+  }
+
+  /**
+   * 切换锁定状态
+   */
+  toggleLock(obj?: fabric.Object): boolean {
+    const target = obj || this.canvas.getActiveObject();
+    if (!target) {
+      console.warn('⚠️ 没有选中的对象');
+      return false;
+    }
+
+    const isLocked = (target as any).locked === true;
+    if (isLocked) {
+      this.unlockObject(target);
+      return false;
+    } else {
+      this.lockObject(target);
+      return true;
+    }
+  }
+
+  /**
+   * 检查对象是否已锁定
+   */
+  isObjectLocked(obj: fabric.Object): boolean {
+    return (obj as any).locked === true;
+  }
+
+  /**
+   * 处理锁定图标的显示/隐藏
+   */
+  private handleLockIconVisibility(e: fabric.IEvent): void {
+    // 先隐藏所有锁定图标
+    this.hideAllLockIcons();
+
+    // 获取鼠标下的对象
+    const target = e.target;
+    if (!target) return;
+
+    // 如果对象已锁定，显示锁定图标
+    if (this.isObjectLocked(target)) {
+      this.showLockIcon(target);
+    }
+  }
+
+  /**
+   * 显示锁定图标
+   */
+  private showLockIcon(obj: fabric.Object): void {
+    // 如果已经有锁定图标，先移除
+    const existingIcon = this.lockIcons.get(obj);
+    if (existingIcon) {
+      this.canvas.remove(existingIcon);
+    }
+
+    // 创建锁定图标
+    const lockIcon = new fabric.Text('🔒', {
+      fontSize: 16,
+      left: obj.left! - (obj.width! * obj.scaleX!) / 2 + 8,
+      top: obj.top! - (obj.height! * obj.scaleY!) / 2 + 8,
+      selectable: false,
+      evented: false,
+      originX: 'left',
+      originY: 'top',
+    });
+
+    // 添加到画布
+    this.canvas.add(lockIcon);
+    this.lockIcons.set(obj, lockIcon);
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 隐藏所有锁定图标
+   */
+  private hideAllLockIcons(): void {
+    this.lockIcons.forEach((icon) => {
+      this.canvas.remove(icon);
+    });
+    this.lockIcons.clear();
+    this.canvas.renderAll();
+  }
+
+  /**
+   * 获取所有锁定的对象
+   */
+  getLockedObjects(): fabric.Object[] {
+    return this.canvas.getObjects().filter(obj => this.isObjectLocked(obj));
   }
 }
 
