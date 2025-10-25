@@ -604,11 +604,10 @@ export default function Home() {
             // 自动保存时不保存缩略图，减少 localStorage 占用
             versionRef.current.update(activeId, data);
             lastSavedData = data;
-            console.log('💾 自动保存成功:', {
-              版本ID: activeId,
-              数据大小: data.length,
-              时间: new Date().toLocaleTimeString()
-            });
+            // 🔇 降低日志级别，避免控制台刷屏
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('💾 自动保存:', activeId, `${(data.length / 1024).toFixed(1)}KB`);
+            }
           } catch (error) {
             console.error('❌ 自动保存失败:', error);
             // 如果 localStorage 满了，清理旧版本

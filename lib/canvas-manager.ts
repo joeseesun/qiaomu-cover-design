@@ -2979,7 +2979,8 @@ export class CanvasManager {
         }
       }
 
-      console.log('📊 Canvas 对象数量:', objects.length);
+      // 🔇 降低日志级别，避免控制台刷屏
+      // console.log('📊 Canvas 对象数量:', objects.length);
 
       // 尝试序列化 - 使用 try-catch 保护
       let canvasData;
@@ -3528,12 +3529,13 @@ export class CanvasManager {
       try {
         // 先检查每个对象是否有效
         const allObjects = this.canvas.getObjects();
-        console.log('🔍 准备序列化对象:', allObjects.map((obj: any) => ({
-          type: obj.type,
-          hasStroke: obj.stroke !== undefined,
-          hasFill: obj.fill !== undefined,
-          hasPath: obj.path !== undefined,
-        })));
+        // 🔇 降低日志级别，避免控制台刷屏
+        // console.log('🔍 准备序列化对象:', allObjects.map((obj: any) => ({
+        //   type: obj.type,
+        //   hasStroke: obj.stroke !== undefined,
+        //   hasFill: obj.fill !== undefined,
+        //   hasPath: obj.path !== undefined,
+        // })));
 
         canvasData = this.canvas.toJSON(['data', 'selectable', 'evented']);
       } catch (innerError) {
