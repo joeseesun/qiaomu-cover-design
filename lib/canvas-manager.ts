@@ -3025,10 +3025,20 @@ export class CanvasManager {
 
   // 从 JSON 加载
   loadFromJSON(json: string) {
+    // 🆕 加载时禁用历史记录，避免触发自动保存
+    const wasLoadingTemplate = this.isLoadingTemplate;
+    this.isLoadingTemplate = true;
+
     this.canvas.loadFromJSON(json, () => {
       // 加载完成后，重新绑定所有 Group 对象的双击事件
       this.rebindGroupEvents();
       this.canvas.renderAll();
+
+      // 🆕 延迟恢复历史记录状态，确保渲染完成
+      setTimeout(() => {
+        this.isLoadingTemplate = wasLoadingTemplate;
+        console.log('✅ 画布加载完成');
+      }, 100);
     });
   }
 

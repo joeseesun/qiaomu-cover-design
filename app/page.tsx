@@ -878,6 +878,7 @@ export default function Home() {
       版本名称: version?.name,
       更新时间: version ? new Date(version.updatedAt).toLocaleString() : null,
       数据是否为空: !version?.data,
+      数据长度: version?.data?.length || 0,
     });
 
     if (version) {
@@ -886,8 +887,11 @@ export default function Home() {
         console.log('📄 新建空白画布');
         managerRef.current.clear();
       } else {
+        console.log('📥 加载画布数据，长度:', version.data.length);
         managerRef.current.loadFromJSON(version.data);
       }
+    } else {
+      console.error('❌ 未找到版本:', id);
     }
 
     setActiveId(id);
