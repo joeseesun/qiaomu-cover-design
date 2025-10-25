@@ -49,7 +49,7 @@ export default function ImageDialog({
   // 图库相关
   const [libraryImages, setLibraryImages] = useState<ImageLibraryItem[]>([]);
   const [libraryPage, setLibraryPage] = useState(1);
-  const LIBRARY_PER_PAGE = 15;
+  const LIBRARY_PER_PAGE = 10; // 改为 10 张/页
 
   // 🆕 共享素材相关
   const [sharedMaterials, setSharedMaterials] = useState<any[]>([]);
@@ -59,7 +59,7 @@ export default function ImageDialog({
   const [sharedTotalPages, setSharedTotalPages] = useState(0);
   const [sharedTotal, setSharedTotal] = useState(0);
   const [sharedSearchQuery, setSharedSearchQuery] = useState('');
-  const SHARED_PER_PAGE = 20;
+  const SHARED_PER_PAGE = 10; // 改为 10 张/页
 
   // 搜索相关
   const [searchQuery, setSearchQuery] = useState('');
@@ -339,7 +339,7 @@ export default function ImageDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-5xl h-[calc(85vh+10px)] flex flex-col p-0">
         <DialogTitle className="sr-only">插入图片</DialogTitle>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
           <TabsList className="mx-6 mt-6 mb-0 grid grid-cols-4 w-auto border-b rounded-none bg-transparent">
@@ -438,7 +438,7 @@ export default function ImageDialog({
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto px-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     {sharedMaterials.map((material) => (
                       <div
                         key={material.id}
@@ -512,7 +512,7 @@ export default function ImageDialog({
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto p-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     {paginatedLibraryImages.map((item) => (
                       <div
                         key={item.url}
@@ -686,7 +686,7 @@ export default function ImageDialog({
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto p-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     {paginatedSearchResults.map((photo) => (
                       <div
                         key={photo.id}
