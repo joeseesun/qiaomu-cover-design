@@ -3617,6 +3617,73 @@ export class CanvasManager {
 
     const imageUrls: string[] = [];
 
+    // 🆕 检查是否所有对象都是图片
+    const allImages = activeObjects.every(obj => obj.type === 'image');
+
+    // 🆕 检查是否所有对象都是非图片（文本、形状、画笔路径等）
+    const allNonImages = activeObjects.every(obj => obj.type !== 'image');
+
+    // 🆕 如果选中了多个非图片对象，合并成一张图
+    if (activeObjects.length > 1 && allNonImages) {
+      console.log('🎨 检测到多个非图片对象，合并渲染为一张图');
+
+      try {
+        // 获取所有对象的整体边界框
+        const activeSelection = this.canvas.getActiveObject();
+        if (!activeSelection) {
+          throw new Error('无法获取选中对象');
+        }
+
+        const boundingRect = activeSelection.getBoundingRect();
+        const padding = 20;
+
+        // 创建临时画布
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = boundingRect.width + padding * 2;
+        tempCanvas.height = boundingRect.height + padding * 2;
+
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('无法创建canvas context');
+        }
+
+        // 设置白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // 保存当前状态
+        ctx.save();
+
+        // 移动到合适的位置，使所有对象都在画布内
+        ctx.translate(padding - boundingRect.left, padding - boundingRect.top);
+
+        // 渲染所有对象
+        activeObjects.forEach((obj) => {
+          obj.render(ctx);
+        });
+
+        ctx.restore();
+
+        // 转换为DataURL
+        const dataUrl = tempCanvas.toDataURL('image/png');
+
+        // 上传到七牛云
+        const uploadedUrl = await this.qiniuUploader.uploadBase64(
+          dataUrl.split(',')[1],
+          `image-to-image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.png`
+        );
+
+        console.log('✅ 合并后的图片已上传到七牛云:', uploadedUrl);
+        imageUrls.push(uploadedUrl);
+
+        return imageUrls;
+      } catch (error) {
+        console.error('❌ 合并渲染对象失败:', error);
+        throw error;
+      }
+    }
+
+    // 🆕 原有逻辑：单个对象或混合对象（图片+非图片）
     for (const obj of activeObjects) {
       try {
         // 如果是图片对象,直接使用它的URL
@@ -3656,14 +3723,7 @@ export class CanvasManager {
         ctx.save();
 
         // 移动到中心位置
-        ctx.translate(padding, padding);
-
-        // 如果对象有旋转,需要处理
-        if (obj.angle) {
-          ctx.translate(boundingRect.width / 2, boundingRect.height / 2);
-          ctx.rotate((obj.angle * Math.PI) / 180);
-          ctx.translate(-boundingRect.width / 2, -boundingRect.height / 2);
-        }
+        ctx.translate(padding - boundingRect.left, padding - boundingRect.top);
 
         // 渲染对象到临时画布
         obj.render(ctx);
