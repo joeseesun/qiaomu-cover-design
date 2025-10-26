@@ -1430,7 +1430,7 @@ export default function Home() {
 
           if (data.success && data.template) {
             template = data.template;
-            console.log('✅ 从公开模板获取成功:', template.name);
+            console.log('✅ 从公开模板获取成功:', template?.name);
           }
         } catch (error) {
           console.error('❌ 获取公开模板失败:', error);
@@ -1442,12 +1442,19 @@ export default function Home() {
         return;
       }
 
+      // 🔥 TypeScript 类型守卫：确保 template 不为 undefined
+      const validTemplate = template;
+      if (!validTemplate) {
+        setToast({ show: true, message: '模板数据无效', type: 'error' });
+        return;
+      }
+
       // 创建完整的 CanvasSize 对象
       const newCanvasSize: CanvasSize = {
-        name: `${template.canvasSize.width}×${template.canvasSize.height}`,
-        width: template.canvasSize.width,
-        height: template.canvasSize.height,
-        ratio: template.canvasSize.width > template.canvasSize.height ? '4:3' : '3:4',
+        name: `${validTemplate.canvasSize.width}×${validTemplate.canvasSize.height}`,
+        width: validTemplate.canvasSize.width,
+        height: validTemplate.canvasSize.height,
+        ratio: validTemplate.canvasSize.width > validTemplate.canvasSize.height ? '4:3' : '3:4',
       };
 
       // 更新画布尺寸
@@ -1462,8 +1469,8 @@ export default function Home() {
       // 创建新的 CanvasManager
       managerRef.current = new CanvasManager(
         canvasRef.current,
-        template.canvasSize.width,
-        template.canvasSize.height
+        validTemplate.canvasSize.width,
+        validTemplate.canvasSize.height
       );
 
       // 🆕 立即设置加载模板标志，禁用历史记录保存
@@ -1474,14 +1481,14 @@ export default function Home() {
       try {
         // 🔥 直接应用模板 JSON 数据，不依赖 templateManager
         // 这样可以支持公开模板（不在本地存储中）
-        const canvasData = JSON.parse(template.canvasJSON);
+        const canvasData = JSON.parse(validTemplate.canvasJSON);
         console.log('📦 模板数据:', canvasData);
 
         // 清空画布
         managerRef.current.canvas.clear();
 
         // 设置背景色（如果有）
-        if (template.canvasJSON.includes('backgroundColor')) {
+        if (validTemplate.canvasJSON.includes('backgroundColor')) {
           const bgColor = canvasData.backgroundColor || '#ffffff';
           managerRef.current.canvas.setBackgroundColor(bgColor, () => {
             managerRef.current?.canvas.renderAll();
@@ -1489,7 +1496,7 @@ export default function Home() {
         }
 
         // 加载对象
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           managerRef.current!.canvas.loadFromJSON(canvasData, () => {
             console.log('✅ 模板对象加载完成');
             managerRef.current!.canvas.renderAll();
