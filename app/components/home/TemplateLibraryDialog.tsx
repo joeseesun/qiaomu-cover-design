@@ -374,9 +374,9 @@ export default function TemplateLibraryDialog({
           </div>
 
           {/* 右侧模板展示 */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col bg-white">
             {/* 搜索栏和筛选 */}
-            <div className="p-4 border-b space-y-3">
+            <div className="p-4 border-b space-y-3 bg-white">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -408,7 +408,7 @@ export default function TemplateLibraryDialog({
             </div>
 
             {/* 模板网格 */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 bg-white">
               {/* 🆕 加载状态 */}
               {selectedCategory === '网友分享' && isLoadingPublic ? (
                 <div className="flex items-center justify-center h-full text-gray-400">
