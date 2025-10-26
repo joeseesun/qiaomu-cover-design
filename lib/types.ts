@@ -27,6 +27,7 @@ export interface FontConfig {
   weight: number[];
   preview: string;  // 预览文字
   loaded?: boolean; // 是否已加载
+  customUrl?: string; // 🆕 自定义字体 CDN URL（如果有，则不使用 Google Fonts）
 }
 
 export const HIGHLIGHT_COLORS = [
@@ -37,15 +38,45 @@ export const HIGHLIGHT_COLORS = [
   '#FF5722', // 橙色
 ];
 
-// 16 个精选中文字体（第一页展示前 3 个）
+// 精选字体（中文 + 英文）
 export const FONTS: FontConfig[] = [
+  // 🆕 自定义 CDN 字体
+  {
+    name: '京华老宋体',
+    family: 'KingHwaOldSong',
+    weight: [400],
+    preview: '设计',
+    customUrl: 'https://fontsapi.zeoseven.com/309/main/result.css'
+  },
+  {
+    name: 'Maple Mono',
+    family: 'Maple Mono NF CN',
+    weight: [400],
+    preview: 'Code',
+    customUrl: 'https://fontsapi.zeoseven.com/442/main/result.css'
+  },
+  {
+    name: '朱雀仿宋',
+    family: 'Zhuque Fangsong (technical preview)',
+    weight: [400],
+    preview: '设计',
+    customUrl: 'https://fontsapi.zeoseven.com/7/main/result.css'
+  },
+
+  // 🆕 Google Fonts 英文字体
+  { name: 'Georgia', family: 'Georgia', weight: [400, 700], preview: 'Design' },
+  { name: 'Playfair', family: 'Playfair Display', weight: [400, 700], preview: 'Design' },
+  { name: 'Merriweather', family: 'Merriweather', weight: [400, 700], preview: 'Design' },
+  { name: 'Lora', family: 'Lora', weight: [400, 700], preview: 'Design' },
+  { name: 'Roboto', family: 'Roboto', weight: [400, 700], preview: 'Design' },
+
+  // 原有中文字体
   { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
   { name: '汇文明朝体', family: 'Huiwen-mincho', weight: [400], preview: '设计' },
   { name: '抖音美好体', family: 'Douyin Sans', weight: [700], preview: '设计' },
   { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' },
   { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' },
   { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' },
-  { name: 'Maple Mono', family: 'Maple Mono CN Medium', weight: [600], preview: '设计' },
   { name: '上图东观体', family: 'STDongGuanTi Bld', weight: [400], preview: '设计' },
   { name: '全小素', family: 'QuanPixel 8px', weight: [600], preview: '设计' },
   { name: '铁蒺藜体', family: 'Tiejili', weight: [400], preview: '设计' },

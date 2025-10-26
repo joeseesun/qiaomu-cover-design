@@ -241,18 +241,34 @@ export default function FontPanel({
 
     try {
       const link = document.createElement('link');
-      link.href = `https://fonts.googleapis.com/css2?family=${font.family.replace(
-        / /g,
-        '+'
-      )}:wght@${font.weight.join(';')}&display=swap`;
-      link.rel = 'stylesheet';
+
+      // 🆕 如果有自定义 URL，使用自定义 CDN；否则使用 Google Fonts
+      if (font.customUrl) {
+        link.href = font.customUrl;
+        link.rel = 'stylesheet';
+        link.crossOrigin = 'anonymous';
+        console.log('🔤 加载自定义字体:', font.name, font.customUrl);
+      } else {
+        link.href = `https://fonts.googleapis.com/css2?family=${font.family.replace(
+          / /g,
+          '+'
+        )}:wght@${font.weight.join(';')}&display=swap`;
+        link.rel = 'stylesheet';
+        console.log('🔤 加载 Google 字体:', font.name);
+      }
+
       document.head.appendChild(link);
 
-      await document.fonts.ready;
+      // 🆕 等待字体加载完成（最多等待 3 秒）
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => setTimeout(resolve, 3000))
+      ]);
 
       setLoadedFonts((prev) => new Set(prev).add(font.family));
+      console.log('✅ 字体加载完成:', font.name);
     } catch (error) {
-      console.error(`Failed to load font: ${font.family}`, error);
+      console.error(`❌ 字体加载失败: ${font.family}`, error);
     } finally {
       setLoadingFonts((prev) => {
         const next = new Set(prev);
@@ -263,10 +279,12 @@ export default function FontPanel({
   };
 
   const handleFontClick = async (font: FontConfig) => {
-    // 先加载字体,等待完成后再应用
-    await loadFont(font);
+    // 🆕 立即应用字体，同时在后台加载
     onFontChange(font.family);
     addToRecent(font);
+
+    // 后台加载字体（不阻塞 UI）
+    loadFont(font);
   };
 
   // 计算分页（每页 3 个字体）
