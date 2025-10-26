@@ -38,9 +38,30 @@ export const HIGHLIGHT_COLORS = [
   '#FF5722', // 橙色
 ];
 
-// 精选字体（中文 + 英文）
+// 精选字体（中文 + 英文）- 按使用频率和热度排序
 export const FONTS: FontConfig[] = [
-  // 🆕 自定义 CDN 字体
+  // 🔥 热门中文字体（第 1 页）
+  { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
+  { name: '汇文明朝体', family: 'Huiwen-mincho', weight: [400], preview: '设计' },
+  { name: '抖音美好体', family: 'Douyin Sans', weight: [700], preview: '设计' },
+
+  // 🔥 常用中文字体（第 2-3 页）
+  { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' },
+  { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' },
+  { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' },
+  { name: '优设标题黑', family: 'YouSheBiaoTiHei', weight: [400], preview: '设计' },
+  { name: '得意黑', family: 'Smiley Sans Oblique', weight: [400], preview: '设计' },
+  { name: '斗鱼追光体', family: 'DOUYU Font', weight: [400], preview: '设计' },
+
+  // 🎨 特色中文字体（第 4-5 页）
+  { name: '上图东观体', family: 'STDongGuanTi Bld', weight: [400], preview: '设计' },
+  { name: '千图笔锋手写体', family: 'qiantubifengshouxieti', weight: [400], preview: '设计' },
+  { name: '鸿雷行书简体', family: 'hongleixingshu', weight: [400], preview: '设计' },
+  { name: '全小素', family: 'QuanPixel 8px', weight: [600], preview: '设计' },
+  { name: '铁蒺藜体', family: 'Tiejili', weight: [400], preview: '设计' },
+  { name: '精品點陣體', family: 'BoutiqueBitmap7x7 1.6', weight: [400], preview: '设计' },
+
+  // 🆕 自定义 CDN 字体（第 6 页）
   {
     name: '京华老宋体',
     family: 'KingHwaOldSong',
@@ -49,43 +70,26 @@ export const FONTS: FontConfig[] = [
     customUrl: 'https://fontsapi.zeoseven.com/309/main/result.css'
   },
   {
-    name: 'Maple Mono',
-    family: 'Maple Mono NF CN',
-    weight: [400],
-    preview: 'Code',
-    customUrl: 'https://fontsapi.zeoseven.com/442/main/result.css'
-  },
-  {
     name: '朱雀仿宋',
     family: 'Zhuque Fangsong (technical preview)',
     weight: [400],
     preview: '设计',
     customUrl: 'https://fontsapi.zeoseven.com/7/main/result.css'
   },
+  {
+    name: 'Maple Mono',
+    family: 'Maple Mono NF CN',
+    weight: [400],
+    preview: 'Code',
+    customUrl: 'https://fontsapi.zeoseven.com/442/main/result.css'
+  },
 
-  // 🆕 Google Fonts 英文字体
+  // 🆕 Google Fonts 英文字体（第 7-8 页）
   { name: 'Georgia', family: 'Georgia', weight: [400, 700], preview: 'Design' },
   { name: 'Playfair', family: 'Playfair Display', weight: [400, 700], preview: 'Design' },
   { name: 'Merriweather', family: 'Merriweather', weight: [400, 700], preview: 'Design' },
   { name: 'Lora', family: 'Lora', weight: [400, 700], preview: 'Design' },
   { name: 'Roboto', family: 'Roboto', weight: [400, 700], preview: 'Design' },
-
-  // 原有中文字体
-  { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
-  { name: '汇文明朝体', family: 'Huiwen-mincho', weight: [400], preview: '设计' },
-  { name: '抖音美好体', family: 'Douyin Sans', weight: [700], preview: '设计' },
-  { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' },
-  { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' },
-  { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' },
-  { name: '上图东观体', family: 'STDongGuanTi Bld', weight: [400], preview: '设计' },
-  { name: '全小素', family: 'QuanPixel 8px', weight: [600], preview: '设计' },
-  { name: '铁蒺藜体', family: 'Tiejili', weight: [400], preview: '设计' },
-  { name: '优设标题黑', family: 'YouSheBiaoTiHei', weight: [400], preview: '设计' },
-  { name: '斗鱼追光体', family: 'DOUYU Font', weight: [400], preview: '设计' },
-  { name: '千图笔锋手写体', family: 'qiantubifengshouxieti', weight: [400], preview: '设计' },
-  { name: '得意黑', family: 'Smiley Sans Oblique', weight: [400], preview: '设计' },
-  { name: '鸿雷行书简体', family: 'hongleixingshu', weight: [400], preview: '设计' },
-  { name: '精品點陣體', family: 'BoutiqueBitmap7x7 1.6', weight: [400], preview: '设计' },
 ];
 
 // 画布尺寸配置
