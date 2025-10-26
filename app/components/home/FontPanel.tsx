@@ -259,16 +259,56 @@ export default function FontPanel({
 
       document.head.appendChild(link);
 
-      // 🆕 等待字体加载完成（最多等待 3 秒）
-      await Promise.race([
-        document.fonts.ready,
-        new Promise((resolve) => setTimeout(resolve, 3000))
-      ]);
+      // 🔥 使用更精确的字体加载检测
+      // 方法 1: 等待 link 标签加载完成
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          console.warn('⚠️ 字体加载超时（5秒），继续执行:', font.name);
+          resolve();
+        }, 5000);
+
+        link.onload = () => {
+          clearTimeout(timeout);
+          console.log('📥 字体 CSS 加载完成:', font.name);
+
+          // 方法 2: 检查字体是否真正可用
+          // 使用 document.fonts.check() 检测字体是否加载
+          const checkFontLoaded = () => {
+            try {
+              // 检查字体是否可用（使用第一个 weight）
+              const fontSpec = `${font.weight[0]} 12px "${font.family}"`;
+              const isLoaded = document.fonts.check(fontSpec);
+
+              if (isLoaded) {
+                console.log('✅ 字体已可用:', font.name, fontSpec);
+                resolve();
+              } else {
+                // 如果还没加载完成，等待一下再检查
+                setTimeout(checkFontLoaded, 100);
+              }
+            } catch (error) {
+              console.warn('⚠️ 字体检测失败，假定已加载:', font.name, error);
+              resolve();
+            }
+          };
+
+          // 延迟一点再检查，给浏览器时间解析 CSS
+          setTimeout(checkFontLoaded, 50);
+        };
+
+        link.onerror = () => {
+          clearTimeout(timeout);
+          console.error('❌ 字体 CSS 加载失败:', font.name);
+          reject(new Error(`Failed to load font: ${font.name}`));
+        };
+      });
 
       setLoadedFonts((prev) => new Set(prev).add(font.family));
       console.log('✅ 字体加载完成:', font.name);
     } catch (error) {
       console.error(`❌ 字体加载失败: ${font.family}`, error);
+      // 即使失败也标记为已加载，避免重复尝试
+      setLoadedFonts((prev) => new Set(prev).add(font.family));
     } finally {
       setLoadingFonts((prev) => {
         const next = new Set(prev);
@@ -279,12 +319,25 @@ export default function FontPanel({
   };
 
   const handleFontClick = async (font: FontConfig) => {
-    // 🆕 立即应用字体，同时在后台加载
+    // 1. 立即应用字体（即使还没加载完成，给用户即时反馈）
     onFontChange(font.family);
     addToRecent(font);
 
-    // 后台加载字体（不阻塞 UI）
-    loadFont(font);
+    // 2. 检查字体是否已加载
+    const wasLoaded = loadedFonts.has(font.family);
+
+    if (!wasLoaded) {
+      console.log('🔤 字体未加载，开始加载:', font.name);
+
+      // 3. 等待字体加载完成
+      await loadFont(font);
+
+      // 4. 字体加载完成后，重新应用以触发正确渲染
+      console.log('✅ 字体加载完成，重新渲染:', font.name);
+      onFontChange(font.family);
+    } else {
+      console.log('✅ 字体已加载，直接应用:', font.name);
+    }
   };
 
   // 计算分页（每页 3 个字体）
