@@ -259,40 +259,35 @@ export default function FontPanel({
 
       document.head.appendChild(link);
 
-      // 🔥 使用更可靠的字体加载检测方法
-      // 不依赖 link.onload/onerror（跨域请求可能误报）
-      // 直接使用 document.fonts API 检测字体是否可用
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
-          console.warn('⚠️ 字体加载超时（5秒），继续执行:', font.name);
-          resolve();
-        }, 5000);
+      // 🔥 使用 document.fonts.load() 真正加载字体文件
+      // 这比 check() 更可靠，会等待字体文件下载完成
+      try {
+        // 为每个 weight 加载字体
+        const loadPromises = font.weight.map(async (weight) => {
+          const fontSpec = `${weight} 12px "${font.family}"`;
+          console.log('📥 开始加载字体文件:', font.name, fontSpec);
 
-        // 轮询检查字体是否可用
-        const checkFontLoaded = () => {
           try {
-            // 检查字体是否可用（使用第一个 weight）
-            const fontSpec = `${font.weight[0]} 12px "${font.family}"`;
-            const isLoaded = document.fonts.check(fontSpec);
-
-            if (isLoaded) {
-              clearTimeout(timeout);
-              console.log('✅ 字体已可用:', font.name, fontSpec);
-              resolve();
-            } else {
-              // 如果还没加载完成，等待一下再检查
-              setTimeout(checkFontLoaded, 100);
-            }
+            // document.fonts.load() 会真正下载字体文件并等待完成
+            await Promise.race([
+              document.fonts.load(fontSpec),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('timeout')), 5000)
+              )
+            ]);
+            console.log('✅ 字体文件加载完成:', font.name, fontSpec);
           } catch (error) {
-            clearTimeout(timeout);
-            console.warn('⚠️ 字体检测失败，假定已加载:', font.name, error);
-            resolve();
+            // 单个 weight 加载失败不影响其他 weight
+            console.warn('⚠️ 字体 weight 加载失败:', font.name, weight, error);
           }
-        };
+        });
 
-        // 延迟一点再开始检查，给浏览器时间下载和解析 CSS
-        setTimeout(checkFontLoaded, 200);
-      });
+        // 等待所有 weight 加载完成（或超时）
+        await Promise.allSettled(loadPromises);
+        console.log('✅ 字体所有 weight 加载完成:', font.name);
+      } catch (error) {
+        console.warn('⚠️ 字体加载过程出错，继续执行:', font.name, error);
+      }
 
       setLoadedFonts((prev) => new Set(prev).add(font.family));
       console.log('✅ 字体加载完成:', font.name);
