@@ -1649,6 +1649,11 @@ export default function Home() {
     managerRef.current?.updateTextAlign(align);
   };
 
+  // 🆕 处理文本描边变化
+  const handleStrokeChange = (enabled: boolean, color?: string, width?: number) => {
+    managerRef.current?.setTextStroke(enabled, color, width);
+  };
+
   const handleCanvasBackgroundChange = (type: 'solid' | 'gradient' | 'image', value: string) => {
     if (!managerRef.current) return;
 
@@ -1862,6 +1867,7 @@ export default function Home() {
                 onLineHeightChange={handleLineHeightChange}
                 onLetterSpacingChange={handleLetterSpacingChange}
                 onTextAlignChange={handleTextAlignChange}
+                onStrokeChange={handleStrokeChange}
                 onBackgroundChange={handleBackgroundChange}
                 onUnderlineChange={handleUnderlineChange}
                 onBorderChange={handleBorderChange}
@@ -1934,6 +1940,7 @@ export default function Home() {
               onLineHeightChange={handleLineHeightChange}
               onLetterSpacingChange={handleLetterSpacingChange}
               onTextAlignChange={handleTextAlignChange}
+              onStrokeChange={handleStrokeChange}
               onBackgroundChange={handleBackgroundChange}
               onUnderlineChange={handleUnderlineChange}
               onBorderChange={handleBorderChange}

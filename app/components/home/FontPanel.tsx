@@ -31,6 +31,8 @@ interface FontPanelProps {
   onLetterSpacingChange?: (letterSpacing: number) => void;
   // 对齐
   onTextAlignChange?: (align: 'left' | 'center' | 'right') => void;
+  // 🆕 描边
+  onStrokeChange?: (enabled: boolean, color?: string, width?: number) => void;
   // 背景
   onBackgroundChange?: (style: 'none' | 'solid', color?: string, opacity?: number) => void;
   // 下划线
@@ -57,6 +59,7 @@ export default function FontPanel({
   onLineHeightChange,
   onLetterSpacingChange,
   onTextAlignChange,
+  onStrokeChange,
   onBackgroundChange,
   onUnderlineChange,
   onBorderChange,
@@ -78,6 +81,11 @@ export default function FontPanel({
   // 文本对齐状态
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
+  // 🆕 描边状态
+  const [strokeEnabled, setStrokeEnabled] = useState(false);
+  const [strokeColor, setStrokeColor] = useState('#000000');
+  const [strokeWidth, setStrokeWidth] = useState(3);
+
   // 画布背景状态
   const [canvasBackgroundType, setCanvasBackgroundType] = useState<'solid' | 'image' | 'pattern'>('solid');
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#FFFFFF');
@@ -98,6 +106,16 @@ export default function FontPanel({
     if (selectedObject) {
       setLocalLetterSpacing(selectedObject.charSpacing ?? letterSpacing);
       setLocalLineHeight(selectedObject.lineHeight ?? lineHeight);
+
+      // 🆕 同步描边状态
+      if (selectedObject.type === 'i-text' || selectedObject.type === 'textbox' || selectedObject.type === 'text') {
+        const hasStroke = selectedObject.stroke && selectedObject.strokeWidth > 0;
+        setStrokeEnabled(hasStroke);
+        if (hasStroke) {
+          setStrokeColor(selectedObject.stroke || '#000000');
+          setStrokeWidth(selectedObject.strokeWidth || 3);
+        }
+      }
 
       // 同步背景颜色和不透明度(从Group中提取)
       if (selectedObject.type === 'group') {
@@ -469,6 +487,82 @@ export default function FontPanel({
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* 🆕 描边设置 */}
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold">描边</label>
+              <Button
+                variant={strokeEnabled ? "default" : "outline"}
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => {
+                  const newEnabled = !strokeEnabled;
+                  setStrokeEnabled(newEnabled);
+                  onStrokeChange?.(newEnabled, strokeColor, strokeWidth);
+                }}
+                disabled={!selectedObject}
+              >
+                {strokeEnabled ? '已启用' : '已禁用'}
+              </Button>
+            </div>
+
+            {strokeEnabled && (
+              <div className="space-y-3">
+                {/* 描边颜色 */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-2 block">颜色</label>
+                  <ColorPicker
+                    color={strokeColor}
+                    onChange={(color) => {
+                      setStrokeColor(color);
+                      onStrokeChange?.(true, color, strokeWidth);
+                    }}
+                    compact
+                    disabled={!selectedObject}
+                  />
+                </div>
+
+                {/* 描边宽度 */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-2 block">宽度</label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => {
+                        const newWidth = Math.max(1, strokeWidth - 1);
+                        setStrokeWidth(newWidth);
+                        onStrokeChange?.(true, strokeColor, newWidth);
+                      }}
+                      disabled={!selectedObject}
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <div className="flex-1 text-center h-8 flex items-center justify-center border rounded-md">
+                      <div className="text-base font-semibold tabular-nums">
+                        {strokeWidth}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => {
+                        const newWidth = Math.min(20, strokeWidth + 1);
+                        setStrokeWidth(newWidth);
+                        onStrokeChange?.(true, strokeColor, newWidth);
+                      }}
+                      disabled={!selectedObject}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 

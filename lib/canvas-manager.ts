@@ -2276,6 +2276,56 @@ export class CanvasManager {
     this.canvas.fire('object:modified', { target: activeObj });
   }
 
+  // 🆕 设置文本描边
+  setTextStroke(enabled: boolean, color: string = '#000000', width: number = 3) {
+    const activeObj = this.canvas.getActiveObject();
+    if (!activeObj) return;
+
+    console.log('🎨 设置文本描边:', { enabled, color, width, type: activeObj.type });
+
+    // 处理多选
+    if (activeObj.type === 'activeSelection') {
+      const selection = activeObj as fabric.ActiveSelection;
+      const objects = selection.getObjects();
+
+      objects.forEach((obj: any) => {
+        this.updateSingleObjectStroke(obj, enabled, color, width);
+      });
+
+      this.canvas.renderAll();
+      this.canvas.fire('object:modified', { target: activeObj });
+      return;
+    }
+
+    // 处理单个对象
+    this.updateSingleObjectStroke(activeObj, enabled, color, width);
+    this.canvas.renderAll();
+    this.canvas.fire('object:modified', { target: activeObj });
+  }
+
+  // 🆕 更新单个对象的描边
+  private updateSingleObjectStroke(obj: any, enabled: boolean, color: string, width: number) {
+    // 只处理文本对象
+    if (obj.type !== 'i-text' && obj.type !== 'textbox' && obj.type !== 'text') {
+      return;
+    }
+
+    if (enabled) {
+      obj.set({
+        stroke: color,
+        strokeWidth: width,
+        strokeLineJoin: 'round',  // 圆角连接
+        strokeLineCap: 'round',   // 圆角端点
+        paintFirst: 'stroke',     // 先绘制描边，再绘制填充（描边不会覆盖文字）
+      });
+    } else {
+      obj.set({
+        stroke: '',
+        strokeWidth: 0,
+      });
+    }
+  }
+
   // 更新单个对象的文本对齐
   private updateSingleObjectTextAlign(obj: any, align: 'left' | 'center' | 'right') {
     // 如果是Group,找到内部的文本对象并更新
