@@ -259,48 +259,39 @@ export default function FontPanel({
 
       document.head.appendChild(link);
 
-      // 🔥 使用更精确的字体加载检测
-      // 方法 1: 等待 link 标签加载完成
-      await new Promise<void>((resolve, reject) => {
+      // 🔥 使用更可靠的字体加载检测方法
+      // 不依赖 link.onload/onerror（跨域请求可能误报）
+      // 直接使用 document.fonts API 检测字体是否可用
+      await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
           console.warn('⚠️ 字体加载超时（5秒），继续执行:', font.name);
           resolve();
         }, 5000);
 
-        link.onload = () => {
-          clearTimeout(timeout);
-          console.log('📥 字体 CSS 加载完成:', font.name);
+        // 轮询检查字体是否可用
+        const checkFontLoaded = () => {
+          try {
+            // 检查字体是否可用（使用第一个 weight）
+            const fontSpec = `${font.weight[0]} 12px "${font.family}"`;
+            const isLoaded = document.fonts.check(fontSpec);
 
-          // 方法 2: 检查字体是否真正可用
-          // 使用 document.fonts.check() 检测字体是否加载
-          const checkFontLoaded = () => {
-            try {
-              // 检查字体是否可用（使用第一个 weight）
-              const fontSpec = `${font.weight[0]} 12px "${font.family}"`;
-              const isLoaded = document.fonts.check(fontSpec);
-
-              if (isLoaded) {
-                console.log('✅ 字体已可用:', font.name, fontSpec);
-                resolve();
-              } else {
-                // 如果还没加载完成，等待一下再检查
-                setTimeout(checkFontLoaded, 100);
-              }
-            } catch (error) {
-              console.warn('⚠️ 字体检测失败，假定已加载:', font.name, error);
+            if (isLoaded) {
+              clearTimeout(timeout);
+              console.log('✅ 字体已可用:', font.name, fontSpec);
               resolve();
+            } else {
+              // 如果还没加载完成，等待一下再检查
+              setTimeout(checkFontLoaded, 100);
             }
-          };
-
-          // 延迟一点再检查，给浏览器时间解析 CSS
-          setTimeout(checkFontLoaded, 50);
+          } catch (error) {
+            clearTimeout(timeout);
+            console.warn('⚠️ 字体检测失败，假定已加载:', font.name, error);
+            resolve();
+          }
         };
 
-        link.onerror = () => {
-          clearTimeout(timeout);
-          console.error('❌ 字体 CSS 加载失败:', font.name);
-          reject(new Error(`Failed to load font: ${font.name}`));
-        };
+        // 延迟一点再开始检查，给浏览器时间下载和解析 CSS
+        setTimeout(checkFontLoaded, 200);
       });
 
       setLoadedFonts((prev) => new Set(prev).add(font.family));
