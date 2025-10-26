@@ -2982,14 +2982,15 @@ export class CanvasManager {
   // 导出为 JSON
   toJSON() {
     try {
-      // 如果正在加载模板，返回空 JSON
-      if (this.isLoadingTemplate) {
-        console.warn('⚠️ 正在加载模板，跳过 toJSON');
-        return JSON.stringify({
-          version: '5.3.0',
-          objects: [],
-        });
-      }
+      // 🔥 移除 isLoadingTemplate 检查，允许在加载过程中导出数据
+      // 这样可以避免在画布切换、尺寸改变时丢失数据
+      // if (this.isLoadingTemplate) {
+      //   console.warn('⚠️ 正在加载模板，跳过 toJSON');
+      //   return JSON.stringify({
+      //     version: '5.3.0',
+      //     objects: [],
+      //   });
+      // }
 
       // 确保 canvas 已初始化
       if (!this.canvas) {

@@ -863,10 +863,16 @@ export default function Home() {
   const switchVersion = (id: string) => {
     if (!managerRef.current || !versionRef.current) return;
 
-    // 保存当前版本
+    // 🔥 保存当前版本前，先确保不在加载状态
+    managerRef.current.setLoadingTemplate(false);
     const currentData = managerRef.current.toJSON();
     const currentThumbnail = managerRef.current.toThumbnail();
     versionRef.current.update(activeId, currentData, currentThumbnail);
+
+    console.log('💾 保存当前版本:', {
+      版本ID: activeId,
+      数据长度: currentData.length,
+    });
 
     // 切换版本
     versionRef.current.setActive(id); // ✅ 更新 VersionManager 的 activeId
@@ -886,9 +892,14 @@ export default function Home() {
       if (!version.data || version.data === '') {
         console.log('📄 新建空白画布');
         managerRef.current.clear();
+        // 清空后启用历史记录
+        managerRef.current.setLoadingTemplate(false);
       } else {
         console.log('📥 加载画布数据，长度:', version.data.length);
+        // 🔥 加载前禁用历史记录
+        managerRef.current.setLoadingTemplate(true);
         managerRef.current.loadFromJSON(version.data);
+        // loadFromJSON 内部会在加载完成后恢复 isLoadingTemplate 状态
       }
     } else {
       console.error('❌ 未找到版本:', id);
@@ -1342,7 +1353,16 @@ export default function Home() {
   const handleCanvasSizeChange = (newSize: CanvasSize) => {
     if (!managerRef.current) return;
 
+    // 🔥 先确保不在加载状态，再保存数据
+    managerRef.current.setLoadingTemplate(false);
     const currentData = managerRef.current.toJSON();
+
+    console.log('📐 改变画布尺寸:', {
+      从: `${canvasSize.width}×${canvasSize.height}`,
+      到: `${newSize.width}×${newSize.height}`,
+      数据长度: currentData.length,
+    });
+
     setCanvasSize(newSize);
 
     managerRef.current.dispose();
@@ -1354,7 +1374,7 @@ export default function Home() {
       );
 
       // 🆕 如果需要加载数据，先禁用历史记录
-      if (currentData) {
+      if (currentData && currentData.length > 100) { // 检查数据是否有效（不是空 JSON）
         managerRef.current.setLoadingTemplate(true);
         managerRef.current.loadFromJSON(currentData);
         // 加载完成后启用历史记录
