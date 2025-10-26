@@ -125,16 +125,44 @@ export default function Canvas({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) {
+        // 🔥 检查是否在输入框或文本编辑状态
+        const target = e.target as HTMLElement;
+        const isInputFocused =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable;
+
+        // 如果在输入框或文本编辑状态，不触发画布拖拽模式
+        if (isInputFocused) {
+          console.log('⌨️ 空格键：在输入框中，允许输入空格');
+          return; // 不阻止默认行为，让空格正常输入
+        }
+
+        // 只有在非输入状态下才触发画布拖拽
         e.preventDefault();
         setIsSpacePressed(true);
+        console.log('🖐️ 空格键：进入临时拖拽模式');
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
+        // 🔥 检查是否在输入框或文本编辑状态
+        const target = e.target as HTMLElement;
+        const isInputFocused =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable;
+
+        // 如果在输入框或文本编辑状态，不处理
+        if (isInputFocused) {
+          return;
+        }
+
         e.preventDefault();
         setIsSpacePressed(false);
         setIsPanning(false);
+        console.log('🖐️ 空格键：退出临时拖拽模式');
       }
     };
 
