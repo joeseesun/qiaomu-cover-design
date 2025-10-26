@@ -1419,7 +1419,23 @@ export default function Home() {
 
     try {
       const templateManager = getTemplateManager();
-      const template = templateManager.getById(templateId);
+      let template = templateManager.getById(templateId);
+
+      // 🔥 如果本地找不到，尝试从公开模板 API 获取
+      if (!template) {
+        console.log('📥 本地未找到模板，尝试从公开模板获取:', templateId);
+        try {
+          const response = await fetch(`/api/templates/public/get?id=${templateId}`);
+          const data = await response.json();
+
+          if (data.success && data.template) {
+            template = data.template;
+            console.log('✅ 从公开模板获取成功:', template.name);
+          }
+        } catch (error) {
+          console.error('❌ 获取公开模板失败:', error);
+        }
+      }
 
       if (!template) {
         setToast({ show: true, message: '模板不存在', type: 'error' });
@@ -1451,13 +1467,43 @@ export default function Home() {
       );
 
       // 🆕 立即设置加载模板标志，禁用历史记录保存
-      // 必须在 applyToCanvas 之前设置，因为 applyToCanvas 会触发事件
+      // 必须在应用模板之前设置，因为会触发事件
       managerRef.current.setLoadingTemplate(true);
       console.log('🎨 开始应用模板...');
 
       try {
-        await templateManager.applyToCanvas(templateId, managerRef.current.canvas);
+        // 🔥 直接应用模板 JSON 数据，不依赖 templateManager
+        // 这样可以支持公开模板（不在本地存储中）
+        const canvasData = JSON.parse(template.canvasJSON);
+        console.log('📦 模板数据:', canvasData);
+
+        // 清空画布
+        managerRef.current.canvas.clear();
+
+        // 设置背景色（如果有）
+        if (template.canvasJSON.includes('backgroundColor')) {
+          const bgColor = canvasData.backgroundColor || '#ffffff';
+          managerRef.current.canvas.setBackgroundColor(bgColor, () => {
+            managerRef.current?.canvas.renderAll();
+          });
+        }
+
+        // 加载对象
+        await new Promise<void>((resolve, reject) => {
+          managerRef.current!.canvas.loadFromJSON(canvasData, () => {
+            console.log('✅ 模板对象加载完成');
+            managerRef.current!.canvas.renderAll();
+            resolve();
+          }, (o: any, object: any) => {
+            // 对象加载回调
+            console.log('📦 加载对象:', object.type);
+          });
+        });
+
         console.log('✅ 模板应用完成');
+      } catch (error) {
+        console.error('❌ 模板应用失败:', error);
+        setToast({ show: true, message: '模板应用失败', type: 'error' });
       } finally {
         // 🆕 无论成功失败都要恢复历史记录保存
         managerRef.current.setLoadingTemplate(false);
