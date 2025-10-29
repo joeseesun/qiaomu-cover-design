@@ -3141,14 +3141,16 @@ export class CanvasManager {
           hasFill: obj?.fill !== undefined,
           hasStroke: obj?.stroke !== undefined,
         })));
-        // 返回空的有效 JSON
-        return JSON.stringify({
-          version: '5.3.0',
-          objects: [],
-        });
+        // 🔥 不要返回空 JSON，而是抛出错误让外层处理
+        throw innerError;
       }
 
       const jsonString = JSON.stringify(canvasData);
+
+      // 🔇 降低日志级别
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('📊 toJSON 成功，数据长度:', jsonString.length, 'bytes');
+      }
 
       return jsonString;
     } catch (error) {
@@ -3159,11 +3161,39 @@ export class CanvasManager {
         objectCount: this.canvas?.getObjects?.()?.length || 0,
       });
 
-      // 返回一个空的有效 JSON
-      return JSON.stringify({
-        version: '5.3.0',
-        objects: [],
-      });
+      // 🔥 尝试使用备用方案：直接序列化画布对象
+      try {
+        console.warn('⚠️ 尝试备用序列化方案...');
+        const objects = this.canvas.getObjects();
+        const simpleData = {
+          version: '5.3.0',
+          objects: objects.map((obj: any) => {
+            // 只保存基本属性，避免复杂对象导致序列化失败
+            return {
+              type: obj.type,
+              left: obj.left,
+              top: obj.top,
+              width: obj.width,
+              height: obj.height,
+              scaleX: obj.scaleX,
+              scaleY: obj.scaleY,
+              angle: obj.angle,
+              fill: obj.fill,
+              stroke: obj.stroke,
+              strokeWidth: obj.strokeWidth,
+            };
+          }),
+        };
+        console.warn('✅ 备用序列化成功，对象数量:', objects.length);
+        return JSON.stringify(simpleData);
+      } catch (backupError) {
+        console.error('❌ 备用序列化也失败:', backupError);
+        // 最后的兜底：返回空 JSON
+        return JSON.stringify({
+          version: '5.3.0',
+          objects: [],
+        });
+      }
     }
   }
 
@@ -3191,6 +3221,11 @@ export class CanvasManager {
   setLoadingTemplate(loading: boolean) {
     this.isLoadingTemplate = loading;
     console.log('🔄 设置加载模板状态:', loading);
+  }
+
+  // 🆕 获取是否正在加载模板
+  getLoadingTemplate(): boolean {
+    return this.isLoadingTemplate;
   }
 
   // 重新绑定所有 Group 对象的双击事件

@@ -68,6 +68,7 @@ export default function Topbar({
   onSaveAsTemplate,
 }: TopbarProps) {
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
   const [activeRatio, setActiveRatio] = useState<'3:4' | '1:1' | '4:3' | '16:9' | '21:9' | '9:16'>('3:4');
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -106,7 +107,7 @@ export default function Topbar({
         </div>
 
         {/* 版本选择 */}
-        <DropdownMenu>
+        <DropdownMenu open={versionMenuOpen} onOpenChange={setVersionMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="h-10 px-5 border-gray-200 gap-2">
               {activeVersion?.name || '画布 1'}
@@ -154,7 +155,10 @@ export default function Topbar({
                     // 正常模式
                     <>
                       <button
-                        onClick={() => onVersionChange(version.id)}
+                        onClick={() => {
+                          onVersionChange(version.id);
+                          setVersionMenuOpen(false);
+                        }}
                         className="flex-1 text-left px-2 py-1 text-sm"
                       >
                         {version.name}

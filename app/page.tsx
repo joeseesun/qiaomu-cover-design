@@ -599,6 +599,12 @@ export default function Home() {
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (managerRef.current && versionRef.current && activeId) {
+        // 🔥 检查是否正在加载模板，避免保存空数据
+        if (managerRef.current.getLoadingTemplate()) {
+          console.log('⚠️ 正在加载模板，跳过页面卸载前保存');
+          return;
+        }
+
         const data = managerRef.current.toJSON();
         versionRef.current.update(activeId, data);
         console.log('💾 页面卸载前保存:', {
@@ -623,6 +629,11 @@ export default function Home() {
 
     const timer = setInterval(() => {
       if (managerRef.current && versionRef.current && activeId) {
+        // 🔥 检查是否正在加载模板，避免保存空数据
+        if (managerRef.current.getLoadingTemplate()) {
+          return;
+        }
+
         const data = managerRef.current.toJSON();
 
         // 只有数据变化时才保存，避免重复写入
@@ -892,6 +903,12 @@ export default function Home() {
 
     // 🔥 保存当前版本前，先确保不在加载状态
     managerRef.current.setLoadingTemplate(false);
+
+    console.log('📊 切换前画布状态:', {
+      对象数量: managerRef.current.canvas.getObjects().length,
+      画布尺寸: `${managerRef.current.width}x${managerRef.current.height}`,
+    });
+
     const currentData = managerRef.current.toJSON();
     const currentThumbnail = managerRef.current.toThumbnail();
     versionRef.current.update(activeId, currentData, currentThumbnail);
@@ -899,6 +916,7 @@ export default function Home() {
     console.log('💾 保存当前版本:', {
       版本ID: activeId,
       数据长度: currentData.length,
+      数据预览: currentData.substring(0, 100),
     });
 
     // 切换版本
