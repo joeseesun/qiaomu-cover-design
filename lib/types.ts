@@ -28,6 +28,7 @@ export interface FontConfig {
   preview: string;  // 预览文字
   loaded?: boolean; // 是否已加载
   customUrl?: string; // 🆕 自定义字体 CDN URL（如果有，则不使用 Google Fonts）
+  cssPath?: string; // 🆕 npm 包的 CSS 路径（相对于 node_modules）
 }
 
 export const HIGHLIGHT_COLORS = [
@@ -41,25 +42,37 @@ export const HIGHLIGHT_COLORS = [
 // 精选字体（中文 + 英文）- 按使用频率和热度排序
 export const FONTS: FontConfig[] = [
   // 🔥 热门中文字体（第 1 页）
-  { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计' },
-  { name: '汇文明朝体', family: 'Huiwen-mincho', weight: [400], preview: '设计' },
-  { name: '抖音美好体', family: 'Douyin Sans', weight: [700], preview: '设计' },
+  { name: '霞鹜文楷', family: 'LXGW WenKai', weight: [400, 700], preview: '设计', cssPath: '@chinese-fonts/lxgwwenkai/dist/LXGWWenKai-Regular/result.css' },
+  { name: '汇文明朝体', family: 'Huiwen-mincho', weight: [400], preview: '设计', cssPath: '@chinese-fonts/hwmct/dist/汇文明朝体/result.css' },
+  { name: '抖音美好体', family: 'Douyin Sans', weight: [700], preview: '设计', cssPath: '@chinese-fonts/dymh/dist/DouyinSansBold/result.css' },
 
   // 🔥 常用中文字体（第 2-3 页）
-  { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' },
-  { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' },
-  { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' },
-  { name: '优设标题黑', family: 'YouSheBiaoTiHei', weight: [400], preview: '设计' },
-  { name: '得意黑', family: 'Smiley Sans Oblique', weight: [400], preview: '设计' },
-  { name: '斗鱼追光体', family: 'DOUYU Font', weight: [400], preview: '设计' },
+  { name: '思源黑体', family: 'Noto Sans SC', weight: [400, 700], preview: '设计' }, // Google Fonts
+  { name: '思源宋体', family: 'Noto Serif SC', weight: [400, 700], preview: '设计' }, // Google Fonts
+  { name: '站酷快乐体', family: 'ZCOOL KuaiLe', weight: [400], preview: '设计' }, // Google Fonts
+  { name: '优设标题黑', family: 'YouSheBiaoTiHei', weight: [400], preview: '设计', cssPath: '@chinese-fonts/ysbth/dist/优设标题黑/result.css' },
+  { name: '得意黑', family: 'Smiley Sans Oblique', weight: [400], preview: '设计', cssPath: '@chinese-fonts/dyh/dist/SmileySans-Oblique/result.css' },
+  { name: '斗鱼追光体', family: 'DOUYU Font', weight: [400], preview: '设计', cssPath: '@chinese-fonts/dyzgt/dist/斗鱼追光体/result.css' },
 
-  // 🎨 特色中文字体（第 4-5 页）
-  { name: '上图东观体', family: 'STDongGuanTi Bld', weight: [400], preview: '设计' },
-  { name: '千图笔锋手写体', family: 'qiantubifengshouxieti', weight: [400], preview: '设计' },
-  { name: '鸿雷行书简体', family: 'hongleixingshu', weight: [400], preview: '设计' },
-  { name: '全小素', family: 'QuanPixel 8px', weight: [600], preview: '设计' },
-  { name: '铁蒺藜体', family: 'Tiejili', weight: [400], preview: '设计' },
-  { name: '精品點陣體', family: 'BoutiqueBitmap7x7 1.6', weight: [400], preview: '设计' },
+  // 🎨 特色中文字体（第 4-5 页）- npm 包
+  { name: '上图东观体', family: 'STDongGuanTi Bld', weight: [400], preview: '设计', cssPath: '@chinese-fonts/stdgt/dist/上图东观体-粗体/result.css' },
+  { name: '千图笔锋手写体', family: 'qiantubifengshouxieti', weight: [400], preview: '设计', cssPath: '@chinese-fonts/qtbfsxt/dist/千图笔锋手写体/result.css' },
+  { name: '鸿雷行书简体', family: 'hongleixingshu', weight: [400], preview: '设计', cssPath: '@chinese-fonts/hlxsjt/dist/鸿雷行书简体/result.css' },
+  { name: '全小素', family: 'QuanPixel 8px', weight: [600], preview: '设计', cssPath: '@chinese-fonts/qxs/dist/quan/result.css' },
+  { name: '铁蒺藜体', family: 'Tiejili', weight: [400], preview: '设计', cssPath: '@chinese-fonts/tjl/dist/Tiejili_Regular/result.css' },
+  { name: '精品點陣體', family: 'BoutiqueBitmap7x7 1.6', weight: [400], preview: '设计', cssPath: '@chinese-fonts/jpdzt/dist/BoutiqueBitmap7x7_1_6/result.css' },
+
+  // 🌟 个性中文字体（第 6 页）- npm 包
+  { name: '寒蝉全圆体', family: '寒蝉全圆体', weight: [400], preview: '设计', cssPath: '@chinese-fonts/hcqyt/dist/ChillRoundFRegular/result.css' },
+  { name: '悠哉', family: 'Yozai', weight: [400, 700], preview: '设计', cssPath: '@chinese-fonts/yozai/dist/Yozai-Regular/result.css' },
+  { name: '小赖体', family: 'Xiaolai SC', weight: [400], preview: '设计', cssPath: '@chinese-fonts/xiaolai/dist/Xiaolai/result.css' },
+  { name: '霞鹜漫黑', family: 'LXGW Marker Gothic', weight: [400], preview: '设计', cssPath: '@chinese-fonts/lxgwmanhei/dist/LXGWMarkerGothic/result.css' },
+  { name: '猫啃网糖圆体', family: 'MaoKenTangYuan (beta)', weight: [400], preview: '设计', cssPath: '@chinese-fonts/mkwtyt/dist/MaoKenTangYuan/result.css' },
+  { name: '演示佛系体', family: 'Slidefu', weight: [400], preview: '设计', cssPath: '@chinese-fonts/ysfxt/dist/Slidefu-Regular/result.css' },
+  { name: '演示悠然小楷', family: 'slideyouran', weight: [400], preview: '设计', cssPath: '@chinese-fonts/ysyrxk/dist/slideyouran-Regular2_0/result.css' },
+  { name: '字魂扁桃体', family: 'zihunbiantaoti', weight: [400], preview: '设计', cssPath: '@chinese-fonts/zhbtt/dist/字魂扁桃体/result.css' },
+  { name: '有字库龙藏体', family: 'Long Cang', weight: [400], preview: '设计', cssPath: '@chinese-fonts/yzklct/dist/有字库龙藏体/result.css' },
+  { name: '标小智龙珠体', family: 'LogoSC LongZhuTi', weight: [400], preview: '设计', cssPath: '@chinese-fonts/bxzlzt/dist/标小智龙珠体/result.css' },
 
   // 🆕 自定义 CDN 字体（第 6 页）
   {

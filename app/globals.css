@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/*
+ * 中文字体采用按需加载策略，避免一次性加载过多字体导致 webpack 崩溃
+ * 字体 CSS 在 FontPanel.tsx 中动态加载
+ */
+
 @custom-variant dark (&:is(.dark *));
 
 * {

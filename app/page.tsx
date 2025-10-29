@@ -119,16 +119,20 @@ export default function Home() {
     }
 
     // 监听选择事件
+    // 🔥 保存完整的 activeObject（可能是单个对象或 activeSelection）
     managerRef.current.canvas.on('selection:created', (e: any) => {
       const target = e.selected?.[0] || e.target;
       setSelectedObject(target);
+      console.log('🎯 selection:created:', target?.type, 'selected count:', e.selected?.length);
     });
     managerRef.current.canvas.on('selection:updated', (e: any) => {
       const target = e.selected?.[0] || e.target;
       setSelectedObject(target);
+      console.log('🎯 selection:updated:', target?.type, 'selected count:', e.selected?.length);
     });
     managerRef.current.canvas.on('selection:cleared', () => {
       setSelectedObject(null);
+      console.log('🎯 selection:cleared');
     });
 
     // 在Fabric.js的upperCanvasEl上监听右键
@@ -138,8 +142,20 @@ export default function Home() {
       e.preventDefault();
       e.stopPropagation();
 
+      const currentActiveObject = managerRef.current!.canvas.getActiveObject();
+
+      // 🔥 如果当前是多选状态，直接显示菜单，不改变选择
+      if (currentActiveObject?.type === 'activeSelection') {
+        console.log('🖱️ 右键点击多选对象');
+        setContextMenu({ x: e.pageX, y: e.pageY });
+        // 保存当前多选对象
+        (setContextMenu as any).clickedObject = currentActiveObject;
+        console.log('✅ 显示多选菜单');
+        return;
+      }
+
+      // 单选或无选择状态：查找点击的对象
       const pointer = managerRef.current!.canvas.getPointer(e);
-      // 使用 skipGroup: false 来查找所有对象，包括锁定的对象
       const allObjects = managerRef.current!.canvas.getObjects();
       let target = null;
 
@@ -154,7 +170,12 @@ export default function Home() {
         }
       }
 
-      console.log('🖱️ 右键点击:', { target: target?.type, locked: (target as any)?.locked, pointer });
+      console.log('🖱️ 右键点击:', {
+        target: target?.type,
+        locked: (target as any)?.locked,
+        currentActive: currentActiveObject?.type,
+        pointer
+      });
 
       if (target) {
         // 如果对象未锁定，设置为选中状态
@@ -162,6 +183,7 @@ export default function Home() {
           managerRef.current!.canvas.setActiveObject(target);
           managerRef.current!.canvas.renderAll();
         }
+
         // 使用 pageX/pageY 而不是 clientX/clientY，避免高 DPI 屏幕缩放问题
         setContextMenu({ x: e.pageX, y: e.pageY });
         // 保存右键点击的对象（用于锁定对象的菜单）
@@ -1699,6 +1721,7 @@ export default function Home() {
 
   // 字体面板操作
   const handleFontChange = (fontFamily: string) => {
+    console.log('🎨 handleFontChange 被调用:', fontFamily);
     managerRef.current?.updateProperty('fontFamily', fontFamily);
   };
 
@@ -2024,10 +2047,19 @@ export default function Home() {
       </div>
 
       {/* 右键菜单 */}
-      {contextMenu && (selectedObject || (setContextMenu as any).clickedObject) && (() => {
-        // 获取右键点击的对象（可能是锁定的对象）
+      {contextMenu && (selectedObject || (setContextMenu as any).clickedObject || managerRef.current?.canvas.getActiveObject()) && (() => {
+        // 🔥 获取当前激活的对象（可能是单个对象、多选对象或锁定对象）
+        const activeObject = managerRef.current?.canvas.getActiveObject();
         const clickedObject = (setContextMenu as any).clickedObject || selectedObject;
         const isLocked = (clickedObject as any)?.locked === true;
+        const isMultiSelect = activeObject?.type === 'activeSelection';
+
+        console.log('🎨 右键菜单渲染:', {
+          isMultiSelect,
+          activeType: activeObject?.type,
+          clickedType: clickedObject?.type,
+          isLocked
+        });
 
         return (
           <>

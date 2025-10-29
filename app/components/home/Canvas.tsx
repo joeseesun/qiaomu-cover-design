@@ -30,10 +30,9 @@ export default function Canvas({
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [isSpacePressed, setIsSpacePressed] = useState(false);
 
-  // 判断是否可以拖拽：锁定模式 或 按住空格键
-  const canPan = isPanMode || isSpacePressed;
+  // 判断是否可以拖拽：仅锁定模式（移除空格键快捷键）
+  const canPan = isPanMode;
 
   // 测试原生contextmenu事件
   useEffect(() => {
@@ -121,59 +120,9 @@ export default function Canvas({
     };
   }, [userZoom, onUserZoomChange]);
 
-  // 监听空格键按下/释放
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) {
-        // 🔥 检查是否在输入框或文本编辑状态
-        const target = e.target as HTMLElement;
-        const isInputFocused =
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable;
-
-        // 如果在输入框或文本编辑状态，不触发画布拖拽模式
-        if (isInputFocused) {
-          console.log('⌨️ 空格键：在输入框中，允许输入空格');
-          return; // 不阻止默认行为，让空格正常输入
-        }
-
-        // 只有在非输入状态下才触发画布拖拽
-        e.preventDefault();
-        setIsSpacePressed(true);
-        console.log('🖐️ 空格键：进入临时拖拽模式');
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        // 🔥 检查是否在输入框或文本编辑状态
-        const target = e.target as HTMLElement;
-        const isInputFocused =
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable;
-
-        // 如果在输入框或文本编辑状态，不处理
-        if (isInputFocused) {
-          return;
-        }
-
-        e.preventDefault();
-        setIsSpacePressed(false);
-        setIsPanning(false);
-        console.log('🖐️ 空格键：退出临时拖拽模式');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
+  // 🔥 移除空格键快捷键功能
+  // 原因：空格键会干扰输入框、文本编辑等场景
+  // 用户可以使用顶部工具栏的「手型」按钮来切换拖拽模式
 
   // 处理画布拖拽
   const handleMouseDown = (e: React.MouseEvent) => {

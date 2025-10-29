@@ -240,53 +240,81 @@ export default function FontPanel({
     setLoadingFonts((prev) => new Set(prev).add(font.family));
 
     try {
+      // 🔥 先移除已存在的同名字体 link 标签，避免缓存问题
+      const existingLinks = document.querySelectorAll(`link[data-font-family="${font.family}"]`);
+      existingLinks.forEach(link => link.remove());
+
       const link = document.createElement('link');
 
-      // 🆕 如果有自定义 URL，使用自定义 CDN；否则使用 Google Fonts
-      if (font.customUrl) {
+      // 🆕 优先级：cssPath (npm 包) > customUrl (自定义 CDN) > Google Fonts
+      if (font.cssPath) {
+        // npm 包字体：通过 API 路由提供
+        // 添加时间戳避免缓存
+        const timestamp = Date.now();
+        link.href = `/api/fonts?path=${encodeURIComponent(font.cssPath)}&t=${timestamp}`;
+        link.rel = 'stylesheet';
+        link.setAttribute('data-font-family', font.family);
+        console.log('🔤 加载 npm 包字体:', font.name, font.cssPath);
+      } else if (font.customUrl) {
+        // 自定义 CDN 字体
         link.href = font.customUrl;
         link.rel = 'stylesheet';
         link.crossOrigin = 'anonymous';
+        link.setAttribute('data-font-family', font.family);
         console.log('🔤 加载自定义字体:', font.name, font.customUrl);
       } else {
+        // Google Fonts
         link.href = `https://fonts.googleapis.com/css2?family=${font.family.replace(
           / /g,
           '+'
         )}:wght@${font.weight.join(';')}&display=swap`;
         link.rel = 'stylesheet';
+        link.setAttribute('data-font-family', font.family);
         console.log('🔤 加载 Google 字体:', font.name);
       }
 
-      document.head.appendChild(link);
-
-      // 🔥 使用 document.fonts.load() 真正加载字体文件
-      // 这比 check() 更可靠，会等待字体文件下载完成
-      try {
-        // 为每个 weight 加载字体
-        const loadPromises = font.weight.map(async (weight) => {
-          const fontSpec = `${weight} 12px "${font.family}"`;
-          console.log('📥 开始加载字体文件:', font.name, fontSpec);
-
-          try {
-            // document.fonts.load() 会真正下载字体文件并等待完成
-            await Promise.race([
-              document.fonts.load(fontSpec),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('timeout')), 5000)
-              )
-            ]);
-            console.log('✅ 字体文件加载完成:', font.name, fontSpec);
-          } catch (error) {
-            // 单个 weight 加载失败不影响其他 weight
-            console.warn('⚠️ 字体 weight 加载失败:', font.name, weight, error);
+      // 🔥 等待 CSS 文件加载完成
+      await new Promise<void>((resolve, reject) => {
+        link.onload = () => {
+          console.log('✅ CSS 文件加载完成:', font.name);
+          resolve();
+        };
+        link.onerror = () => {
+          console.warn('⚠️ CSS 文件加载失败（可能是网络问题）:', font.name);
+          // 对于 Google Fonts，加载失败时不抛出错误，而是静默失败
+          // 这样用户仍然可以尝试使用字体（浏览器可能已经缓存了）
+          if (!font.cssPath && !font.customUrl) {
+            console.log('📝 Google Fonts 加载失败，但继续执行');
+            resolve(); // 继续执行，不阻塞
+          } else {
+            reject(new Error('CSS load failed'));
           }
-        });
+        };
+        document.head.appendChild(link);
+      });
 
-        // 等待所有 weight 加载完成（或超时）
-        await Promise.allSettled(loadPromises);
-        console.log('✅ 字体所有 weight 加载完成:', font.name);
-      } catch (error) {
-        console.warn('⚠️ 字体加载过程出错，继续执行:', font.name, error);
+      // 🔥 等待字体真正可用 - 使用轮询检查
+      // 对于分片字体，我们检查常用字符是否可用
+      const testText = '设计'; // 使用预览文本
+      const maxAttempts = 50; // 最多尝试 50 次
+      const delayMs = 100; // 每次间隔 100ms
+
+      for (let i = 0; i < maxAttempts; i++) {
+        // 检查字体是否在 document.fonts 中
+        const fontFaces = Array.from(document.fonts).filter(
+          (f: any) => f.family === font.family || f.family === `"${font.family}"`
+        );
+
+        if (fontFaces.length > 0) {
+          console.log(`✅ 字体已在 document.fonts 中: ${font.name}, 找到 ${fontFaces.length} 个 @font-face`);
+          // 再等待一小段时间确保字体文件下载
+          await new Promise(resolve => setTimeout(resolve, 200));
+          break;
+        }
+
+        if (i < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
       }
 
       setLoadedFonts((prev) => new Set(prev).add(font.family));
@@ -305,25 +333,32 @@ export default function FontPanel({
   };
 
   const handleFontClick = async (font: FontConfig) => {
-    // 1. 立即应用字体（即使还没加载完成，给用户即时反馈）
-    onFontChange(font.family);
-    addToRecent(font);
+    console.log('🖱️ 点击字体:', font.name, 'family:', font.family);
 
-    // 2. 检查字体是否已加载
+    // 1. 检查字体是否已加载
     const wasLoaded = loadedFonts.has(font.family);
 
     if (!wasLoaded) {
       console.log('🔤 字体未加载，开始加载:', font.name);
 
-      // 3. 等待字体加载完成
+      // 2. 等待字体加载完成
       await loadFont(font);
 
-      // 4. 字体加载完成后，重新应用以触发正确渲染
-      console.log('✅ 字体加载完成，重新渲染:', font.name);
-      onFontChange(font.family);
+      console.log('✅ 字体加载完成，现在应用:', font.name);
     } else {
       console.log('✅ 字体已加载，直接应用:', font.name);
     }
+
+    // 3. 应用字体（在加载完成后）
+    onFontChange(font.family);
+    addToRecent(font);
+
+    // 4. 🔥 延迟再次应用，确保字体文件真正下载完成
+    // 对于分片字体，浏览器需要时间下载所需的字体文件
+    setTimeout(() => {
+      console.log('🔄 延迟再次应用字体:', font.name);
+      onFontChange(font.family);
+    }, 300);
   };
 
   // 计算分页（每页 3 个字体）

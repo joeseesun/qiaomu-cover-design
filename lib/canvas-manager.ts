@@ -2125,6 +2125,8 @@ export class CanvasManager {
     const activeObj = this.canvas.getActiveObject();
     if (!activeObj) return;
 
+    console.log(`🔄 updateProperty: ${property} = ${value}, activeObj type: ${activeObj.type}`);
+
     // 处理多选
     if (activeObj.type === 'activeSelection') {
       const selection = activeObj as fabric.ActiveSelection;
@@ -2136,6 +2138,14 @@ export class CanvasManager {
 
       this.canvas.renderAll();
       this.canvas.fire('object:modified', { target: activeObj });
+
+      // 🔥 对于字体属性，延迟再次渲染，确保字体加载完成
+      if (property === 'fontFamily') {
+        setTimeout(() => {
+          this.canvas.renderAll();
+          console.log('🔄 延迟渲染完成（多选）');
+        }, 100);
+      }
       return;
     }
 
@@ -2144,6 +2154,15 @@ export class CanvasManager {
     activeObj.setCoords();
     this.canvas.renderAll();
     this.canvas.fire('object:modified', { target: activeObj });
+
+    // 🔥 对于字体属性，延迟再次渲染，确保字体加载完成
+    if (property === 'fontFamily') {
+      setTimeout(() => {
+        activeObj.setCoords();
+        this.canvas.renderAll();
+        console.log('🔄 延迟渲染完成（单选）');
+      }, 100);
+    }
   }
 
   // 更新图形填充颜色
@@ -2231,19 +2250,89 @@ export class CanvasManager {
       }
     }
 
-    // 对于文本颜色，需要特殊处理以支持多行文本
-    if (property === 'fill' && (targetObj.type === 'i-text' || targetObj.type === 'textbox' || targetObj.type === 'text')) {
-      // 设置整体颜色
-      targetObj.set('fill', value);
+    const isTextObject = targetObj.type === 'i-text' || targetObj.type === 'textbox' || targetObj.type === 'text';
 
-      // 如果是 i-text 或 textbox，清除所有选区样式，确保所有文本都使用统一颜色
+    // 🔥 对于文本样式属性（颜色、字体等），需要特殊处理以支持多行文本
+    if (isTextObject && (property === 'fill' || property === 'fontFamily' || property === 'fontSize' || property === 'fontWeight' || property === 'fontStyle')) {
+      console.log(`🔤 开始应用文本样式: ${property} = ${value}`);
+      console.log(`📝 应用前 ${property}:`, targetObj.get(property));
+
+      // 1. 设置整体属性
+      targetObj.set(property, value);
+
+      console.log(`📝 应用后 ${property}:`, targetObj.get(property));
+
+      // 2. 如果是 i-text 或 textbox，需要清除字符级样式
       if (targetObj.type === 'i-text' || targetObj.type === 'textbox') {
         const textLength = (targetObj as any).text?.length || 0;
+        console.log(`📝 文本长度: ${textLength}, 当前 styles:`, targetObj.styles);
+
         if (textLength > 0) {
-          // 清除所有字符的样式，让它们使用对象的 fill 属性
-          (targetObj as any).setSelectionStyles({ fill: value }, 0, textLength);
+          // 🔥 关键修复：完全清除 styles 对象，而不是用 setSelectionStyles 覆盖
+          // 这样可以确保所有文本都使用对象级别的属性
+          if (property === 'fontFamily') {
+            // 对于字体，需要清除所有行的 fontFamily 样式
+            if (targetObj.styles) {
+              Object.keys(targetObj.styles).forEach((lineIndex) => {
+                const lineStyles = targetObj.styles[lineIndex];
+                if (lineStyles) {
+                  Object.keys(lineStyles).forEach((charIndex) => {
+                    if (lineStyles[charIndex]) {
+                      delete lineStyles[charIndex].fontFamily;
+                      delete lineStyles[charIndex].fontWeight;
+                      delete lineStyles[charIndex].fontStyle;
+                    }
+                  });
+                }
+              });
+            }
+            console.log(`✅ 已清除字符级 fontFamily 样式`);
+          } else if (property === 'fill') {
+            // 对于颜色，清除所有行的 fill 样式
+            if (targetObj.styles) {
+              Object.keys(targetObj.styles).forEach((lineIndex) => {
+                const lineStyles = targetObj.styles[lineIndex];
+                if (lineStyles) {
+                  Object.keys(lineStyles).forEach((charIndex) => {
+                    if (lineStyles[charIndex]) {
+                      delete lineStyles[charIndex].fill;
+                    }
+                  });
+                }
+              });
+            }
+            console.log(`✅ 已清除字符级 fill 样式`);
+          } else if (property === 'fontSize') {
+            // 对于字号，清除所有行的 fontSize 样式
+            if (targetObj.styles) {
+              Object.keys(targetObj.styles).forEach((lineIndex) => {
+                const lineStyles = targetObj.styles[lineIndex];
+                if (lineStyles) {
+                  Object.keys(lineStyles).forEach((charIndex) => {
+                    if (lineStyles[charIndex]) {
+                      delete lineStyles[charIndex].fontSize;
+                    }
+                  });
+                }
+              });
+            }
+            console.log(`✅ 已清除字符级 fontSize 样式`);
+          }
         }
       }
+
+      // 3. 🔥 强制重新计算文本尺寸（字体变化时很重要）
+      if (property === 'fontFamily' || property === 'fontSize') {
+        // 🔥 关键修复：设置 dirty = true 强制 Fabric.js 清除缓存
+        (targetObj as any).dirty = true;
+        (targetObj as any)._clearCache();
+
+        targetObj.initDimensions();
+        targetObj.setCoords();
+        console.log(`✅ 已重新计算文本尺寸，dirty = true`);
+      }
+
+      console.log(`✅ 文本样式应用完成: ${property} = ${value}`);
     } else {
       targetObj.set(property, value);
     }
