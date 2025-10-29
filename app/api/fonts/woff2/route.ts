@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     const fileBuffer = await readFile(filePath);
     console.log('✅ WOFF2 文件加载成功:', woff2Path, `(${fileBuffer.length} bytes)`);
 
-    // 返回 WOFF2 文件
-    return new NextResponse(fileBuffer, {
+    // 返回 WOFF2 文件（将 Buffer 转换为 Uint8Array）
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': 'font/woff2',
         'Cache-Control': 'public, max-age=31536000, immutable', // 缓存 1 年
