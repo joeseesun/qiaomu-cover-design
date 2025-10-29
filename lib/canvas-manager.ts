@@ -3164,7 +3164,7 @@ export class CanvasManager {
   }
 
   // 从 JSON 加载
-  loadFromJSON(json: string) {
+  loadFromJSON(json: string, enableHistoryAfterLoad: boolean = true) {
     // 🆕 加载时禁用历史记录，避免触发自动保存
     const wasLoadingTemplate = this.isLoadingTemplate;
     this.isLoadingTemplate = true;
@@ -3176,8 +3176,9 @@ export class CanvasManager {
 
       // 🆕 延迟恢复历史记录状态，确保渲染完成
       setTimeout(() => {
-        this.isLoadingTemplate = wasLoadingTemplate;
-        console.log('✅ 画布加载完成');
+        // 如果 enableHistoryAfterLoad 为 true，则启用历史记录；否则恢复之前的状态
+        this.isLoadingTemplate = enableHistoryAfterLoad ? false : wasLoadingTemplate;
+        console.log('✅ 画布加载完成, isLoadingTemplate =', this.isLoadingTemplate);
       }, 100);
     });
   }
@@ -3732,7 +3733,8 @@ export class CanvasManager {
     if (this.historyIndex > 0) {
       this.isUndoRedoing = true;
       this.historyIndex--;
-      this.loadFromJSON(this.history[this.historyIndex]);
+      // 撤销时不启用历史记录，避免创建新的历史记录
+      this.loadFromJSON(this.history[this.historyIndex], false);
       this.isUndoRedoing = false;
     }
   }
@@ -3742,7 +3744,8 @@ export class CanvasManager {
     if (this.historyIndex < this.history.length - 1) {
       this.isUndoRedoing = true;
       this.historyIndex++;
-      this.loadFromJSON(this.history[this.historyIndex]);
+      // 重做时不启用历史记录，避免创建新的历史记录
+      this.loadFromJSON(this.history[this.historyIndex], false);
       this.isUndoRedoing = false;
     }
   }

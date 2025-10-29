@@ -114,8 +114,13 @@ export default function Home() {
     setActiveId(activeVersion!.id);
 
     if (activeVersion?.data) {
+      console.log('📥 初始化加载画布数据，长度:', activeVersion.data.length);
       managerRef.current.loadFromJSON(activeVersion.data);
       // ✅ 不再需要 migrateOldGroups，因为 rebindGroupEvents 已经处理了双击编辑
+    } else {
+      console.log('📄 初始化空白画布');
+      // 如果没有数据，直接启用历史记录
+      managerRef.current.setLoadingTemplate(false);
     }
 
     // 监听选择事件
@@ -918,10 +923,8 @@ export default function Home() {
         managerRef.current.setLoadingTemplate(false);
       } else {
         console.log('📥 加载画布数据，长度:', version.data.length);
-        // 🔥 加载前禁用历史记录
-        managerRef.current.setLoadingTemplate(true);
+        // loadFromJSON 会自动启用历史记录
         managerRef.current.loadFromJSON(version.data);
-        // loadFromJSON 内部会在加载完成后恢复 isLoadingTemplate 状态
       }
     } else {
       console.error('❌ 未找到版本:', id);
@@ -1395,16 +1398,9 @@ export default function Home() {
         newSize.height
       );
 
-      // 🆕 如果需要加载数据，先禁用历史记录
+      // 🆕 如果需要加载数据，加载并自动启用历史记录
       if (currentData && currentData.length > 100) { // 检查数据是否有效（不是空 JSON）
-        managerRef.current.setLoadingTemplate(true);
-        managerRef.current.loadFromJSON(currentData);
-        // 加载完成后启用历史记录
-        setTimeout(() => {
-          if (managerRef.current) {
-            managerRef.current.setLoadingTemplate(false);
-          }
-        }, 100);
+        managerRef.current.loadFromJSON(currentData); // 默认会启用历史记录
       } else {
         // 没有数据要加载，直接启用历史记录
         managerRef.current.setLoadingTemplate(false);
