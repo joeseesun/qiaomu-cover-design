@@ -34,6 +34,10 @@ export class CanvasManager {
     // 注意：不要在构造函数中自动启用，由外部调用者控制
     this.isLoadingTemplate = true;
 
+    // 🔥 设置全局 crossOrigin，确保所有图片都支持跨域
+    // 这样可以避免画布被污染，允许导出为图片
+    (fabric.Image as any).prototype.crossOrigin = 'anonymous';
+
     this.canvas = new fabric.Canvas(element, {
       width: this.width,
       height: this.height,
@@ -3629,11 +3633,17 @@ export class CanvasManager {
 
   // 生成缩略图
   toThumbnail() {
-    return this.canvas.toDataURL({
-      format: 'jpeg', // 使用 JPEG 格式，比 PNG 小很多
-      quality: 0.2,   // 降低质量到 0.2
-      multiplier: 0.15, // 降低尺寸到 0.15
-    });
+    try {
+      return this.canvas.toDataURL({
+        format: 'jpeg', // 使用 JPEG 格式，比 PNG 小很多
+        quality: 0.2,   // 降低质量到 0.2
+        multiplier: 0.15, // 降低尺寸到 0.15
+      });
+    } catch (error) {
+      // 如果画布被污染（包含跨域图片），返回空字符串
+      console.warn('⚠️ 无法生成缩略图（画布包含跨域图片）:', error);
+      return '';
+    }
   }
 
   // 清空画布
