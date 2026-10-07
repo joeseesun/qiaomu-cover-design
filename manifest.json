@@ -1,3 +1,10 @@
 {
-  "id": "qiaomu-cover-design", "name": "Qiaomu Cover Design", "version": "0.1.0", "minAppVersion": "1.8.7", "description": "Design covers with text, shapes and local images, then export them into your notes.", "author": "向阳乔木", "authorUrl": "https://github.com/joeseesun", "isDesktopOnly": true
+  "id": "qiaomu-cover-design",
+  "name": "Qiaomu Cover Design",
+  "version": "0.2.0",
+  "minAppVersion": "1.8.7",
+  "description": "Design covers for Xiaohongshu, YouTube and Bilibili with platform presets, local fonts and flexible export.",
+  "author": "向阳乔木",
+  "authorUrl": "https://github.com/joeseesun",
+  "isDesktopOnly": true
 }

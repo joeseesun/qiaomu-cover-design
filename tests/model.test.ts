@@ -31,5 +31,29 @@ test('writes stay ordered after failures, avoiding stale asynchronous saves',asy
 test('complete zh/en keys and interpolation, deterministic unknown locale fallback',()=>{
   assert.deepEqual(Object.keys(en).sort(),Object.keys(zh).sort());
   for(const key of Object.keys(en) as (keyof typeof en)[]){assert.deepEqual(en[key].match(/\{\w+\}/g),zh[key].match(/\{\w+\}/g));}
-  assert.equal(translate('zh-CN','exportDone',{path:'设计.png'}),'PNG 已保存：设计.png');assert.equal(translate('xx','save'),'Save');
+  assert.equal(translate('zh-CN','exportDone',{path:'设计.png'}),'已导出：设计.png');assert.equal(translate('xx','save'),'Save');
+});
+import { SnapshotCodec, renderFilename, validBackground } from '../src/model';
+import { interpret } from '../src/ops';
+import { PLATFORMS } from '../src/platforms';
+test('snapshots share one copy of each embedded image and restore it exactly',()=>{
+  const c=new SnapshotCodec();const img='data:image/png;base64,YWJj';
+  const d={...valid,canvas:{objects:[{type:'Image',src:img}]}} as never;
+  const a=c.encode(d),b=c.encode(d);assert.ok(!a.includes('base64'));assert.equal(a,b);
+  assert.equal((c.decode(a).canvas.objects as {src:string}[])[0]!.src,img);
+  assert.throws(()=>c.decode(a.replace('@img:0','@img:9')));
+});
+test('file names from templates are safe and background specs validated',()=>{
+  const safe=renderFilename('{name}-{platform}/../x',{name:'封面 A',platform:'xhs'});assert.equal(safe,'封面-A-xhs-..-x');assert.ok(!/[\\/]/.test(safe));
+  assert.equal(renderFilename('',{}),'Cover');
+  assert.ok(validBackground({kind:'solid',color:'#ffffff'}));assert.ok(!validBackground({kind:'solid',color:'red'}));
+  assert.ok(validBackground({kind:'linear',from:'#000000',to:'#ffffff',angle:90}));
+});
+test('offline commands map Chinese requests to ops; platform presets are valid',()=>{
+  const base={zh:true,fonts:['PingFang SC'],size:{width:1,height:1}};
+  assert.deepEqual(interpret({...base,prompt:'切换到 YouTube'}).ops,[{op:'platform',id:'youtube'}]);
+  assert.deepEqual(interpret({...base,prompt:'背景改成深蓝渐变黑色'}).ops.map(o=>o.op),['background']);
+  assert.ok(interpret({...base,prompt:'添加文字“限时福利”'}).ops.some(o=>o.op==='addText'));
+  assert.equal(interpret({...base,prompt:'今天天气怎么样'}).ops.length,0);
+  for(const p of PLATFORMS)assert.ok(p.width>=200&&p.height>=200&&p.width<=4096&&p.height<=4096);
 });
