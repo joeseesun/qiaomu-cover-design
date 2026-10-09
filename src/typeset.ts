@@ -15,11 +15,11 @@ export interface Pair { title: string[]; body: string[]; zh: string }
 const BODY = ['阿里巴巴普惠体', 'MiSans', '鸿蒙黑体', '思源黑体', '霞鹜新晰黑', 'PingFang SC'];
 export const MOODS: Record<Mood, Pair> = {
   heavy: { zh: '稳重有力', title: ['阿里巴巴普惠体 Heavy', '优设标题黑', '鸿蒙黑体 Black', 'MiSans Heavy', '思源黑体 Bold', '思源黑体'], body: BODY },
-  punch: { zh: '冲击抓眼', title: ['优设标题黑', '阿里巴巴普惠体 Heavy', '抖音美好体', '鸿蒙黑体 Black', '思源黑体 Bold'], body: BODY },
+  punch: { zh: '冲击抓眼', title: ['优设标题黑', '钉钉进步体', '阿里巴巴普惠体 Heavy', '抖音美好体', '鸿蒙黑体 Black', '思源黑体 Bold'], body: BODY },
   tech: { zh: '科技数据', title: ['阿里妈妈数黑体', '阿里巴巴普惠体 Heavy', '未来荧黑', '得意黑', '思源黑体 Bold'], body: ['MiSans', ...BODY] },
   trend: { zh: '潮流年轻', title: ['抖音美好体', '站酷庆科黄油体', '优设标题黑', '阿里巴巴普惠体 Heavy'], body: BODY },
-  warm: { zh: '亲切活泼', title: ['站酷庆科黄油体', '抖音美好体', '得意黑', '优设标题黑'], body: BODY },
-  serif: { zh: '文艺深度', title: ['朱雀仿宋', '思源宋体 Bold', '思源宋体', '霞鹜文楷', 'Songti SC'], body: ['霞鹜文楷', '思源宋体', ...BODY] },
+  warm: { zh: '亲切活泼', title: ['站酷庆科黄油体', '江城圆体', '优设标题圆', '抖音美好体', '得意黑', '优设标题黑'], body: BODY },
+  serif: { zh: '文艺深度', title: ['朱雀仿宋', '京华老宋体', '思源宋体 Bold', '思源宋体', '霞鹜文楷', 'Songti SC'], body: ['霞鹜文楷', '仓耳渔阳体', '思源宋体', ...BODY] },
   brush: { zh: '国风书法', title: ['马善政楷书', '志莽行书', '阿里妈妈刀隶体', '演示夏行楷'], body: ['霞鹜文楷', '思源宋体', ...BODY] },
 };
 

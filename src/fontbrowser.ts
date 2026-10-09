@@ -2,7 +2,7 @@ import { Notice, setIcon } from 'obsidian';
 import type { CoverView } from './view';
 import { FontEntry, ZH_NAMES } from './fonts';
 import { FONT_LIBRARY, type LibFont } from './fontlib';
-import { fetchGoogleFont, gfUrls, GFont, loadGoogleIndex, lookOfCategory } from './googlefonts';
+import { fetchGoogleFont, fetchGoogleInstall, gfUrls, GFont, loadGoogleIndex, lookOfCategory } from './googlefonts';
 import { FontLibraryModal } from './modals';
 import { emptyState, iconButton, textButton } from './ui';
 
@@ -84,7 +84,7 @@ export function renderFontBrowser(view: CoverView, host: HTMLElement, o: FontBro
     const pick = (): void => {
       if (r.source === 'google') {
         if (busy.has(r.family)) return; busy.add(r.family); render();
-        void fetchGoogleFont(r.gf!).then(buf => fonts.installBuffer(r.family, 'woff2', buf, view.doc)).then(() => { new Notice(view.t('fontLibDone', { name: r.family })); busy.delete(r.family); return o.onPick(r.family); }).catch(e => { busy.delete(r.family); new Notice(view.t('fontLibFail', { name: r.family, message: e instanceof Error ? e.message : String(e) })); }).finally(() => { if (host.isConnected) render(); });
+        void fetchGoogleInstall(r.gf!).then(f => fonts.installBuffer(r.family, f.ext, f.buf, view.doc)).then(() => { new Notice(view.t('fontLibDone', { name: r.family })); busy.delete(r.family); return o.onPick(r.family); }).catch(e => { busy.delete(r.family); new Notice(view.t('fontLibFail', { name: r.family, message: e instanceof Error ? e.message : String(e) })); }).finally(() => { if (host.isConnected) render(); });
         return;
       }
       if (r.source === 'library') {
