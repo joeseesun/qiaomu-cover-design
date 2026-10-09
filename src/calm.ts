@@ -3,7 +3,7 @@
  * accent, so the template's own small ornaments step aside, the subject never sits on the words, and decoration never lands on text.
  */
 import { FabricObject, Textbox } from 'fabric';
-import { arrangeForSubject } from './templates';
+import { arrangeForSubject, rewrap } from './templates';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 type Q = FabricObject & { qcRole?: string; qcWrapped?: boolean; qcKind?: string };
@@ -79,13 +79,12 @@ export function separateCopyFromSubject(objects: FabricObject[], w: number, h: n
   const echoes = objects.filter((o): o is Textbox => o instanceof Textbox && !(o as Q).qcRole && o.text === title.text && o !== title);
   const offsets = echoes.map(e => ({ e, dx: e.left - title.left, dy: e.top - title.top }));
   for (const t of texts) {
-    if (t.qcWrapped) { t.set({ text: t.text.replace(/\u00a0/g, ' ').replace(/([A-Za-z0-9])\n([A-Za-z0-9])/g, '$1 $2').replace(/\n/g, '') }); t.qcWrapped = false; }
-    t.set({ width: Math.min(t.width, free / (t.scaleX || 1)) });
+    t.set({ width: Math.min(t.width, free / (t.scaleX || 1)) }); rewrap(t);
   }
   for (let guard = 0; guard < 12; guard++) {
     title.initDimensions(); const e = textExtent(title);
     const clear = stacked || !sub || title.top + title.getScaledHeight() <= sub.top - 4;
-    if ((title.getScaledHeight() <= h * 0.46 && e.x + e.w <= s.x - gap * 0.5 && clear) || title.fontSize <= 36) break; title.set({ fontSize: Math.max(36, title.fontSize * 0.92) });
+    if ((title.getScaledHeight() <= h * 0.46 && e.x + e.w <= s.x - gap * 0.5 && clear) || title.fontSize <= 36) break; title.set({ fontSize: Math.max(36, title.fontSize * 0.92) }); rewrap(title);
   }
   title.initDimensions(); title.setCoords();
   for (const { e, dx, dy } of offsets) { e.set({ text: title.text, width: title.width, fontSize: title.fontSize, left: title.left + dx, top: title.top + dy }); e.initDimensions(); e.setCoords(); }

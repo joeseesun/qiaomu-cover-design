@@ -8,7 +8,7 @@ import { resolvePair, typeFor, usePairing, type Resolved } from './typeset';
 import { Background, Design, ExportFormat, ExportPrefs, EXPORT_DEFAULTS, folderPath, History, parseDesign, renderFilename, safeName, SerialWriter, SnapshotCodec, validSize } from './model';
 import { Platform, PLATFORMS, platformById, platformFor } from './platforms';
 import { BadgeBox } from './badge';
-import { arrangeForSubject, builtPalette, canReflow, reserveBelowTitle, unwrap, templateById, templatesFor, gradient, hasCjk, textbox, textWidth, tightenCopy } from './templates';
+import { arrangeForSubject, builtPalette, canReflow, reserveBelowTitle, rewrap, sourceOf, unwrap, templateById, templatesFor, gradient, hasCjk, textbox, textWidth, tightenCopy } from './templates';
 import { decorInFront, drawDecor } from './decor';
 import { expandPattern, patternById } from './playbook';
 import { renderPattern } from './preview';
@@ -29,7 +29,7 @@ export const VIEW = 'qiaomu-cover-design';
 export interface Variant { id: string; label: string; url: string }
 export interface ChatMessage { role: 'user' | 'assistant'; text: string; applied?: string[]; retry?: boolean; variants?: Variant[]; tweaks?: boolean }
 export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean };
-export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcHug', 'qcTpl', 'qcCredit'];
+export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit'];
 type Layout = Pick<DesignSpec, 'title' | 'subtitle' | 'badge' | 'points' | 'palette'>;
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_SIDE = 2600;
@@ -375,7 +375,8 @@ export class CoverView extends FileView implements CoverApi {
     const c = this.canvas; if (!c) return;
     const texts = c.getObjects().filter((o): o is Textbox => o instanceof Textbox);
     await Promise.all([...new Set(texts.map(t => t.fontFamily))].map(f => this.plugin.fonts.ensure(this.doc, f)));
-    for (const t of texts) { t.initDimensions(); t.set('dirty', true); t.setCoords(); }
+    // Text we wrapped ourselves was measured before its face loaded: wrap it again with the real metrics.
+    for (const t of texts) { rewrap(t); t.initDimensions(); t.set('dirty', true); t.setCoords(); }
     c.requestRenderAll();
   }
   currentDesign(): Design {
@@ -762,7 +763,7 @@ export class CoverView extends FileView implements CoverApi {
     const title = texts.find(o => o.qcRole === 'title') ?? [...texts].sort((a, b) => b.fontSize * b.scaleY - a.fontSize * a.scaleY)[0];
     const sub = texts.find(o => o.qcRole === 'subtitle') ?? [...texts].filter(o => o !== title).sort((a, b) => b.fontSize - a.fontSize)[0];
     const badge = texts.find(o => o.qcRole === 'badge')?.text.trim();
-    const flat = (t?: Textbox & QObject): string | undefined => t ? (t.qcWrapped ? unwrap(t.text) : t.text) : undefined;
+    const flat = (t?: Textbox & QObject): string | undefined => t ? sourceOf(t) : undefined;
     return { title: flat(title) ?? this.design?.source?.replace(/^.*\//, '').replace(/\.md$/, '') ?? this.t('newText'), subtitle: flat(sub) ?? this.t('subtext'), ...(badge ? { badge } : {}) };
   }
 

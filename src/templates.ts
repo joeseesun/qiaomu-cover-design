@@ -34,18 +34,32 @@ interface TextOptions { qcRole?: string; fontSize: number; fill: string; fontWei
  * words ("A|I"), starts the next line with the space it broke at, and happily leaves one character alone on the last line.
  */
 export function textbox(text: string, left: number, top: number, width: number, o: TextOptions): Textbox {
-  const own = hasCjk(text) && !text.includes('\n') && !!o.fontSize;
+  const own = hasCjk(text) && !!o.fontSize;
   // Big CJK headlines end up at -18 tracking (see the finish pass below), so wrap them at that tracking.
   const track = o.qcRole === 'title' && o.fontSize >= 64 ? -18 : o.charSpacing ?? 0;
   const lines = own ? wrapLines(text, width, o.fontSize, o.fontWeight ?? 'normal', track) : undefined; const wrapped = !!lines && (lines.length > 1 || /\s/.test(text));
   // Spaces inside a computed line become no-break spaces, so Fabric cannot break the line a second time with its own metrics.
-  const box = new Textbox(wrapped ? lines.map(l => l.replace(/ /g, '\u00a0')).join('\n') : text, {
+  const box = new Textbox(wrapped ? lines.map(glue).join('\n') : text, {
     left, top, width, originX: 'left', originY: 'top', fontFamily: SANS, fontWeight: 'normal', lineHeight: 1.25, splitByGrapheme: hasCjk(text) && !wrapped, paintFirst: o.stroke ? 'stroke' : 'fill', ...o,
     // The paired face goes in at construction: a Textbox only ever grows to fit, so a first layout in the wider fallback face would stick.
     ...typeFor(o.qcRole, o.fontFamily ?? SANS, o.fontWeight), ...(own ? { charSpacing: track } : {}),
   } as Partial<TextboxProps>);
-  if (wrapped) (box as FabricObject & { qcWrapped?: boolean }).qcWrapped = true;
+  // qcSource keeps the writer's own text (with their line breaks) so a re-layout starts from it, not from our wrapping.
+  if (wrapped) Object.assign(box, { qcWrapped: true, qcSource: text });
   return box;
+}
+type Wrapped = Textbox & { qcWrapped?: boolean; qcSource?: string };
+const glue = (line: string): string => line.replace(/ /g, '\u00a0');
+/** The text as the writer typed it: their own line breaks survive, the breaks we inserted do not. */
+export function sourceOf(t: Textbox): string {
+  const q = t as Wrapped; if (!q.qcWrapped) return t.text;
+  return q.qcSource && unwrap(q.qcSource) === unwrap(t.text) ? q.qcSource : unwrap(t.text);
+}
+/** Wraps a text we wrapped before again, at its current width, size and real face (after a font loads or the box is resized). */
+export function rewrap(t: Textbox): void {
+  const q = t as Wrapped; if (!q.qcWrapped || !t.fontSize) return;
+  const src = sourceOf(t); const lines = wrapLines(src, t.width, t.fontSize, String(t.fontWeight), t.charSpacing ?? 0, t.fontFamily);
+  const next = lines.map(glue).join('\n'); if (next !== t.text) t.set({ text: next }); q.qcSource = src; t.initDimensions();
 }
 /** Undoes the hard line breaks `textbox` inserted, so a title can be re-laid-out at another width. */
 export function unwrap(text: string): string { return text.replace(/\u00a0/g, ' ').replace(/([A-Za-z0-9])\n([A-Za-z0-9])/g, '$1 $2').replace(/\n/g, ''); }
@@ -53,19 +67,19 @@ export function unwrap(text: string): string { return text.replace(/\u00a0/g, ' 
 let measureCtx: CanvasRenderingContext2D | null | undefined;
 /** Rendered width of a single line of text, in px. */
 export function textWidth(text: string, size: number, weight = 'bold'): number { return measure(text, size, weight); }
-/** Real rendered width when a canvas exists (the app), a close estimate otherwise (unit tests). */
-function measure(text: string, size: number, weight: string): number {
+/** Real rendered width when a canvas exists (the app), a close estimate otherwise (unit tests). Measures in the paired title face unless a family is given. */
+function measure(text: string, size: number, weight: string, family?: string): number {
   try {
     if (measureCtx === undefined) measureCtx = getEnv().document?.createElement('canvas').getContext('2d') ?? null;
-    if (measureCtx) { measureCtx.font = `${weight} ${size}px ${titleFace()}, ${SANS}`; return measureCtx.measureText(text).width; }
+    if (measureCtx) { measureCtx.font = `${weight} ${size}px ${family ? `"${family}"` : titleFace()}, ${SANS}`; return measureCtx.measureText(text).width; }
   } catch { measureCtx = null; }
   let w = 0; for (const ch of text) w += hasCjk(ch) ? size : ch === ' ' ? size * 0.3 : size * 0.56; return w;
 }
 const CLOSING = /^[，。、！？；：）”’》】…,.!?;:)]$/;
 /** Greedy wrap that never splits a Latin word, never starts a line with closing punctuation and never strands one CJK character. */
-export function wrapLines(text: string, width: number, size: number, weight = 'bold', spacing = 0): string[] {
+export function wrapLines(text: string, width: number, size: number, weight = 'bold', spacing = 0, family?: string): string[] {
   const out: string[] = []; const track = size * spacing / 1000;
-  const fits = (s: string): boolean => measure(s, size, weight) + [...s].length * track <= width;
+  const fits = (s: string): boolean => measure(s, size, weight, family) + [...s].length * track <= width;
   for (const para of text.split('\n')) {
     const tokens = para.match(/[A-Za-z0-9][A-Za-z0-9.'’_+%$@#-]*|\s+|[\s\S]/gu) ?? []; let cur = ''; const start = out.length;
     for (const tok of tokens) {
