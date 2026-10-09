@@ -1,6 +1,30 @@
 {
-  "name": "qiaomu-cover-design", "version": "0.1.0", "description": "Offline visual cover designer for Obsidian", "type": "module", "main": "main.js", "license": "MIT",
-  "scripts": { "dev": "node esbuild.config.mjs --watch", "build": "tsc --noEmit && node esbuild.config.mjs", "test": "tsx --test tests/*.test.ts", "lint": "eslint src", "check": "npm run lint && npm test && npm run build" },
-  "dependencies": { "fabric": "7.4.0" },
-  "devDependencies": { "@types/node": "^22.0.0", "esbuild": "^0.25.0", "obsidian": "latest", "typescript": "^5.9.0", "tsx": "^4.20.0", "eslint": "^9.39.0", "typescript-eslint": "^8.0.0" }
+  "name": "qiaomu-cover-design",
+  "version": "0.2.1",
+  "description": "Offline visual cover designer for Obsidian",
+  "type": "module",
+  "main": "main.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node esbuild.config.mjs --watch",
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "lint": "eslint src",
+    "check": "npm run lint && npm test && npm run build",
+    "audit": "tsx scripts/audit-templates.ts",
+    "gallery": "node scripts/template-gallery/build.mjs && python3 scripts/template-gallery/server.py",
+    "package": "npm run build && node scripts/package.mjs"
+  },
+  "dependencies": {
+    "fabric": "7.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "latest",
+    "typescript": "^5.9.0",
+    "tsx": "^4.20.0",
+    "eslint": "^9.39.0",
+    "typescript-eslint": "^8.0.0"
+  }
 }
