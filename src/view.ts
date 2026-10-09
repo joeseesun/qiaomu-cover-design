@@ -1063,7 +1063,8 @@ export class CoverView extends FileView implements CoverApi {
     const face = (role: string): string | undefined => { const f = texts.find(o => o.qcRole === role)?.fontFamily; return f && !['sans-serif', 'serif', 'monospace'].includes(f) ? f : undefined; };
     const palette = { ...(this.palette ?? {}) }; const titleFont = face('title'), bodyFont = face('subtitle');
     const list = this.plugin.settings.series;
-    const s: Series = { id: `s${Date.now().toString(36)}`, name: `${t ? (this.zh ? t.zh : t.en) : d.template} ${list.length + 1}`, template: d.template, palette, ...(titleFont ? { titleFont } : {}), ...(bodyFont ? { bodyFont } : {}) };
+    const base = t ? (this.zh ? t.zh : t.en) : d.template; const taken = new Set(list.map(x => x.name)); let n = 1; while (taken.has(`${base} ${n}`)) n++;
+    const s: Series = { id: `s${Date.now().toString(36)}`, name: `${base} ${n}`, template: d.template, palette, ...(titleFont ? { titleFont } : {}), ...(bodyFont ? { bodyFont } : {}) };
     this.plugin.settings.series = addSeries(list, s); void this.plugin.saveSettings(); return s;
   }
   removeSeries(id: string): void { this.plugin.settings.series = this.plugin.settings.series.filter(s => s.id !== id); void this.plugin.saveSettings(); }
