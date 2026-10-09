@@ -117,7 +117,15 @@ export function layoutPass(objects: FabricObject[], w: number, h: number): numbe
   const gap = (): number => title.fontSize * (title.scaleY || 1) * 0.22;
   const rect = (t: Textbox): Rect => textExtent(t);
   const backed = (t: Textbox): boolean => hasBacking(objects, t);
-  // 1. A subtitle never sits inside the headline: push it down (inside its card or bar if it has one), or shrink the headline until both fit.
+  // 1. Inside the canvas: nothing may poke out of the margin box on any side. This runs first, so pulling a text back in
+  // can never leave it on another one: the overlap rules below get the last word.
+  for (const t of [badge, title, sub]) {
+    if (!t) continue; const r = rect(t); let dx = 0, dy = 0;
+    if (r.x < m * 0.5) dx = m * 0.5 - r.x; else if (r.x + r.w > w - m * 0.5) dx = w - m * 0.5 - (r.x + r.w);
+    if (r.y < m * 0.5) dy = m * 0.5 - r.y; else if (r.y + r.h > h - m * 0.5) dy = h - m * 0.5 - (r.y + r.h);
+    if (dx || dy) { t.set({ left: t.left + dx, top: t.top + dy }); t.setCoords(); fixes++; }
+  }
+  // 2. A subtitle never sits inside the headline: push it down (inside its card or bar if it has one), or shrink the headline until both fit.
   if (sub && !sub.angle && !title.angle) {
     const card = backingOf(objects, sub); const floor = card ? card.y + card.h - m * 0.6 : h - m;
     for (let guard = 0; guard < 12; guard++) {
@@ -128,7 +136,7 @@ export function layoutPass(objects: FabricObject[], w: number, h: number): numbe
       title.set({ fontSize: Math.max(36, title.fontSize * 0.92) }); title.initDimensions(); title.setCoords(); fixes++;
     }
   }
-  // 2. A badge never sits on the headline: lift it above, or drop the headline below it.
+  // 3. A badge never sits on the headline: lift it above, or drop the headline below it.
   if (badge) {
     const a = rect(title), b = rect(badge);
     if (hit(a, b)) {
@@ -137,12 +145,57 @@ export function layoutPass(objects: FabricObject[], w: number, h: number): numbe
       else if (b.y + b.h + gap() + a.h <= h - m) { title.set({ top: title.top + (b.y + b.h + gap() - a.y) }); title.setCoords(); fixes++; if (sub && !backed(sub)) { sub.set({ top: sub.top + (b.y + b.h + gap() - a.y) }); sub.setCoords(); } }
     }
   }
-  // 3. Inside the canvas: nothing may poke out of the margin box on any side.
-  for (const t of [badge, title, sub]) {
-    if (!t) continue; const r = rect(t); let dx = 0, dy = 0;
-    if (r.x < m * 0.5) dx = m * 0.5 - r.x; else if (r.x + r.w > w - m * 0.5) dx = w - m * 0.5 - (r.x + r.w);
-    if (r.y < m * 0.5) dy = m * 0.5 - r.y; else if (r.y + r.h > h - m * 0.5) dy = h - m * 0.5 - (r.y + r.h);
-    if (dx || dy) { t.set({ left: t.left + dx, top: t.top + dy }); t.setCoords(); fixes++; }
-  }
   return fixes;
+}
+
+/**
+ * Keeps the copy off a platform's UI (avatar, caption bar, buttons). The copy and everything that belongs to it (the bars and
+ * pills it sits on, an echo of the headline) is one group, fitted into the largest box the zones leave free with a single
+ * scale and move, so the template's own composition survives exactly: nothing is re-stacked, nothing lands on anything else.
+ * Returns how many texts moved.
+ */
+export function clearCopyOfZones(objects: FabricObject[], zones: Rect[], w: number, h: number): number {
+  // A centred badge is a sticker's label: it belongs to its disc, not to the copy block.
+  const copy = objects.filter((o): o is Textbox => o instanceof Textbox && !o.lockMovementX && ['title', 'subtitle', 'badge'].includes((o as Q).qcRole ?? '') && !((o as Q).qcRole === 'badge' && o.originX === 'center'));
+  if (!copy.length || !zones.length) return 0;
+  const hits = (a: Rect, z: Rect): boolean => a.x < z.x + z.w && a.x + a.w > z.x && a.y < z.y + z.h && a.y + a.h > z.y;
+  const ext = copy.map(textExtent); const ux = Math.min(...ext.map(r => r.x)), uy = Math.min(...ext.map(r => r.y));
+  const u: Rect = { x: ux, y: uy, w: Math.max(...ext.map(r => r.x + r.w)) - ux, h: Math.max(...ext.map(r => r.y + r.h)) - uy };
+  if (!zones.some(z => hits(u, z))) return 0;
+  // What travels with the words: the bar or card a text sits on, and shapes or echo texts lying mostly inside the copy's box.
+  const backs = copy.map(t => backingOf(objects, t)).filter((r): r is Rect => !!r);
+  const group = objects.filter(o => {
+    if (copy.includes(o as Textbox)) return true;
+    if (!(o instanceof Textbox) && backs.some(b => { const r = rectOf(o); return Math.abs(r.x - b.x) < 1 && Math.abs(r.y - b.y) < 1 && Math.abs(r.w - b.w) < 1; })) return true;
+    if (['image', 'subject', 'scrim', 'decor'].includes((o as Q).qcRole ?? '')) return false;
+    const r = rectOf(o); if (!area(r) || area(r) > w * h * 0.6) return false;
+    const ix = Math.max(0, Math.min(r.x + r.w, u.x + u.w) - Math.max(r.x, u.x)), iy = Math.max(0, Math.min(r.y + r.h, u.y + u.h) - Math.max(r.y, u.y));
+    return ix * iy >= area(r) * 0.6;
+  });
+  const gr = group.map(o => copy.includes(o as Textbox) ? textExtent(o as Textbox) : rectOf(o)); const gx = Math.min(...gr.map(r => r.x)), gy = Math.min(...gr.map(r => r.y));
+  const g: Rect = { x: gx, y: gy, w: Math.max(...gr.map(r => r.x + r.w)) - gx, h: Math.max(...gr.map(r => r.y + r.h)) - gy };
+  // Where the group would land in a box, and how much of the template's artwork (a disc, an arch, a sticker) it would cover there.
+  const scene = objects.filter(o => !group.includes(o) && o.visible !== false && (o.opacity ?? 1) > 0.3).map(rectOf).filter(r => area(r) > 0 && area(r) < w * h * 0.6);
+  const place = (c: Rect): Rect & { k: number } => { const k = Math.min(1, c.w / g.w, c.h / g.h); return { k, w: g.w * k, h: g.h * k, x: Math.max(c.x, Math.min(g.x, c.x + c.w - g.w * k)), y: Math.max(c.y, Math.min(g.y, c.y + c.h - g.h * k)) }; };
+  const score = (c: Rect): number => {
+    const d = place(c); const covered = scene.reduce((sum, r) => sum + Math.max(0, Math.min(r.x + r.w, d.x + d.w) - Math.max(r.x, d.x)) * Math.max(0, Math.min(r.y + r.h, d.y + d.h) - Math.max(r.y, d.y)), 0);
+    return d.k - Math.min(1, covered / area(d)) * 1.5 - (Math.abs(d.x - g.x) + Math.abs(d.y - g.y)) / (w + h) * 0.1;
+  };
+  // The free box: start from the canvas, and for each zone in the way cut off the side that scores best: big copy, clear of artwork, little travel.
+  const pad = Math.min(w, h) * 0.025; let box: Rect = { x: pad, y: pad, w: w - pad * 2, h: h - pad * 2 };
+  for (const z of zones) {
+    if (!hits(box, z)) continue;
+    const r = box.x + box.w, b = box.y + box.h;
+    const cuts: Rect[] = [
+      { ...box, h: Math.min(b, z.y - pad) - box.y }, { ...box, y: Math.max(box.y, z.y + z.h + pad), h: b - Math.max(box.y, z.y + z.h + pad) },
+      { ...box, w: Math.min(r, z.x - pad) - box.x }, { ...box, x: Math.max(box.x, z.x + z.w + pad), w: r - Math.max(box.x, z.x + z.w + pad) },
+    ].filter(c => c.w > g.w * 0.3 && c.h > g.h * 0.3);
+    if (!cuts.length) return 0;
+    box = cuts.reduce((best, c) => score(c) > score(best) ? c : best);
+  }
+  const d = place(box);
+  for (const o of group) {
+    o.set({ left: d.x + (o.left - g.x) * d.k, top: d.y + (o.top - g.y) * d.k, scaleX: (o.scaleX || 1) * d.k, scaleY: (o.scaleY || 1) * d.k }); o.setCoords();
+  }
+  return copy.length;
 }

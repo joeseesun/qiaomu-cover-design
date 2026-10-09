@@ -1,7 +1,9 @@
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
-import { calmLayout, decorOnText, layoutPass } from './calm';
+import { picturePolicy, requestsPicture, usefulFeedback, withoutPictures } from './designflow';
+import { templateThumb } from './panels';
+import { calmLayout, clearCopyOfZones, decorOnText, layoutPass } from './calm';
 import { faceFor, isSingleWeight, pillFor, styleText, type TextPreset } from './textstyles';
 import { openInsertPopover } from './insertpop';
 import { resolvePair, typeFor, usePairing, type Resolved } from './typeset';
@@ -15,7 +17,7 @@ import { renderPattern } from './preview';
 import { MESH_PRESETS, MeshPreset } from './mesh';
 import { glow as kitGlow, grain } from './kit';
 import { Anchor, decorPlacement, defaultSubjectBox, SubjectBox, TitleBox } from './compose';
-import { clearOfZones, ensureReadable, thumbCheck } from './quality';
+import { ensureReadable, thumbCheck } from './quality';
 import { addSeries, pickVariants, Series } from './series';
 import { imageStyleById } from './prompts';
 import { Align, AssistantInput, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op, runOps } from './ops';
@@ -26,11 +28,11 @@ import { iconButton, textButton, toggleButton } from './ui';
 import { ExportModal, RenameModal, SizeModal, ShortcutsModal, PickFile } from './modals';
 
 export const VIEW = 'qiaomu-cover-design';
-export interface Variant { id: string; label: string; url: string }
-export interface ChatMessage { role: 'user' | 'assistant'; text: string; applied?: string[]; retry?: boolean; variants?: Variant[]; tweaks?: boolean }
+export interface Variant { id: string; label: string; url: string; spec?: DesignSpec; selected?: boolean }
+export interface ChatMessage { role: 'user' | 'assistant'; text: string; applied?: string[]; retry?: boolean; variants?: Variant[]; variantScroll?: number; tweaks?: boolean }
 export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean };
 export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit'];
-type Layout = Pick<DesignSpec, 'title' | 'subtitle' | 'badge' | 'points' | 'palette'>;
+type Layout = Pick<DesignSpec, 'title' | 'subtitle' | 'badge' | 'points' | 'palette' | 'titleFont' | 'bodyFont'>;
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_SIDE = 2600;
 
@@ -51,6 +53,7 @@ export class CoverView extends FileView implements CoverApi {
   zoom: number | 'fit' = 'fit'; rightTab: 'design' | 'layers' | 'canvas' = 'canvas'; private tabsEl?: HTMLElement; private refreshQueued = false;
   private unsubscribeFonts?: () => void;
   /** Conversation with the designer. It lives on the view so it survives drawer redraws. */
+  pictureRequested = false;
   chat: ChatMessage[] = []; busy = false; progress = ''; private centerEl?: HTMLElement; private progressEl?: HTMLElement; onChat?: () => void; private lastPrompt = ''; currentPattern?: string; private lastSpec?: DesignSpec; palette?: import('./templates').Palette; private templateId?: string;
 
   constructor(leaf: WorkspaceLeaf, public plugin: CoverPlugin) { super(leaf); }
@@ -740,7 +743,10 @@ export class CoverView extends FileView implements CoverApi {
     // Things the user added themselves (no template flag, no role) can be carried over too, so a re-layout never deletes their work.
     const mine = keepRoles.includes('*user') ? c.getObjects().filter(o => !(o as QObject).qcTpl && !(o as QObject).qcRole) : [];
     const copy = this.copyText();
-    const pair = this.pairing(t.id); usePairing(pair);
+    const pair = this.pairing(t.id);
+    if (over.titleFont && this.plugin.fonts.available(this.doc, over.titleFont)) { pair.title = over.titleFont; pair.titleBold = !isSingleWeight(over.titleFont); }
+    if (over.bodyFont && this.plugin.fonts.available(this.doc, over.bodyFont)) pair.body = over.bodyFont;
+    usePairing(pair);
     let result: ReturnType<typeof t.build>;
     try { result = t.build({ width: d.width, height: d.height, title: over.title ?? copy.title, subtitle: over.subtitle ?? copy.subtitle, badge: over.badge ?? copy.badge, points: over.points, palette: over.palette, zh: this.zh }); } finally { usePairing(undefined); }
     this.missingFonts = pair.missing;
@@ -791,7 +797,11 @@ export class CoverView extends FileView implements CoverApi {
   /** One-shot layout from a spec: sizes the canvas, picks a template that suits the picture, then generates the picture. */
   async applyDesign(input: DesignSpec): Promise<string[]> {
     const d = this.design; if (!d || !this.canvas) return [];
+    const targetCanvas = this.canvas;
     const spec = expandPattern(input, family => this.plugin.fonts.available(this.doc, family));
+    const pair = this.pairing(spec.template);
+    await Promise.all([spec.titleFont ?? pair.title, spec.bodyFont ?? pair.body].filter((f): f is string => !!f).map(f => this.plugin.fonts.ensure(this.doc, f)));
+    if (this.canvas !== targetCanvas || this.design !== d) return [];
     const notes: string[] = []; const zh = this.zh; this.lastSpec = spec; if (spec.pattern) this.currentPattern = spec.pattern;
     if (spec.platform && spec.platform !== this.platform()?.id && this.setPlatform(spec.platform, false)) notes.push(zh ? `已切换平台：${spec.platform}` : `Platform: ${spec.platform}`);
     const imageOkEarly = this.plugin.ai.imageReady(); const picture = !!spec.imagePrompt && imageOkEarly;
@@ -846,10 +856,7 @@ export class CoverView extends FileView implements CoverApi {
     let moved = 0;
     if (pf?.avoid.length) {
       const zones = pf.avoid.map(z => ({ x: z.x * d.width, y: z.y * d.height, w: z.w * d.width, h: z.h * d.height, zh: z.zh, en: z.en }));
-      for (const t of texts) {
-        const box = { x: t.left, y: t.top, w: t.getScaledWidth(), h: t.getScaledHeight() }; const y = clearOfZones(box, zones, d.height, d.height * 0.02);
-        if (y !== undefined) { t.set({ top: y }); t.setCoords(); moved++; }
-      }
+      moved = clearCopyOfZones(c.getObjects(), zones, d.width, d.height);
     }
     if (moved) notes.push(this.zh ? `已让 ${moved} 处文字避开平台遮挡区` : `Moved ${moved} text layer${moved > 1 ? 's' : ''} clear of platform UI`);
     const bg = d.bg?.kind === 'solid' ? d.bg.color : d.bg?.kind === 'linear' ? d.bg.from : undefined;
@@ -1027,7 +1034,7 @@ export class CoverView extends FileView implements CoverApi {
     const history = this.chat.slice(0, -1).filter(m => m.text).map(m => ({ role: m.role, text: m.text.slice(0, 400) }));
     return {
       prompt, zh: this.zh, fonts: this.plugin.fonts.all().map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
-      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: this.plugin.settings.imageStyle === 'none', series: this.plugin.settings.series,
+      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
     };
   }
   /** Sends a request to the selected assistant and applies what comes back. Shared by the chat box, retry and auto-design. */
@@ -1036,22 +1043,72 @@ export class CoverView extends FileView implements CoverApi {
     const list = this.plugin.assistantList(); const extras = list.some(p => p.id !== 'ai' && p.id !== 'offline'); const provider = (extras ? list.find(p => p.id === this.plugin.settings.assistant) : list.find(p => p.id === 'ai')) ?? list[0]!;
     this.busy = true; this.lastPrompt = prompt; this.chat.push({ role: 'user', text: display }); this.setProgress(this.t('progressPlan'));
     try {
-      const result = await provider.run(this.assistantInput(prompt));
+      const generation = this.generation;
+      const request = this.assistantInput(prompt);
+      const result = picturePolicy(await provider.run(request), !request.noPicture);
+      if (generation !== this.generation) return;
+      const proposals = result.designs?.length ? result.designs : request.chooseDesigns ? result.ops.filter((o): o is Extract<Op, { op: 'design' }> => o.op === 'design' && !!o.title) : [];
+      if (proposals.length) {
+        const variants = await this.designChoices(proposals);
+        if (generation !== this.generation || !this.canvas) return;
+        if (!variants.length) throw new Error(this.t('previewFailed'));
+        this.chat.push({ role: 'assistant', text: this.t('chooseDirection'), variants });
+        return;
+      }
       if (!this.canvas) return;
       const applied = await this.runAssistantOps(result.ops);
       const designed = result.ops.some(o => o.op === 'design');
-      const message: ChatMessage = { role: 'assistant', text: result.reply || (applied.length ? this.t('chatDone') : this.t('chatNothing')), applied, retry: designed, tweaks: applied.length > 0 };
+      const message: ChatMessage = { role: 'assistant', text: result.reply || (applied.length ? this.t('chatDone') : this.t('chatNothing')), applied: usefulFeedback(applied), retry: designed, tweaks: applied.length > 0 };
       this.chat.push(message);
       if (designed) void this.variantThumbs().then(v => { message.variants = v; this.onChat?.(); }).catch(() => undefined);
     } catch (e) {
       this.chat.push({ role: 'assistant', text: this.t('error', { message: e instanceof Error ? e.message : String(e) }) });
-    } finally { this.busy = false; this.setProgress(); }
+    } finally { this.busy = false; this.pictureRequested = false; this.setProgress(); }
   }
   /**
    * Other layouts for the same words, rendered offline in a blink, so a first pass is a choice and not a gamble. They come from
    * different style families and follow the copy (a number, a question, a list), and use the fonts each layout really gets.
    */
-  async variantThumbs(n = 4): Promise<Variant[]> {
+  async designChoices(proposals: DesignSpec[]): Promise<Variant[]> {
+    const d = this.design; if (!d) return [];
+    const specs = proposals.slice(0, 3).map(withoutPictures);
+    if (specs.length < 3) {
+      const seed = specs[0]!;
+      const ids = pickVariants(templatesFor(this.platform()?.id).filter(t => !t.photo && !t.slot).map(t => t.id), seed.template, { title: seed.title ?? '', subtitle: seed.subtitle }, 3 - specs.length);
+      for (const id of ids) specs.push({ ...seed, template: id, titleFont: undefined, bodyFont: undefined, palette: undefined });
+    }
+    const out: Variant[] = [];
+    for (const input of specs) {
+      const spec = expandPattern(input, f => this.plugin.fonts.available(this.doc, f));
+      delete spec.pattern; delete spec.decor;
+      let t = templateById(spec.template ?? ''); if (!t) continue;
+      // A text-first proposal must be complete without an empty photo/subject slot.
+      if (t.photo || t.slot) { t = templateById('highlight')!; spec.template = t.id; }
+      const platform = spec.platform ? platformById(spec.platform) : undefined;
+      const pair = this.pairing(t.id);
+      if (spec.titleFont && this.plugin.fonts.available(this.doc, spec.titleFont)) pair.title = spec.titleFont;
+      if (spec.bodyFont && this.plugin.fonts.available(this.doc, spec.bodyFont)) pair.body = spec.bodyFont;
+      if (spec.titleFont) pair.titleBold = !isSingleWeight(spec.titleFont);
+      if (pair.title) await this.plugin.fonts.ensure(this.doc, pair.title);
+      if (pair.body) await this.plugin.fonts.ensure(this.doc, pair.body);
+      const url = await templateThumb(this.doc, this.zh, platform?.width ?? d.width, platform?.height ?? d.height, t, spec.title ?? '', spec.subtitle ?? '', { badge: spec.badge, points: spec.points, pair, palette: spec.palette });
+      out.push({ id: t.id, label: spec.title ?? (this.zh ? t.zh : t.en), spec, url });
+    }
+    return out;
+  }
+  async chooseVariant(message: ChatMessage, variant: Variant): Promise<void> {
+    if (this.busy || this.task || this.restoring || !this.canvas) return;
+    this.busy = true; this.onChat?.();
+    try {
+      if (variant.spec) message.applied = usefulFeedback(await this.applyDesign(withoutPictures(variant.spec)));
+        else this.applyTemplate(variant.id, {}, true);
+      for (const v of message.variants ?? []) v.selected = v === variant;
+      message.text = this.t('directionApplied');
+      message.tweaks = true;
+    } catch (e) { new Notice(this.t('error', { message: e instanceof Error ? e.message : String(e) })); }
+    finally { this.busy = false; this.onChat?.(); }
+  }
+  async variantThumbs(n = 3): Promise<Variant[]> {
     const d = this.design, c = this.canvas; if (!d || !c) return [];
     const copy = this.copyText(); const hasPhoto = c.getObjects().some(o => (o as QObject).qcRole === 'image' && !o.clipPath);
     const candidates = templatesFor(this.platform()?.id).filter(t => !['checklist', 'compare'].includes(t.id) && (hasPhoto || !t.photo)).map(t => t.id);
@@ -1114,7 +1171,7 @@ export class CoverView extends FileView implements CoverApi {
   async applyPatternNow(id: string): Promise<void> {
     const p = patternById(id); if (!p || this.busy || !this.canvas) return;
     this.busy = true;
-    try { const notes = await this.applyDesign({ pattern: id, title: p.sample.title, subtitle: p.sample.subtitle, badge: p.sample.badge, points: p.sample.points }); this.chat.push({ role: 'assistant', text: this.t('patternApplied', { name: this.zh ? p.zh : p.en }), applied: notes }); }
+    try { const notes = await this.applyDesign({ pattern: id, title: p.sample.title, subtitle: p.sample.subtitle, badge: p.sample.badge, points: p.sample.points }); this.chat.push({ role: 'assistant', text: this.t('patternApplied', { name: this.zh ? p.zh : p.en }), applied: usefulFeedback(notes) }); }
     finally { this.busy = false; this.onChat?.(); }
   }
   /** Touch edit: redraws one picture layer from its own prompt (optionally edited) and keeps its place on the canvas. */

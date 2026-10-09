@@ -56,10 +56,10 @@ export interface AssistantInput {
   /** What is on the canvas now, so "make the title bigger" has something to refer to. */
   canvas?: CanvasItem[]; history?: { role: 'user' | 'assistant'; text: string }[]; imageStyle?: string;
   /** The cover pattern currently in use; the assistant keeps it unless asked to change style. */
-  pattern?: string; /** The user chose "no picture": layout only. */ noPicture?: boolean;
+  pattern?: string; /** The user chose "no picture": layout only. */ noPicture?: boolean; /** Offer complete copy/layout choices before changing the canvas. */ chooseDesigns?: boolean;
   /** Saved looks; the first is the default the assistant follows. */ series?: import('./series').Series[];
 }
-export interface AssistantResult { reply: string; ops: Op[] }
+export interface AssistantResult { reply: string; ops: Op[]; designs?: DesignSpec[] }
 export interface AssistantProvider { id: string; name: string; run(input: AssistantInput): Promise<AssistantResult> }
 
 export async function runOps(api: CoverApi, ops: Op[], zh: boolean): Promise<string[]> {

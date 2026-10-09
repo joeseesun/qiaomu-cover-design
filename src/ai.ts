@@ -7,6 +7,7 @@ import { AiConfig, aiReady, extractJson, imageReady, pickArkSize, pickAspect, pi
 import { AssistantInput, AssistantResult } from './ops';
 import { PLATFORMS } from './platforms';
 import { TEMPLATES } from './templates';
+import { contractLine } from './contracts';
 import { IMAGE_RULES, IMAGE_STYLES, SUBJECT_RULES } from './prompts';
 import { seriesPrompt } from './series';
 
@@ -26,24 +27,29 @@ async function send(req: RequestUrlParam): Promise<{ json: unknown; buffer: Arra
 /** Installed library fonts with what each is good for, so the model can pick a headline face that fits the topic. */
 function fontGuide(input: AssistantInput): string {
   const have = FONT_LIBRARY.filter(f => input.fonts.includes(f.family));
-  const rules = '搭配规则：全图最多 2 种字体——标题用 1 款展示字体，副标题和其余文字用 1 款安静的正文字体；标题粗、正文细，靠字重对比建立层级；展示字体不要叠用；衬线标题配楷体/宋体正文，黑体标题配黑体正文。不写 titleFont/bodyFont 时，插件会按模板气质自动搭配，通常不用你操心。';
+  const rules = '搭配规则：全图最多 2 种字体——标题用 1 款展示字体，副标题和其余文字用 1 款安静的正文字体；标题粗、正文细，靠字重对比建立层级；展示字体不要叠用；衬线标题配楷体/宋体正文，黑体标题配黑体正文。不写 titleFont/bodyFont 时，插件会按模板气质自动搭配，应积极选择适合内容的展示字体；不要所有方案都使用同一种粗黑。';
   if (!have.length) return `字体：用户还没安装字体库里的字体，不要写 titleFont / bodyFont。${rules}`;
   const body = have.filter(f => f.mood === 'sans' || f.mood === 'serif');
   return `字体：可用 titleFont 指定标题字体、bodyFont 指定副标题字体（必须是下面这些之一）。按主题气质选：\n${have.map(f => `   · ${f.family}：${f.hint}`).join('\n')}${body.length ? `\n   适合做 bodyFont 的：${body.map(f => f.family).join('、')}` : ''}\n${rules}`;
 }
 export function systemPrompt(input: AssistantInput, imageOn: boolean): string {
   const platforms = PLATFORMS.map(p => `- ${p.id}：${p.zh} ${p.width}×${p.height}。${p.zhHint}${p.avoid.length ? `；会被遮挡：${p.avoid.map(a => a.zh).join('、')}` : ''}`).join('\n');
-  const templates = TEMPLATES.map(t => `- ${t.id}（${t.zh}）：${t.zhUse}${t.photo ? '；可叠在整张图上' : ''}${t.slot ? '；有图位' : ''}；适合 ${t.fit.slice(0, 4).join('/')}`).join('\n');
+  const templates = TEMPLATES.filter(t => !input.chooseDesigns || (!t.photo && !t.slot)).map(t => `- ${t.id}（${t.zh}）：${t.zhUse}${t.photo ? '；可叠在整张图上' : ''}${t.slot ? '；有图位' : ''}；适合 ${t.fit.slice(0, 4).join('/')}${contractLine(t.id)}`).join('\n');
   const styles = IMAGE_STYLES.filter(s => s.prompt).map(s => `${s.zh}=${s.prompt}`).join('；');
   const canvas = (input.canvas ?? []).length ? input.canvas!.map(o => `- ${o.kind}${o.role ? `[${o.role}]` : ''}${o.text ? `「${o.text.slice(0, 40)}」` : ''}${o.size ? ` ${o.size}px` : ''}${o.color ? ` ${o.color}` : ''}`).join('\n') : '（空白）';
   return `你是「乔木封面设计师」，运行在 Obsidian 的封面画布里。用户通常很懒：只会丢给你一段话、一篇文章要点或一个主题。你要替他决定平台、模板、文案和配色，并输出画布指令。
 只输出一个 JSON 对象，不要解释，不要 Markdown 围栏。
 
 # 输出格式
-{"reply":"一句话说明设计思路（≤40 字，用用户的语言）","ops":[ …指令… ]}
+${input.chooseDesigns ? '{"reply":"选一个喜欢的方向","ops":[],"designs":[{"template":"…","title":"…","subtitle":"…"},{"template":"…","title":"…","subtitle":"…"},{"template":"…","title":"…","subtitle":"…"}]} 新封面必须是三个独立方案，禁止只输出一个 design 指令。已有画布的明确局部调整仍可输出 ops。' : '{"reply":"一句话说明设计思路（≤40 字，用用户的语言）","ops":[ …指令… ]}'}
 
+${input.chooseDesigns ? `# 候选方案
+用户要从文案和版式中选择。若需要 design，输出 {"reply":"选一个喜欢的方向","ops":[],"designs":[三个完整 design 字段对象，不含 op]}。
+三个方案各自提炼真实、不同角度的标题和副标题，使用不同构图模板和适合的字体；不只是换颜色。每个对象必须有 template/title/subtitle，平台一致。
+数字、收益、案例只能来自用户材料，不编造。优先完整的纯文字构图，不为未生成的图片留空位。候选不得写 imagePrompt/subjectPrompt/decor/pattern。微调已有画布时仍输出 ops，不输出 designs。
+` : ''}
 # 指令
-1. design（整页自动排版；用户给了一段话、主题或说“做封面”时用它，通常只要这一条）
+1. design（整页自动排版；用户给了一段话、主题或说“做封面”时用它，生成候选时用这些字段放进 designs 数组，只有用户已选中方案或要求局部调整时执行 ops）
    {"op":"design","platform":"xhs","template":"number","title":"…","subtitle":"…","badge":"7","points":["…","…"],"palette":{"bg":"#fff7e6","ink":"#1a1a1a","accent":"#ef4444"}${imageOn ? ',"subjectPrompt":"…","subjectAt":"right"' : ''},"titleFont":"…","bodyFont":"…","pattern":"…","decor":[…]}
    · 所有字段可省略，省略则保持当前值。palette 可选键：bg bg2 ink sub accent accentInk（必须 #rrggbb；不写就用模板默认配色）。默认不写 bg2：bg2 ≠ bg 会变成渐变底，渐变在信息流里显得廉价、压低文字反差。
    · title 是钩子不是摘要：中文最好 8~10 字、最多 14 字（能自然断成 2 行），英文 ≤6 词；标题文字约占画面 30%~40%，手机上一眼能读完。subtitle 补一个具体收益、数字或出处，≤24 字。badge 是 2~4 字标签或一个数字，如“必看”“干货”“7”“03”。
@@ -76,7 +82,7 @@ ${templates}
    · 同一张图最多一个强调色；不要用不透明的大件盖住标题。
    · 库：
 ${decorCatalog().split('\n').map(l => '     ' + l).join('\n')}
-${imageOn ? `3. 【生图已开启，必须用上】每个 design 都要有一个视觉主角：写 subjectPrompt（优先）或 imagePrompt，除非用户明确说“纯文字/不要图”。
+${imageOn ? `3. 【本次用户要求配图】可写 subjectPrompt（优先）或 imagePrompt；只生成本次需要的图片，保留已有文案和版式。
    · 产品、工具、App、公司（如 TRAE、Cursor）：画一个能象征它的具体物体——发光的代码窗口、悬浮的键盘与光标、机器人助手、火箭、放大镜、齿轮与电路板的 3D 物件等，不要画 logo 或文字。
    · 观点、方法、教程：画一个比喻物体（灯泡、天平、阶梯、钥匙、指南针）。人物只用剪影或背影。
    · subjectPrompt 用英文，只写这个主体本身、材质、光线、视角，不写背景和文字；插件会让它生成在纯色底上并自动抠成透明图层。subjectAt 可选 left/right/center（横版默认 right，文字放另一侧）。
@@ -119,15 +125,16 @@ ${playbookPrompt(input.platform, imageOn)}
   · 深度长文 / 人物 / 评论 → mag、newspaper、calm、seal（国风）
   · 系列文章 / 周刊 / 播客头图 → serial（badge 写“栏目名 + 期号”）
   · 文化 / 设计 / 潮流 → riso、print、collage；口号 / 金句 → stack（短标题）
+  · 每个模板写了能装多少字（“标题 a–b 字”）：标题超出就换一个装得下的模板，或把标题改短，不要硬塞；局部修改（换色、换字）时保留它的“改它时保留”项，那是这个模板的识别度
   · 渐变类（acid、glass、aurora、photo 无图时）只在用户点名要“弥散 / 玻璃 / 极光 / 暗黑发布会”时用。
 - 配色：同一张图里只用一个强调色；深底配亮字，浅底配深字，保证文字和背景明显反差。
 ${imageOn ? `
 # 生图
 design 里可写 imagePrompt（英文，按「主体 + 风格 + 色调 + 构图 + 细节」五段写，不要写任何文字内容；要给标题留出干净的空白区，并写明留在哪一侧；插件会自动追加“无文字、无水印、不模糊不变形”要求）。
 - imageRole=background：整张图做底，插件会自动改用 photo 模板（impact 也可）。imageRole=side：图放进模板的图位，只适合有图位的模板：split、keyword、polaroid、bili、number（竖版）。
-- 默认都要配图（见上面的图层策略）；只有金句卡、纯清单、或用户明确要纯文字时才不配。
+- 用户明确选择本次配图才允许生成；生图服务已配置不代表每次都需要配图。
 - 可参考的风格：${styles}。用户指定了风格就必须采用。
-` : '\n# 生图\n当前未接入生图模型，不要写 imagePrompt，也不要用 image 指令。\n'}${input.imageStyle ? `\n用户偏好的配图风格：${input.imageStyle}\n` : ''}
+` : '\n# 生图\n本次先做文案和版式，不要写 subjectPrompt/imagePrompt，也不要用 image 指令。\n'}${input.imageStyle ? `\n用户偏好的配图风格：${input.imageStyle}\n` : ''}
 ${seriesPrompt(input.series ?? [])}${input.pattern ? `\n# 当前风格\n画布正在使用套路 ${input.pattern}。除非用户明确要求换风格，design 里继续写 "pattern":"${input.pattern}"，只改文案、颜色或局部。\n` : ''}${input.noPicture ? '\n用户选择了“不配图”：不要写 subjectPrompt 或 imagePrompt，只用排版、配色和 decor。\n' : ''}
 # 当前画布
 平台：${input.platform ?? '自定义'}，${input.size.width}×${input.size.height}

@@ -23,6 +23,14 @@ export const MOODS: Record<Mood, Pair> = {
   brush: { zh: '国风书法', title: ['马善政楷书', '志莽行书', '阿里妈妈刀隶体', '演示夏行楷'], body: ['霞鹜文楷', '思源宋体', ...BODY] },
 };
 
+const TEMPLATE_FACES: Record<string, string[]> = {
+  keyword: ['得意黑', '优设标题黑'], riso: ['站酷快乐体', '站酷庆科黄油体'],
+  newspaper: ['京华老宋体', '思源宋体 Bold'], mag: ['朱雀仿宋', '思源宋体 Bold'],
+  notes: ['霞鹜文楷', '思源黑体 Bold'], numeral: ['阿里妈妈数黑体', '未来荧黑'],
+  window: ['未来荧黑', '得意黑'], brush: ['马善政楷书', '阿里妈妈刀隶体'],
+  polaroid: ['霞鹜文楷', '站酷庆科黄油体'], stack: ['优设标题黑', '思源黑体 Bold'],
+};
+
 const MOOD_OF: Record<string, Mood> = {
   minimal: 'heavy', editorial: 'serif', bold: 'punch', dark: 'tech', poster: 'heavy', split: 'heavy', sticker: 'warm', gradient: 'trend', center: 'punch',
   checklist: 'warm', number: 'tech', impact: 'punch', photo: 'heavy', bili: 'punch', compare: 'punch', neo: 'punch', soft: 'serif', swiss: 'heavy',
@@ -41,7 +49,7 @@ export interface Resolved { title?: string; body?: string; titleBold: boolean; /
 /** Picks the first installed family of each list. `missing` names the top choice per role when it is not installed. */
 export function resolvePair(templateId: string | undefined, have: (family: string) => boolean): Resolved {
   const mood = MOODS[moodOf(templateId)];
-  const title = mood.title.find(have), body = mood.body.find(have);
+  const title = [...(TEMPLATE_FACES[templateId ?? ''] ?? []), ...mood.title, ...BODY].find(have), body = mood.body.find(have);
   const missing = [mood.title[0], mood.body[0]].filter((f): f is string => !!f && !have(f));
   return { ...(title ? { title } : {}), ...(body ? { body } : {}), titleBold: !!title && HAS_BOLD.has(title), missing: [...new Set(missing)] };
 }

@@ -34,7 +34,7 @@
 
 使用本机已安装字体或库内导入的字体，不下载字库；库内字体随库同步，系统字体换设备时可能不同。首版仅支持桌面端，最低 Obsidian 1.8.7。语言设置在重新打开设计标签页后生效。剪贴板取决于系统权限，失败时可使用 PNG 导出。
 
-首版未移植网页的 AI 图像、抠图、云素材、公开分享、图片裁剪、手绘、路径编辑及完整字体库。不是网页全部功能的等价替代。当前仍处于开发候选阶段，未提交或通过 Obsidian 官方目录审核。
+支持 AI 文案与版式候选、按需生成主体/背景图、Unsplash 搜索及内置字体；未移植网页的公开分享、手绘和路径编辑等全部能力。当前仍处于开发候选阶段，未提交或通过 Obsidian 官方目录审核。
 
 ## 开发
 
@@ -66,3 +66,7 @@ MIT © 向阳乔木。
 ## Bundled fonts
 
 `assets/fonts/` (subset WOFF2 of open-licence fonts plus `index.json`) must be installed beside `main.js` as a `fonts/` folder. Rebuild it with `scripts/build-font-pack.py` (needs fonttools and brotli).
+
+### AI 封面设计
+
+输入主题或粘贴文章，先比较三个文案与版式预览，点击方案后应用到可编辑画布。默认不生成图片；在「配图可选」里选择「本次生成配图」，或应用方案后点击「添加配图」。图片服务配置与本次生成选择独立，正常排版处理不再逐条展示。

@@ -46,17 +46,17 @@ const previewCache = new Map<string, string>();
 let thumbQueue: Promise<unknown> = Promise.resolve();
 const breathe = (): Promise<void> => new Promise(r => window.setTimeout(r, 12));
 /** Renders a small PNG of a template at the given canvas size. */
-export function templateThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; pair?: Resolved; palette?: Partial<Palette> } = {}): Promise<string> {
+export function templateThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; points?: string[]; pair?: Resolved; palette?: Partial<Palette> } = {}): Promise<string> {
   const job = thumbQueue.then(() => breathe()).then(() => renderThumb(doc, zh, width, height, t, title, subtitle, extra));
   thumbQueue = job.catch(() => undefined); return job;
 }
-async function renderThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; pair?: Resolved; palette?: Partial<Palette> }): Promise<string> {
-  const key = `${t.id}|${width}x${height}|${title}|${subtitle}|${extra.badge ?? ''}|${extra.pair?.title ?? ''}|${extra.pair?.body ?? ''}|${zh}|${JSON.stringify(extra.palette ?? {})}`;
+async function renderThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; points?: string[]; pair?: Resolved; palette?: Partial<Palette> }): Promise<string> {
+  const key = `${t.id}|${width}x${height}|${title}|${subtitle}|${extra.badge ?? ''}|${JSON.stringify(extra.points ?? [])}|${extra.pair?.title ?? ''}|${extra.pair?.body ?? ''}|${zh}|${JSON.stringify(extra.palette ?? {})}`;
   const hit = previewCache.get(key); if (hit) return hit;
   const el = doc.createElement('canvas'); const sc = new StaticCanvas(el, { width, height, renderOnAddRemove: false, enableRetinaScaling: false });
   // Same input and same fonts as the real thing, so the thumbnail is what you get when you click.
   usePairing(extra.pair);
-  let r: ReturnType<typeof t.build>; try { r = t.build({ width, height, title, subtitle, zh, ...(extra.badge ? { badge: extra.badge } : {}), ...(extra.palette ? { palette: extra.palette } : {}) }); } finally { usePairing(undefined); }
+  let r: ReturnType<typeof t.build>; try { r = t.build({ width, height, title, subtitle, zh, points: extra.points, ...(extra.badge ? { badge: extra.badge } : {}), ...(extra.palette ? { palette: extra.palette } : {}) }); } finally { usePairing(undefined); }
   sc.backgroundColor = r.background.kind === 'solid' ? r.background.color : gradient(width, height, r.background.from, r.background.to, r.background.angle);
   for (const o of r.objects) sc.add(o);
   sc.renderAll();
@@ -139,13 +139,16 @@ function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: 
       }
     } else {
       const wrap = host.createDiv('qc-tray-pills');
+      const opt = wrap.createEl('button', { text: view.t('pictureThisTime'), cls: 'qc-tray-pill', attr: { type: 'button', 'aria-pressed': String(view.pictureRequested) } });
+      opt.disabled = !ctx.picOn; opt.classList.toggle('is-active', view.pictureRequested);
+      opt.addEventListener('click', () => { view.pictureRequested = !view.pictureRequested; if (view.pictureRequested && plugin.settings.imageStyle === 'none') { plugin.settings.imageStyle = 'auto'; void plugin.saveSettings(); } opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); ctx.chips.picture.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureOptional'); });
       if (!ctx.picOn) { wrap.createSpan({ text: view.t('pictureOffDesc'), cls: 'qc-hint' }); textButton(wrap, view.t('pictureEnable'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm'); }
       else for (const st of IMAGE_STYLES) {
         const [c1, c2] = STYLE_SW[st.id] ?? ['#e5e7eb', '#cbd5e1'];
         const b = wrap.createEl('button', { cls: 'qc-tray-pill', attr: { type: 'button' } }); b.classList.toggle('is-active', plugin.settings.imageStyle === st.id);
         const dot = b.createSpan({ cls: 'qc-tray-dot' }); dot.style.background = st.id === 'none' ? 'repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 3px,#f8fafc 3px,#f8fafc 6px)' : `linear-gradient(135deg, ${c1}, ${c2})`;
         b.createSpan({ text: zh ? st.zh : st.en });
-        b.addEventListener('click', () => { plugin.settings.imageStyle = st.id; void plugin.saveSettings(); view.refreshDrawer(); });
+        b.addEventListener('click', () => { plugin.settings.imageStyle = st.id; if (st.id === 'none') view.pictureRequested = false; void plugin.saveSettings(); view.refreshDrawer(); });
       }
     }
   };
@@ -193,9 +196,9 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const bar = compose.createDiv('qc-compose-bar');
   const styleBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(styleBtn.createSpan({ cls: 'qc-chip-icon' }), 'layout-template'); styleBtn.createSpan({ text: current ? (view.zh ? current.zh : current.en) : view.t('styleChip'), cls: 'qc-chip-label' });
   const promptBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(promptBtn.createSpan({ cls: 'qc-chip-icon' }), 'message-square-text'); promptBtn.title = view.zh ? '提示词' : 'Prompts'; promptBtn.addClass('is-icon');
-  const picOn = sel.value === 'ai' && ai.imageReady(); const picStyle = IMAGE_STYLES.find(x => x.id === plugin.settings.imageStyle) ?? IMAGE_STYLES[0]!;
+  const picOn = sel.value === 'ai' && ai.imageReady();
   const picBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(picBtn.createSpan({ cls: 'qc-chip-icon' }), 'image');
-  picBtn.createSpan({ text: !picOn ? view.t('pictureOffChip') : picStyle.id === 'none' ? view.t('pictureNone') : picStyle.id === 'auto' ? view.t('pictureChipAuto') : view.zh ? picStyle.zh : picStyle.en, cls: 'qc-chip-label' });
+  picBtn.createSpan({ text: view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureOptional'), cls: 'qc-chip-label' });
   bar.createDiv({ cls: 'qc-compose-spacer' });
   // Models are set once and rarely changed, so they live behind one small button instead of taking a row of their own.
   if (sel.value === 'ai') {
@@ -247,17 +250,40 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       for (const a of m.applied ?? []) { const li = bubble.createDiv('qc-msg-applied'); setIcon(li.createSpan(), 'check'); li.createSpan({ text: a }); }
       if (index === view.chat.length - 1 && !view.busy) {
         if (m.variants?.length) {
-          bubble.createDiv({ text: view.t('variantsTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-variants');
+          if (!m.variants.some(v => v.spec)) bubble.createDiv({ text: view.t('variantsTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-variants');
+          strip.setAttribute('aria-label', view.t('variantsTitle'));
+          strip.addEventListener('scroll', () => { m.variantScroll = strip.scrollLeft; });
+          strip.addEventListener('keydown', e => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            const cards = Array.from(strip.querySelectorAll<HTMLButtonElement>('.qc-variant'));
+            const index = cards.indexOf(view.doc.activeElement as HTMLButtonElement);
+            const next = cards[index + (e.key === 'ArrowRight' ? 1 : -1)];
+            if (next) { e.preventDefault(); next.focus({ preventScroll: true }); next.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+          });
+          let startX = 0, startY = 0, initialScroll = 0, pointer: number | undefined, dragged = false;
+          strip.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; pointer = e.pointerId; startX = e.clientX; startY = e.clientY; initialScroll = strip.scrollLeft; dragged = false; });
+          strip.addEventListener('pointermove', e => {
+            if (e.pointerId !== pointer || !e.buttons) return;
+            const dx = e.clientX - startX;
+            if (!dragged && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(e.clientY - startY)) { dragged = true; strip.setPointerCapture(e.pointerId); }
+            if (dragged) { e.preventDefault(); strip.scrollLeft = initialScroll - dx; }
+          });
+          const release = (): void => { pointer = undefined; };
+          strip.addEventListener('pointerup', release); strip.addEventListener('pointercancel', release);
+          strip.addEventListener('click', e => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
+          view.win.requestAnimationFrame(() => { strip.scrollLeft = m.variantScroll ?? 0; });
           for (const v of m.variants) {
-            const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button', title: v.label } }); card.createEl('img', { attr: { src: v.url, alt: v.label } }); card.createSpan({ text: v.label });
-            card.addEventListener('click', () => void view.action(() => { view.applyTemplate(v.id, {}, true); }).then(() => { m.variants = undefined; void view.variantThumbs().then(next => { m.variants = next; view.onChat?.(); }); }));
+            const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button', title: v.label } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
+            image.addEventListener('load', () => { if (image.naturalWidth > image.naturalHeight) card.style.flexBasis = '176px'; }); card.createSpan({ text: v.label });
+            card.classList.toggle('is-active', !!v.selected); card.setAttribute('aria-pressed', String(!!v.selected)); card.disabled = view.busy;
+            card.addEventListener('click', () => void view.chooseVariant(m, v));
           }
         }
         if (m.tweaks) {
           bubble.createDiv({ text: view.t('tweaksTitle'), cls: 'qc-msg-sub' }); const chips = bubble.createDiv('qc-tweaks');
           const list: [Key, Key][] = [['tweakBold', 'tweakBoldP'], ['tweakColor', 'tweakColorP'], ['tweakCalm', 'tweakCalmP'], ['tweakShort', 'tweakShortP'], ['tweakDeco', 'tweakDecoP']];
-          if (ai.imageReady() && plugin.settings.imageStyle !== 'none') list.splice(3, 0, ['tweakSubject', 'tweakSubjectP']);
-          for (const [label, prompt] of list) { const b = chips.createEl('button', { text: view.t(label), cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => void view.ask(view.t(prompt), view.t(label))); }
+          if (ai.imageReady()) list.splice(3, 0, ['tweakSubject', 'tweakSubjectP']);
+          for (const [label, prompt] of list) { const b = chips.createEl('button', { text: view.t(label), cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => { if (label === 'tweakSubject') { view.pictureRequested = true; if (plugin.settings.imageStyle === 'none') plugin.settings.imageStyle = 'auto'; } void view.ask(view.t(prompt), view.t(label)); }); }
         }
         if (m.retry) {
           const row = bubble.createDiv('qc-msg-actions');
@@ -268,6 +294,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     });
     if (view.busy) { const b = messages.createDiv('qc-msg qc-msg-assistant qc-thinking'); setIcon(b.createSpan(), 'loader-circle'); b.createSpan({ text: view.progress || view.t('thinking') }); }
     messages.scrollTop = messages.scrollHeight; send.disabled = view.busy;
+    picBtn.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureOptional');
+    const opt = trayEl.querySelector<HTMLButtonElement>('[aria-pressed]'); if (opt) { opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); }
   };
   view.onChat = draw;
   const submit = (): void => {

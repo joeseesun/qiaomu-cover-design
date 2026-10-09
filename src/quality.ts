@@ -25,6 +25,19 @@ export function readableOn(bg: string): string { return (contrast('#111111', bg)
 export function ensureReadable(fg: string, bg: string, min = 3): string {
   const c = contrast(fg, bg); return c === undefined || c >= min ? fg : readableOn(bg);
 }
+/**
+ * The same hue, mixed toward black (or white on a dark ground) in small steps until it reaches `min` contrast on `bg`.
+ * For an accent that carries words: the colour stays recognisable instead of being swapped for black or white.
+ */
+export function toContrast(fg: string, bg: string, min = 3): string {
+  const a = hexRgb(fg), b = hexRgb(bg); if (!a || !b || (contrast(fg, bg) ?? 21) >= min) return fg;
+  const to = lum(b) > 0.4 ? 0 : 255; let out = fg;
+  for (let k = 1; k <= 20; k++) {
+    out = '#' + a.map(v => Math.round(v + (to - v) * k * 0.05).toString(16).padStart(2, '0')).join('');
+    if ((contrast(out, bg) ?? 0) >= min) break;
+  }
+  return out;
+}
 const hit = (a: Box, b: Box): boolean => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 /**
  * Where a text box should sit so it clears every avoid zone: the same x, moved up for zones in the lower half and down for

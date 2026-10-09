@@ -62,10 +62,10 @@ export function ticker(w: number, y: number, h: number, word: string, size: numb
   const rad = (angle * Math.PI) / 180; const off = { x: -(h - size * 1.2) / 2 * Math.sin(rad), y: ((h - size * 1.2) / 2) * (Math.cos(rad) - 1) }; text.set({ left: (text.left ?? 0) + off.x, top: (text.top ?? 0) + off.y });
   return [tag(band, 'ticker'), tag(text, 'ticker')];
 }
-/** A round sticker with a word on it. */
+/** A round sticker with a word on it. Longer words get smaller, so four characters still sit inside the disc. */
 export function stickerDot(cx: number, cy: number, r: number, fill: string, label: string, ink: string, angle = 0, ring?: string): FabricObject[] {
   const dot = new Circle({ left: cx, top: cy, radius: r, fill, stroke: ring, strokeWidth: ring ? r * 0.08 : 0, originX: 'center', originY: 'center', angle, shadow: new Shadow({ color: 'rgba(0,0,0,0.22)', blur: r * 0.3, offsetX: 0, offsetY: r * 0.1 }) });
-  const t = new BadgeBox(label, { fontSize: r * 0.62, fontWeight: 'bold', fill: ink, badgeBg: 'rgba(0,0,0,0)', padX: 0.2, padY: 0.2, originX: 'center', originY: 'center', left: cx, top: cy, angle, qcRole: 'badge' } as ConstructorParameters<typeof BadgeBox>[1]);
+  const t = new BadgeBox(label, { fontSize: r * Math.min(0.62, 1.5 / Math.max(1, [...label].length * (/[\u3400-\u9fff]/.test(label) ? 1 : 0.6))), fontWeight: 'bold', fill: ink, badgeBg: 'rgba(0,0,0,0)', padX: 0.2, padY: 0.2, originX: 'center', originY: 'center', left: cx, top: cy, angle, qcRole: 'badge' } as ConstructorParameters<typeof BadgeBox>[1]);
   return [dot, t];
 }
 /** A red seal chop: a rounded square with one character reversed out. */

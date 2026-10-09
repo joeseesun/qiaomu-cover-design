@@ -32,6 +32,8 @@ export class BadgeBox extends Textbox {
     this.width = m.width + px * 2; this.height = m.ascent + m.descent + py * 2;
     this.textLines = [this.text]; this._textLines = [[...this.text]]; this.dirty = true;
   }
+  /** The pill is the visible extent. Fabric's own line cache is never filled here, so its version would throw. */
+  getLineWidth(): number { return this.width; }
   _render(c: CanvasRenderingContext2D): void {
     const w = this.width, h = this.height; const m = this.metrics(); const r = Math.min(h / 2, this.radius * h);
     c.save(); c.fillStyle = this.badgeBg; c.beginPath();

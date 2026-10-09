@@ -194,7 +194,7 @@ function sanitizeDesign(o: Record<string, unknown>, c: Catalog): DesignSpec {
 }
 
 /** Keeps only commands the canvas understands, with every value clamped. A model can never reach anything else. */
-export function sanitizeOps(raw: unknown, c: Catalog): { reply: string; ops: Op[] } {
+export function sanitizeOps(raw: unknown, c: Catalog): { reply: string; ops: Op[]; designs?: DesignSpec[] } {
   const root = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const list = Array.isArray(root.ops) ? root.ops : root.op ? [root] : [];
   const ops: Op[] = [];
@@ -220,5 +220,6 @@ export function sanitizeOps(raw: unknown, c: Catalog): { reply: string; ops: Op[
       case 'redo': ops.push({ op: 'redo' }); break;
     }
   }
-  return { reply: str(root.reply, 200) ?? '', ops };
+  const designs = Array.isArray(root.designs) ? root.designs.slice(0, 3).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map(x => sanitizeDesign(x, c)).filter(x => !!x.title && !!x.template) : [];
+  return { reply: str(root.reply, 200) ?? '', ops, ...(designs.length ? { designs } : {}) };
 }

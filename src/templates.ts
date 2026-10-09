@@ -4,6 +4,7 @@ import { ghost } from './kit';
 import { Circle, FabricObject, getEnv, Gradient, Line, Polygon, Rect, Shadow, Textbox, TextboxProps, Triangle } from 'fabric';
 import { Background } from './model';
 import { GAODING } from './gaoding';
+import { toContrast } from './quality';
 
 /** Colours a template reads. An assistant (or the user) can override any of them without touching layout. */
 export interface Palette { bg: string; bg2: string; ink: string; sub: string; accent: string; accentInk: string }
@@ -374,7 +375,9 @@ export const TEMPLATES: Template[] = [
       const size = fitTitle(i.title, inner, h * (wide ? 0.42 : 0.3), 150 * u, 40, 1.12);
       const sub = i.subtitle.trim() ? 80 * u : 0; const top = h - m * 0.9 - sub - textHeight(i.title, inner, size, 1.12);
       const glows = [kitGlow(w * 0.15, h * 0.2, Math.min(w, h) * 0.7, '#ff5fa2', 0.55), kitGlow(w * 0.9, h * 0.35, Math.min(w, h) * 0.65, '#6fb6ff', 0.5), kitGlow(w * 0.55, h * 0.75, Math.min(w, h) * 0.6, '#ffe27a', 0.55)];
-      const scrim = rect(0, h * 0.4, w, h * 0.6, new Gradient({ type: 'linear', gradientUnits: 'pixels', coords: { x1: 0, y1: 0, x2: 0, y2: h * 0.6 }, colorStops: [{ offset: 0, color: 'rgba(40,10,30,0)' }, { offset: 0.7, color: 'rgba(60,20,40,0.26)' }, { offset: 1, color: 'rgba(60,20,40,0.38)' }] }), { qcRole: 'scrim' });
+      // The fade starts above the headline and holds at least 0.6 behind the words (ppt-master's editorial rule), so white type reads on any picture.
+      const fadeTop = Math.max(0, Math.min(h * 0.4, top - h * 0.12)); const fh = h - fadeTop; const at = Math.min(0.9, Math.max(0.2, (top - fadeTop) / fh));
+      const scrim = rect(0, fadeTop, w, fh, new Gradient({ type: 'linear', gradientUnits: 'pixels', coords: { x1: 0, y1: 0, x2: 0, y2: fh }, colorStops: [{ offset: 0, color: 'rgba(30,10,24,0)' }, { offset: at, color: 'rgba(30,10,24,0.6)' }, { offset: 1, color: 'rgba(30,10,24,0.72)' }] }), { qcRole: 'scrim' });
       return { background: linear(p, 160), objects: keep<FabricObject>(
         ...glows, grain(w, h, 0.08, 23), scrim, ...badge(i.badge, m, m, p, Math.max(20, 30 * u)),
         textbox(i.title, m, top, inner, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.12, shadow: shadowSoft(u) }),
@@ -557,7 +560,7 @@ const PREMIUM: Template[] = [
       const subS = Math.max(26, size * 0.3); const subH = i.subtitle.trim() ? subS * 1.7 + 34 * u : 0; const top = (h - th - subH) / 2 + (wide ? 0 : h * 0.03);
       const dots: FabricObject[] = []; const step = 84 * u; for (let x = step / 2; x < w; x += step) for (let y = step / 2; y < h; y += step) dots.push(dot(x, y, 7 * u, 'rgba(0,0,0,0.06)'));
       const r = s0 * (wide ? 0.2 : 0.17); const sx = w - m * 0.6 - r, sy = m * 0.6 + r;
-      const tag = i.badge?.trim() ? stickerDot(sx, sy, r, p.accent, i.badge.trim().slice(0, 4), p.accentInk, 8) : [dot(sx, sy, r, p.accent)];
+      const word = i.badge?.trim() ?? ''; const tag = word ? stickerDot(sx, sy, r, p.accent, hasCjk(word) ? [...word].slice(0, 4).join('') : word.slice(0, 8), p.accentInk, 8) : [dot(sx, sy, r, p.accent)];
       return { background: solid(p.bg), objects: keep<FabricObject>(
         ...dots, rect(-s0 * 0.05, h - s0 * 0.26, s0 * 0.3, s0 * 0.3, '#3b82f6', { rx: s0 * 0.06, ry: s0 * 0.06, angle: 12 }), dot(w - m * 1.2, h - s0 * 0.18, s0 * 0.06, '#22c55e'),
         sparkle(x0 + 30 * u, top - 70 * u, 70 * u, '#ffffff', 0), ...tag,
@@ -593,7 +596,8 @@ const PREMIUM: Template[] = [
     build(i) {
       const p = palette(i, { bg: '#f2efe6', bg2: '#f2efe6', ink: '#0d0d0d', sub: '#4a4a4a', accent: '#ff3b1f', accentInk: '#ffffff' });
       const { u, m, w, h, wide } = metrics(i); const inner = w - m * 2.4; const x0 = m * 1.2; const tw = wide ? inner * 0.78 : inner;
-      const subH = i.subtitle.trim() ? Math.max(60, 92 * u) : 0; const bottom = h - m * 1.15; const head = m * 0.9 + 100 * u + (i.badge?.trim() ? Math.max(16, 20 * u) * 2.6 : 0) + 24 * u;
+      const subS = Math.max(26, 38 * u); const subLines = i.subtitle.trim() ? lineCount(i.subtitle, inner - 44 * u, subS) : 0; // the bar grows with the subtitle, so a second line stays on red
+      const subH = subLines ? Math.max(60, 92 * u, subLines * subS * 1.25 * 1.13 + 40 * u) : 0; const bottom = h - m * 1.15; const head = m * 0.9 + 100 * u + (i.badge?.trim() ? Math.max(16, 20 * u) * 2.6 : 0) + 24 * u;
       // The headline lives between the label block and the red bar; a taller one would be pushed down onto the bar.
       const size = fitTitle(i.title, tw, Math.min(h * (wide ? 0.62 : 0.5), (bottom - subH - 28 * u - head) * 0.86), 280 * u, 40, 0.94); const th = textHeight(i.title, tw, size, 0.94);
       const top = bottom - subH - 28 * u - size * 0.16 - th; const num = digits(i, false);
@@ -604,7 +608,7 @@ const PREMIUM: Template[] = [
         ...barcode(w - m * 1.2 - 150 * u, m * 1.9, 150 * u, 54 * u, p.ink, 6),
         textbox('→', w - m * 1.2 - 130 * u, h * (wide ? 0.18 : 0.3), 130 * u, { fontSize: 130 * u, fill: p.accent, fontWeight: 'bold', lineHeight: 1, textAlign: 'right' }),
         textbox(i.title, x0, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 0.94, charSpacing: -40 }),
-        ...(i.subtitle.trim() ? [rect(x0, bottom - subH, inner, subH, p.accent), ...sub(i, x0 + 22 * u, bottom - subH + (subH - Math.max(26, 38 * u) * 1.3) / 2, inner - 44 * u, Math.max(26, 38 * u), p.accentInk, { fontWeight: 'bold' })] : []),
+        ...(i.subtitle.trim() ? [rect(x0, bottom - subH, inner, subH, p.accent), ...sub(i, x0 + 22 * u, bottom - subH + (subH - subLines * subS * 1.25 * 1.13) / 2, inner - 44 * u, subS, p.accentInk, { fontWeight: 'bold' })] : []),
         ...badge(i.badge, x0, m * 0.9 + 100 * u, { ...p, accent: p.ink, accentInk: p.bg }, Math.max(16, 20 * u)),
       ) };
     },
@@ -772,8 +776,14 @@ const PREMIUM: Template[] = [
         sideText('SAID · REMEMBERED · REPEATED', w - m * 0.6, m * 1.5, h - m * 3, Math.max(13, 16 * u), p.sub, 'down', 0.7),
         textbox(i.title, m * 1.1, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontFamily: SERIF, fontWeight: 'bold', lineHeight: 1.22, charSpacing: -6 }),
         rule(m * 1.1, top + th + 36 * u, 90 * u, p.accent, Math.max(3, 4 * u)),
-        ...sub(i, m * 1.1, top + th + 62 * u, tw, Math.max(24, 34 * u), p.accent, { fontWeight: 'bold', charSpacing: 120 }),
-        ...badge(i.badge, m * 1.1, h - m * 1.1 - 40 * u, p, Math.max(16, 22 * u)),
+        // Wide tracking suits a Latin byline; on CJK it pulls a phrase apart, so Chinese gets a light touch.
+        ...sub(i, m * 1.1, top + th + 62 * u, tw, Math.max(24, 34 * u), p.accent, { fontWeight: 'bold', charSpacing: hasCjk(i.subtitle) ? 30 : 120 }),
+        // The badge sits at the foot; when a long subtitle has taken the foot it goes to the empty top-right corner instead.
+        ...((): BadgeBox[] => {
+          const bs = Math.max(16, 22 * u); const subEnd = top + th + 62 * u + (i.subtitle.trim() ? textHeight(i.subtitle, tw, Math.max(24, 34 * u), 1.25) : 0) + 24 * u;
+          if (subEnd + bs * 2.3 <= h - m * 0.6) return badge(i.badge, m * 1.1, Math.max(h - m * 1.1 - 40 * u, subEnd), p, bs);
+          return badge(i.badge, w - m * 1.8, m, p, bs, { originX: 'right' });
+        })(),
       ) };
     },
   },
@@ -826,7 +836,7 @@ const PREMIUM: Template[] = [
     id: 'split', zh: '左文右图', en: 'Arch split', fit: [...VIDEO, ...BANNER, ...XHS], zhUse: '左文案右拱门：奶油底 + 橙色拱门窗 + 太阳圆 + 细线，右侧放人像或产品最好看', enUse: 'Copy on the left, an orange arch window on the right for a portrait or product; cream paper, a sun disc and fine rules',
     slot: i => { const { w, h } = metrics(i); const x = w * 0.54; return { x, y: 0, w: w - x, h, radius: 0 }; },
     build(i) {
-      const p = palette(i, { bg: '#f6efe3', bg2: '#f6efe3', ink: '#1c1917', sub: '#6b5f55', accent: '#ff7a3d', accentInk: '#ffffff' });
+      const p = palette(i, { bg: '#f6efe3', bg2: '#f6efe3', ink: '#1c1917', sub: '#6b5f55', accent: '#ff7a3d', accentInk: '#1c1917' }); // white on this orange is 2.6:1
       const { u, m, w, h, wide } = metrics(i); const inner = wide ? w * 0.5 - m * 1.2 : w - m * 2;
       const size = fitTitle(i.title, inner, h * (wide ? 0.5 : 0.28), 170 * u, 36, 1.06); const th = textHeight(i.title, inner, size, 1.06);
       const aw = wide ? w * 0.36 : w * 0.7; const ah = wide ? h * 0.9 : h * 0.46; const ax = wide ? w - aw - m * 0.8 : (w - aw) / 2; const ay = wide ? h - ah : h - ah;
@@ -865,7 +875,8 @@ const PREMIUM: Template[] = [
     id: 'bili', zh: 'B 站知识区', en: 'Bilibili explainer', fit: ['bilibili', 'bilibili-43', 'bilibili-hd', 'youtube', 'wide', ...SHORT, ...XHS], zhUse: '浅灰底 + B 站粉蓝双色 + 粉色分区标签 + 黑色大标题 + 小电视画框（屏幕是图位）；知识区、科普、测评的干净信息感', enUse: 'Light grey with Bilibili pink and blue, a section tag, a bold headline and a little-TV frame whose screen takes a picture; explainers and reviews',
     slot: i => biliTv(i).screen,
     build(i) {
-      const p = palette(i, { bg: '#f4f5f7', bg2: '#f4f5f7', ink: '#18191c', sub: '#00aeec', accent: '#fb7299', accentInk: '#ffffff' });
+      // Bilibili's pink and blue, a shade deeper where they carry words: the brand hexes are under 3:1 on light grey.
+      const p = palette(i, { bg: '#f4f5f7', bg2: '#f4f5f7', ink: '#18191c', sub: '#0086c0', accent: '#e8487b', accentInk: '#ffffff' });
       const { u, m, w, h } = metrics(i); const side = w / h > 1.2; const tv = biliTv(i); const x0 = m * 1.1;
       const tw = side ? tv.x - x0 - m * 0.9 : w - x0 * 2; const areaTop = m; const areaH = side ? h - m * 2 : tv.y - m * 2.2;
       const size = fitTitle(i.title, tw, areaH * (side ? 0.56 : 0.6), 200 * u, 36, 1.08); const th = textHeight(i.title, tw, size, 1.08);
@@ -983,7 +994,7 @@ const STUDIO: Template[] = [
       const p = palette(i, { bg: '#1740ff', bg2: '#1740ff', ink: '#ffffff', sub: '#111111', accent: '#ffd400', accentInk: '#111111' });
       const { u, m, w, h } = metrics(i); const side = w / h > 1.2; const x0 = m * 1.1; const tw = side ? w * 0.56 - x0 : w - x0 * 2; const shown = upper(i.title);
       const size = fitTitle(shown, tw, h * (side ? 0.56 : 0.3), 260 * u, 44, 1.0); const th = textHeight(shown, tw, size, 1.0);
-      const tagS = Math.max(28, size * 0.34); const tagH = i.subtitle.trim() ? tagS * 1.8 + 26 * u : 0; const bs = Math.max(20, size * 0.18); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 20 * u : 0;
+      const tagS = Math.max(28, size * 0.34); const tagH = i.subtitle.trim() ? tagS * 1.8 + 26 * u : 0; const bs = Math.max(20, size * 0.18); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 20 * u + tw * Math.sin(2 * Math.PI / 180) : 0; // the tag is tilted 2°: its right end rises toward the badge
       const top = side ? Math.max(m + badgeH + tagH, (h - th - tagH) / 2 + tagH) : m * 1.2 + badgeH + tagH;
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.06, 89),
@@ -997,11 +1008,13 @@ const STUDIO: Template[] = [
     id: 'riso', zh: '孔版印刷', en: 'Risograph', fit: [...XHS, ...BANNER, ...VIDEO], zhUse: '再生纸 + 荧光粉与蓝两种专色叠印 + 轻微错版 + 颗粒；独立杂志、展览、文艺与潮流话题', enUse: 'Recycled paper, fluorescent pink and blue overprinting with slight misregistration and grain; zines, shows and culture',
     build(i) {
       const p = palette(i, { bg: '#f3eee4', bg2: '#f3eee4', ink: '#1f4fd1', sub: '#1f4fd1', accent: '#ff4fa3', accentInk: '#ffffff' });
-      const { u, m, w, h } = metrics(i); const side = w / h > 1.2; const x0 = m * 1.1; const tw = side ? (w - x0 * 2) * 0.64 : w - x0 * 2;
+      const { u, m, w, h } = metrics(i); const side = w / h > 1.2; const x0 = m * 1.1;
+      const R = Math.min(w, h) * (side ? 0.4 : 0.34); const cx = side ? w * 0.8 : w * 0.64; const cy = side ? h * 0.4 : h * 0.27;
+      // Side by side, the words stop before the blue block: overprinting is the look, but blue type on blue ink cannot be read.
+      const tw = side ? Math.min((w - x0 * 2) * 0.64, cx - R * 1.3 - x0 - m * 0.4) : w - x0 * 2;
       const size = fitTitle(i.title, tw, h * (side ? 0.56 : 0.34), 220 * u, 40, 1.02); const th = textHeight(i.title, tw, size, 1.02);
       const subSize = Math.max(24, size * 0.3); const subH = i.subtitle.trim() ? textHeight(i.subtitle, tw, subSize, 1.25) + 26 * u : 0;
       const top = h - m * 1.1 - subH - th; const off = Math.max(4, 7 * u); const mul = { globalCompositeOperation: 'multiply' };
-      const R = Math.min(w, h) * (side ? 0.4 : 0.34); const cx = side ? w * 0.8 : w * 0.64; const cy = side ? h * 0.4 : h * 0.27;
       const title = textbox(i.title, x0, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.02, charSpacing: -18 }); title.set(mul);
       const echo = echoOf(title, i.title, x0 + off, top + off * 0.6, tw, { fontSize: size, fill: p.accent, fontWeight: 'bold', lineHeight: 1.02, charSpacing: -18, opacity: 0.9 }); echo.set(mul);
       return { background: solid(p.bg), objects: keep<FabricObject>(
@@ -1041,7 +1054,7 @@ const STUDIO: Template[] = [
         rule(cx + pad, cy + pad + metaS * 1.9, tw, p.ink, Math.max(1.5, 2 * u), false, 0.6),
         textbox(i.title, cx + pad, ty, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.06 }),
         ...sub(i, cx + pad, ty + th + 24 * u, tw, subSize, p.sub),
-        textbox(label, side ? sx + pad * 0.7 : sx + pad, side ? sy + sh * 0.18 : sy + (sh - ls * 1.19) / 2, side ? sw - pad * 1.4 : sw * 0.5, { qcRole: 'badge', fontSize: ls, fill: p.accent, fontWeight: 'bold', lineHeight: 1.05, textAlign: side ? 'center' : 'left' }),
+        textbox(label, side ? sx + pad * 0.7 : sx + pad, side ? sy + sh * 0.18 : sy + (sh - ls * 1.19) / 2, side ? sw - pad * 1.4 : sw * 0.5, { qcRole: 'badge', fontSize: ls, fill: toContrast(p.accent, card), fontWeight: 'bold', lineHeight: 1.05, textAlign: side ? 'center' : 'left' }),
         ...barcode(side ? sx + (sw - bw) / 2 : sx + sw - pad - bw, side ? sy + sh - pad - bh : sy + (sh - bh) / 2, bw, bh, p.ink, 9),
       ) };
     },
@@ -1201,8 +1214,16 @@ for (const t of TEMPLATES) {
     const texts = r.objects.filter((o): o is Textbox & RoleBox => o instanceof Textbox);
     const title = texts.find(x => x.qcRole === 'title'), sub = texts.find(x => x.qcRole === 'subtitle' && !(x instanceof BadgeBox)), tag = texts.find(x => x.qcRole === 'badge');
     if (title && hasCjk(title.text) && title.fontSize >= 64) title.set({ charSpacing: -18 });
+    // A pill cannot wrap: one that would run past the far margin gets a smaller size instead of leaving the canvas.
+    for (const b of texts) if (b instanceof BadgeBox && b.originX === 'left' && Math.abs(b.angle ?? 0) < 10) {
+      const room = i.width - b.left * 2; if (room > 0 && b.width > room) { b.set({ fontSize: b.fontSize * room / b.width }); b.initDimensions(); b.setCoords(); }
+    }
     // A subtitle has to be readable at thumbnail size: never smaller than about a third of the headline.
-    if (title && sub && !sub.angle && t.id !== 'print' && sub.fontSize < title.fontSize * 0.3) sub.set({ fontSize: Math.min(title.fontSize * 0.3, sub.fontSize * 2.6) });
+    if (title && sub && !sub.angle && t.id !== 'print' && sub.fontSize < title.fontSize * 0.3) {
+      sub.set({ fontSize: Math.min(title.fontSize * 0.3, sub.fontSize * 2.6) });
+      // At the new size the line may no longer fit: wrap it with the CJK-aware rules, not Fabric's per-character split (which starts lines with "；").
+      if (hasCjk(sub.text)) { (sub as Wrapped).qcWrapped = true; sub.set({ splitByGrapheme: false }); rewrap(sub); }
+    }
     if (STACKED.has(t.id)) tightenCopy(r.objects, i.width, i.height, 0.47);
     // The subtitle must never sit on the headline: when they overlap, drop it just below.
     // A label must not sit on the headline: push the headline below it when they collide.

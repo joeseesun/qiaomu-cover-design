@@ -1,6 +1,6 @@
 {
   "name": "qiaomu-cover-design",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Offline visual cover designer for Obsidian",
   "type": "module",
   "main": "main.js",
@@ -11,7 +11,9 @@
     "test": "tsx --test tests/*.test.ts",
     "lint": "eslint src",
     "check": "npm run lint && npm test && npm run build",
-    "gallery": "node scripts/template-gallery/build.mjs && python3 scripts/template-gallery/server.py"
+    "audit": "tsx scripts/audit-templates.ts",
+    "gallery": "node scripts/template-gallery/build.mjs && python3 scripts/template-gallery/server.py",
+    "package": "npm run build && node scripts/package.mjs"
   },
   "dependencies": {
     "fabric": "7.4.0"

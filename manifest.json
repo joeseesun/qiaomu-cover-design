@@ -1,7 +1,7 @@
 {
   "id": "qiaomu-cover-design",
   "name": "Qiaomu Cover Design",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minAppVersion": "1.8.7",
   "description": "Design covers for Xiaohongshu, YouTube and Bilibili with platform presets, local fonts and flexible export.",
   "author": "向阳乔木",
