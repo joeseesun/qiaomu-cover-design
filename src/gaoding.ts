@@ -13,12 +13,14 @@ const items = (points: string[] | undefined, subtitle: string, max: number): str
   const xs = (points?.length ? points : subtitle.split(/[\n,，、；;|｜]/)).map(s => s.trim()).filter(Boolean);
   return xs.length >= 2 ? xs.slice(0, max) : [];
 };
+/** Tags a shape as part of the layout's signature, so the clean-up that runs when a subject picture arrives keeps it. */
+const mark = <T extends FabricObject>(o: T): T => Object.assign(o, { qcKind: 'mark' });
 /** A hand-drawn arrow: one curved stroke and an open head, round caps. From (x0,y0) bending to (x1,y1). */
 function arrow(x0: number, y0: number, x1: number, y1: number, bend: number, color: string, weight: number): Path {
   const mx = (x0 + x1) / 2 + bend, my = (y0 + y1) / 2 - bend * 0.4;
   const ang = Math.atan2(y1 - my, x1 - mx); const head = weight * 3.4;
   const a = (k: number): string => `${(x1 - Math.cos(ang + k) * head).toFixed(1)} ${(y1 - Math.sin(ang + k) * head).toFixed(1)}`;
-  return new Path(`M${x0} ${y0} Q${mx} ${my} ${x1} ${y1} M${a(0.55)} L${x1} ${y1} L${a(-0.55)}`, { fill: '', stroke: color, strokeWidth: weight, strokeLineCap: 'round', strokeLineJoin: 'round', objectCaching: false });
+  return mark(new Path(`M${x0} ${y0} Q${mx} ${my} ${x1} ${y1} M${a(0.55)} L${x1} ${y1} L${a(-0.55)}`, { fill: '', stroke: color, strokeWidth: weight, strokeLineCap: 'round', strokeLineJoin: 'round', objectCaching: false }));
 }
 /** A dry-brush block: a rectangle with ragged, slightly wavy long edges, for a highlighter stroke made by a brush. */
 function brushBlock(x: number, y: number, w: number, h: number, color: string, seed = 3): Path {
@@ -27,7 +29,7 @@ function brushBlock(x: number, y: number, w: number, h: number, color: string, s
   for (let k = 1; k <= n; k++) d += ` L${(x + (w * k) / n).toFixed(1)} ${(y + h * (0.04 + rnd() * 0.16)).toFixed(1)}`;
   d += ` L${(x + w + h * 0.12).toFixed(1)} ${(y + h * 0.55).toFixed(1)}`;
   for (let k = n; k >= 0; k--) d += ` L${(x + (w * k) / n).toFixed(1)} ${(y + h * (0.84 + rnd() * 0.14)).toFixed(1)}`;
-  return new Path(`${d} Z`, { fill: color, stroke: '', angle: -1.2 });
+  return mark(new Path(`${d} Z`, { fill: color, stroke: '', angle: -1.2 }));
 }
 
 export const GAODING: Template[] = [
@@ -91,7 +93,7 @@ export const GAODING: Template[] = [
       const subS = Math.max(24, size * 0.28); const subH = !checks.length && i.subtitle.trim() ? textHeight(i.subtitle, tw, subS, 1.25) + 30 * u : 0;
       const tagS = Math.max(22, size * 0.24); const tagH = tagS * 1.3 * 1.7 + 40 * u;
       const ty = (h - tagH - th - subH - rowH - (rowH ? 40 * u : 0)) / 2 + tagH; const last = lines[lines.length - 1] ?? '';
-      const ray = (k: number): Line => { const a = (-150 - k * 28) * Math.PI / 180; const cx = x0 + tagS * 0.2, cy = ty - tagH * 0.55; const r0 = tagS * 0.9, r1 = tagS * 1.6; return new Line([cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1], { stroke: p.ink, strokeWidth: Math.max(3, 5 * u), strokeLineCap: 'round' }); };
+      const ray = (k: number): Line => { const a = (-150 - k * 28) * Math.PI / 180; const cx = x0 + tagS * 0.2, cy = ty - tagH * 0.55; const r0 = tagS * 0.9, r1 = tagS * 1.6; return mark(new Line([cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1], { stroke: p.ink, strokeWidth: Math.max(3, 5 * u), strokeLineCap: 'round' })); };
       const rowY = ty + th + 40 * u; let cx = x0;
       const row = checks.flatMap(t => { const box = [dot(cx + cs * 0.5, rowY + cs * 0.62, cs * 0.5, p.accent), textbox('✓', cx + cs * 0.1, rowY + cs * 0.06, cs * 0.8, { fontSize: cs * 0.9, fill: p.ink, fontWeight: 'bold', textAlign: 'center', lineHeight: 1 }), textbox(t, cx + cs * 1.3, rowY, lineW(t, cs, 'bold', 0) + cs, { fontSize: cs, fill: p.ink, fontWeight: 'bold', lineHeight: 1.1 })]; cx += cs * 2.2 + lineW(t, cs, 'bold', 0); return box; });
       return { background: solid(p.bg), objects: keep<FabricObject>(
@@ -113,7 +115,7 @@ export const GAODING: Template[] = [
       const size = fitTitle(i.title, tw, ch * 0.5, 220 * u, 36, 1.08); const th = textHeight(i.title, tw, size, 1.08);
       const subS = Math.max(24, size * 0.3); const subH = i.subtitle.trim() ? textHeight(i.subtitle, tw, subS, 1.25) + 30 * u : 0; const head = r * 4;
       const ty = cy + head + (ch - head - th - subH) / 2;
-      const rings = Array.from({ length: holes }, (_, k) => { const x = cx + (cw / holes) * (k + 0.5); return [dot(x, cy + r * 1.6, r * 0.55, p.bg), new Rect({ left: x - r * 0.28, top: cy - r * 1.1, width: r * 0.56, height: r * 2.8, rx: r * 0.28, ry: r * 0.28, fill: '#1b1b1b', originX: 'left', originY: 'top' })]; }).flat();
+      const rings = Array.from({ length: holes }, (_, k) => { const x = cx + (cw / holes) * (k + 0.5); return [mark(dot(x, cy + r * 1.6, r * 0.55, p.bg)), mark(new Rect({ left: x - r * 0.28, top: cy - r * 1.1, width: r * 0.56, height: r * 2.8, rx: r * 0.28, ry: r * 0.28, fill: '#1b1b1b', originX: 'left', originY: 'top' }))]; }).flat();
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.06, 167),
         rect(cx + 14 * u, cy + 18 * u, cw, ch, '#dfe6ff', { rx: 18 * u, ry: 18 * u }),

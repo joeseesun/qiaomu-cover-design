@@ -922,7 +922,7 @@ const STUDIO: Template[] = [
       const size = fitTitle(i.title, tw, h * (wide ? 0.56 : 0.42), 200 * u, 40, lh); const lines = wrapLines(i.title, tw, size, 'bold', -18); const step = size * lh * FABRIC_LINE; const th = lines.length * step;
       const subSize = Math.max(26, size * 0.3); const subH = i.subtitle.trim() ? subSize * 1.4 + 40 * u : 0; const bs = Math.max(20, size * 0.22); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 26 * u : 0;
       const top = (h - th - subH - badgeH) / 2 + badgeH;
-      const marks = lines.map((l, k) => rect(x0 - size * 0.06, top + k * step + size * 0.66, Math.min(w - x0, lineW(l, size) + size * 0.14), size * 0.4, p.accent, { angle: -0.5 }));
+      const marks = lines.map((l, k) => rect(x0 - size * 0.06, top + k * step + size * 0.66, Math.min(w - x0, lineW(l, size) + size * 0.14), size * 0.4, p.accent, { angle: -0.5, qcKind: 'mark' }));
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.05, 19), ...marks,
         ...badge(i.badge, x0, top - badgeH, { ...p, accent: p.ink, accentInk: p.bg }, bs),
