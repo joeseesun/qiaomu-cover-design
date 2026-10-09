@@ -184,3 +184,28 @@ test('template ids are unique, picture slots stay on the artboard, and the studi
 test('wrapping glues a lone last character back onto its line', () => {
   const lines = wrapLines('三十天学会写作', 6 * 100, 100); assert.ok(!orphaned(lines), lines.join('|'));
 });
+
+import { addSeries, contentHints, mergeSeries, pickVariants, seriesPrompt } from '../src/series';
+import { thumbCheck } from '../src/quality';
+
+test('series keep only valid colours, replace their own duplicates and brief the assistant', () => {
+  const list = mergeSeries([{ id: 'a', name: '干货', template: 'highlight', palette: { bg: '#FFFFFF', ink: 'red', accent: '#ffe14d' } }, { id: 'b' }, 'x']);
+  assert.deepEqual(list, [{ id: 'a', name: '干货', template: 'highlight', palette: { bg: '#ffffff', accent: '#ffe14d' } }]);
+  const more = addSeries(list, { id: 'c', name: '同款', template: 'highlight', palette: { bg: '#ffffff', accent: '#ffe14d' } });
+  assert.equal(more.length, 1); assert.equal(more[0]!.id, 'c');
+  assert.match(seriesPrompt(more), /【默认】同款/); assert.equal(seriesPrompt([]), '');
+});
+
+test('A/B variants follow the words and come from different families', () => {
+  const all = ['folio', 'highlight', 'keyword', 'sage', 'notes', 'riso', 'numeral', 'chat', 'mega', 'acid'];
+  assert.deepEqual(contentHints({ title: '7 个技巧', subtitle: '为什么没人告诉你？' }).slice(0, 3), ['numeral', 'number', 'chat']);
+  const v = pickVariants(all, 'folio', { title: '30 天学会写作', subtitle: '从零开始' });
+  assert.equal(v.length, 3); assert.equal(v[0], 'numeral'); assert.ok(!v.includes('folio') && !v.includes('acid'));
+  assert.ok(!v.includes('highlight'), 'same family as the current layout is skipped while others exist');
+});
+
+test('the feed-size check flags tiny words and over-long headlines', () => {
+  assert.deepEqual(thumbCheck([{ role: 'title', size: 160, text: '30 天学会写作' }, { role: 'subtitle', size: 48, text: 'x' }], 1080, 'xhs'), []);
+  const bad = thumbCheck([{ role: 'title', size: 60, text: '新手做小红书最容易踩的十个坑和解决办法' }, { role: 'subtitle', size: 24, text: 'x' }], 1080, 'xhs');
+  assert.deepEqual(bad.map(b => `${b.role}:${b.kind}`), ['title:small', 'subtitle:small', 'title:long']);
+});

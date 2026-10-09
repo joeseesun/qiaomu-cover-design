@@ -1,3 +1,4 @@
+import { FEED_WIDTH } from './quality';
 import { App, FuzzySuggestModal, Modal, Notice, setIcon, TFile, TFolder } from 'obsidian';
 import type CoverPlugin from './main';
 import type { CoverView } from './view';
@@ -108,6 +109,12 @@ export class ExportModal extends Modal {
     if (!hasNote && this.prefs.destination === 'note') this.prefs.destination = 'folder';
     const wrap = this.contentEl.createDiv('qc-export');
     const preview = wrap.createDiv('qc-export-preview'); const img = preview.createEl('img', { attr: { alt: '' } }); const info = preview.createDiv({ cls: 'qc-export-info' });
+    // The cover as a card in a phone feed, at the real card width, with what is hard to read at that size.
+    const feed = preview.createDiv('qc-feed'); feed.createDiv({ text: t('thumbTitle'), cls: 'qc-export-label' });
+    const feedRow = feed.createDiv('qc-feed-row'); const mini = feedRow.createEl('img', { cls: 'qc-feed-img', attr: { alt: '' } }); mini.style.width = `${FEED_WIDTH[platform?.id ?? ''] ?? 150}px`;
+    const issues = view.thumbIssues(); const notes = feedRow.createDiv('qc-feed-notes');
+    if (issues.length) for (const x of issues) notes.createDiv({ text: x, cls: 'qc-feed-warn' }); else notes.createDiv({ text: t('thumbOk'), cls: 'qc-feed-ok' });
+    img.addEventListener('load', () => { mini.src = img.src; });
     const form = wrap.createDiv('qc-export-form');
     const update = (): void => this.schedule(img, info);
     const section = (label: string): HTMLElement => { const s = form.createDiv('qc-export-section'); s.createDiv({ text: label, cls: 'qc-export-label' }); return s; };

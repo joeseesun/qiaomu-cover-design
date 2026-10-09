@@ -8,6 +8,7 @@ import { AssistantInput, AssistantResult } from './ops';
 import { PLATFORMS } from './platforms';
 import { TEMPLATES } from './templates';
 import { IMAGE_RULES, IMAGE_STYLES, SUBJECT_RULES } from './prompts';
+import { seriesPrompt } from './series';
 
 /** Reads `error.message` from the usual provider error shapes, falling back to the raw text. */
 function failure(status: number, text: string): Error {
@@ -127,7 +128,7 @@ design 里可写 imagePrompt（英文，按「主体 + 风格 + 色调 + 构图 
 - 默认都要配图（见上面的图层策略）；只有金句卡、纯清单、或用户明确要纯文字时才不配。
 - 可参考的风格：${styles}。用户指定了风格就必须采用。
 ` : '\n# 生图\n当前未接入生图模型，不要写 imagePrompt，也不要用 image 指令。\n'}${input.imageStyle ? `\n用户偏好的配图风格：${input.imageStyle}\n` : ''}
-${input.pattern ? `\n# 当前风格\n画布正在使用套路 ${input.pattern}。除非用户明确要求换风格，design 里继续写 "pattern":"${input.pattern}"，只改文案、颜色或局部。\n` : ''}${input.noPicture ? '\n用户选择了“不配图”：不要写 subjectPrompt 或 imagePrompt，只用排版、配色和 decor。\n' : ''}
+${seriesPrompt(input.series ?? [])}${input.pattern ? `\n# 当前风格\n画布正在使用套路 ${input.pattern}。除非用户明确要求换风格，design 里继续写 "pattern":"${input.pattern}"，只改文案、颜色或局部。\n` : ''}${input.noPicture ? '\n用户选择了“不配图”：不要写 subjectPrompt 或 imagePrompt，只用排版、配色和 decor。\n' : ''}
 # 当前画布
 平台：${input.platform ?? '自定义'}，${input.size.width}×${input.size.height}
 ${canvas}

@@ -665,3 +665,17 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-root .qc-chat-compose { flex: 0 0 auto; }
 .qc-root .qc-chat-compose:has(.qc-tray:not(.qc-hidden)) textarea.qc-chat-input { min-height: 44px; }
 .qc-tray-strip { flex: 0 0 auto; }
+
+/* my series */
+.qc-series { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--qc-line); }
+.qc-series-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qc-series-title { font-size: 12px; font-weight: 600; color: var(--qc-muted); }
+.qc-series-card { position: relative; cursor: pointer; }
+.qc-series-del { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; padding: 2px; border-radius: 6px; background: var(--background-primary); opacity: 0; transition: opacity 0.12s; }
+.qc-series-card:hover .qc-series-del, .qc-series-del:focus-visible { opacity: 1; }
+/* feed-size preview in the export dialog */
+.qc-feed { display: flex; flex-direction: column; gap: 6px; }
+.qc-feed-row { display: flex; gap: 10px; align-items: flex-start; }
+.qc-feed-img { flex: none; border-radius: 4px; box-shadow: 0 0 0 1px var(--qc-line); }
+.qc-feed-notes { display: flex; flex-direction: column; gap: 4px; font-size: 12px; line-height: 1.4; }
+.qc-feed-warn { color: var(--text-warning); } .qc-feed-ok { color: var(--text-success); }

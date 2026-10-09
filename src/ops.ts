@@ -57,6 +57,7 @@ export interface AssistantInput {
   canvas?: CanvasItem[]; history?: { role: 'user' | 'assistant'; text: string }[]; imageStyle?: string;
   /** The cover pattern currently in use; the assistant keeps it unless asked to change style. */
   pattern?: string; /** The user chose "no picture": layout only. */ noPicture?: boolean;
+  /** Saved looks; the first is the default the assistant follows. */ series?: import('./series').Series[];
 }
 export interface AssistantResult { reply: string; ops: Op[] }
 export interface AssistantProvider { id: string; name: string; run(input: AssistantInput): Promise<AssistantResult> }

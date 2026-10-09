@@ -10,7 +10,8 @@
     "build": "tsc --noEmit && node esbuild.config.mjs",
     "test": "tsx --test tests/*.test.ts",
     "lint": "eslint src",
-    "check": "npm run lint && npm test && npm run build"
+    "check": "npm run lint && npm test && npm run build",
+    "gallery": "node scripts/template-gallery/build.mjs && python3 scripts/template-gallery/server.py"
   },
   "dependencies": {
     "fabric": "7.4.0"

@@ -11,7 +11,7 @@ import { DrawerTab } from './config';
 import { decorById } from './decor';
 import type { Key } from './i18n';
 import { GROUPS, PLATFORMS, platformFor } from './platforms';
-import { Template, gradient, templatesFor } from './templates';
+import { Palette, Template, gradient, templateById, templatesFor } from './templates';
 import { colorControl, emptyState, field, group, iconButton, numberBox, onEnter, segmented, slider, textButton } from './ui';
 import { openFontPopover } from './fontbrowser';
 import { IMAGE_STYLES, startersFor } from './prompts';
@@ -46,17 +46,17 @@ const previewCache = new Map<string, string>();
 let thumbQueue: Promise<unknown> = Promise.resolve();
 const breathe = (): Promise<void> => new Promise(r => window.setTimeout(r, 12));
 /** Renders a small PNG of a template at the given canvas size. */
-export function templateThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; pair?: Resolved } = {}): Promise<string> {
+export function templateThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; pair?: Resolved; palette?: Partial<Palette> } = {}): Promise<string> {
   const job = thumbQueue.then(() => breathe()).then(() => renderThumb(doc, zh, width, height, t, title, subtitle, extra));
   thumbQueue = job.catch(() => undefined); return job;
 }
-async function renderThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; pair?: Resolved }): Promise<string> {
-  const key = `${t.id}|${width}x${height}|${title}|${subtitle}|${extra.badge ?? ''}|${extra.pair?.title ?? ''}|${extra.pair?.body ?? ''}|${zh}`;
+async function renderThumb(doc: Document, zh: boolean, width: number, height: number, t: Template, title: string, subtitle: string, extra: { badge?: string; pair?: Resolved; palette?: Partial<Palette> }): Promise<string> {
+  const key = `${t.id}|${width}x${height}|${title}|${subtitle}|${extra.badge ?? ''}|${extra.pair?.title ?? ''}|${extra.pair?.body ?? ''}|${zh}|${JSON.stringify(extra.palette ?? {})}`;
   const hit = previewCache.get(key); if (hit) return hit;
   const el = doc.createElement('canvas'); const sc = new StaticCanvas(el, { width, height, renderOnAddRemove: false, enableRetinaScaling: false });
   // Same input and same fonts as the real thing, so the thumbnail is what you get when you click.
   usePairing(extra.pair);
-  let r: ReturnType<typeof t.build>; try { r = t.build({ width, height, title, subtitle, zh, ...(extra.badge ? { badge: extra.badge } : {}) }); } finally { usePairing(undefined); }
+  let r: ReturnType<typeof t.build>; try { r = t.build({ width, height, title, subtitle, zh, ...(extra.badge ? { badge: extra.badge } : {}), ...(extra.palette ? { palette: extra.palette } : {}) }); } finally { usePairing(undefined); }
   sc.backgroundColor = r.background.kind === 'solid' ? r.background.color : gradient(width, height, r.background.from, r.background.to, r.background.angle);
   for (const o of r.objects) sc.add(o);
   sc.renderAll();
@@ -64,6 +64,7 @@ async function renderThumb(doc: Document, zh: boolean, width: number, height: nu
   await sc.dispose(); if (previewCache.size > 120) previewCache.clear(); previewCache.set(key, url); return url;
 }
 function drawerTemplates(view: CoverView, body: HTMLElement): void {
+  drawerSeries(view, body);
   body.createDiv({ text: view.t('templatesHint'), cls: 'qc-hint' });
   const grid = body.createDiv('qc-template-grid'); const copy = view.copyText();
   const platformId = view.platform()?.id;
@@ -75,6 +76,26 @@ function drawerTemplates(view: CoverView, body: HTMLElement): void {
     card.addEventListener('click', () => void view.action(() => { view.applyTemplate(t.id, {}, true); }));
     void templateThumb(view.doc, view.zh, view.design!.width, view.design!.height, t, copy.title, copy.subtitle, { ...(copy.badge ? { badge: copy.badge } : {}), pair: view.pairing(t.id) }).then(url => { if (card.isConnected) thumb.createEl('img', { attr: { src: url, alt: '' } }); }).catch(() => undefined);
   }
+}
+/** Saved looks on top of the template list: save the current one, apply one, remove one. The first is the assistant's default. */
+function drawerSeries(view: CoverView, body: HTMLElement): void {
+  const box = body.createDiv('qc-series'); const head = box.createDiv('qc-series-head');
+  head.createSpan({ text: view.t('seriesTitle'), cls: 'qc-series-title' });
+  textButton(head, view.t('seriesSave'), () => { const s = view.saveSeries(); if (s) { new Notice(view.t('seriesSaved', { name: s.name })); view.refreshDrawer(); } }, 'qc-btn-sm', 'bookmark-plus');
+  const list = view.plugin.settings.series;
+  if (!list.length) { box.createDiv({ text: view.t('seriesHint'), cls: 'qc-hint' }); return; }
+  const grid = box.createDiv('qc-template-grid'); const copy = view.copyText(); const d = view.design!;
+  list.forEach((s, k) => {
+    const t = templateById(s.template); if (!t) return;
+    const card = grid.createDiv({ cls: 'qc-template qc-series-card', attr: { role: 'button', tabindex: '0', title: s.name } });
+    const thumb = card.createDiv('qc-template-thumb'); thumb.style.aspectRatio = `${d.width} / ${d.height}`;
+    const label = card.createSpan({ text: s.name, cls: 'qc-template-name' }); if (k === 0) label.createSpan({ text: ` · ${view.t('seriesDefault')}`, cls: 'qc-template-rec' });
+    const del = card.createEl('button', { cls: 'qc-series-del clickable-icon', attr: { type: 'button', 'aria-label': view.t('seriesRemove') } }); setIcon(del, 'x');
+    del.addEventListener('click', e => { e.stopPropagation(); view.removeSeries(s.id); view.refreshDrawer(); });
+    const go = (): void => void view.action(() => view.applySeries(s.id));
+    card.addEventListener('click', go); card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    void templateThumb(view.doc, view.zh, d.width, d.height, t, copy.title, copy.subtitle, { ...(copy.badge ? { badge: copy.badge } : {}), pair: view.pairing(t.id), palette: s.palette }).then(url => { if (card.isConnected) thumb.createEl('img', { attr: { src: url, alt: '' } }); }).catch(() => undefined);
+  });
 }
 /* ---------- assistant ---------- */
 /** Selects the first 【…】 placeholder so the user can type their own topic straight over it. */

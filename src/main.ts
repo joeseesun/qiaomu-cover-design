@@ -94,6 +94,16 @@ export default class CoverPlugin extends Plugin {
       if (!checking) void view.action(() => view.quickExport());
       return true;
     } });
+    this.addCommand({ id: 'ab-variants', name: this.t('abCommand'), checkCallback: checking => {
+      const view = this.activeCover(); if (!view?.canvas) return false;
+      if (!checking) void view.showVariants();
+      return true;
+    } });
+    this.addCommand({ id: 'save-series', name: this.t('seriesSave'), checkCallback: checking => {
+      const view = this.activeCover(); if (!view?.design?.template) return false;
+      if (!checking) { const s = view.saveSeries(); if (s) new Notice(this.t('seriesSaved', { name: s.name })); view.refreshDrawer(); }
+      return true;
+    } });
     this.addRibbonIcon('image', this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
     this.settingsTab = new CoverSettings(this.app, this); this.addSettingTab(this.settingsTab);
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {

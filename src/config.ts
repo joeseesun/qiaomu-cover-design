@@ -1,6 +1,7 @@
 import { ExportPrefs } from './model';
 import { DEFAULT_PLATFORM } from './platforms';
 import { AI_DEFAULTS, AiConfig, mergeAi } from './aiparse';
+import { mergeSeries, Series } from './series';
 
 export type DrawerTab = 'templates' | 'add' | 'fonts' | 'assistant';
 export interface Settings {
@@ -9,11 +10,12 @@ export interface Settings {
   guides: { safe: boolean; center: boolean; grid: boolean; snap: boolean };
   defaultFont: string; recentColors: string[]; recentFonts: string[]; favFonts: string[]; drawer: DrawerTab | ''; assistant: string;
   ai: AiConfig; imageStyle: string; fontNudgeOff: boolean; unsplashSecret: string; unsplashProxy: string;
+  /** Saved looks the user reuses; the first one is what the assistant follows by default. */ series: Series[];
 }
 export const DEFAULTS: Settings = {
   designFolder: 'Cover designs', exportFolder: 'Cover designs/Exports', fontFolder: 'Cover designs/Fonts', language: 'auto', defaultPlatform: DEFAULT_PLATFORM,
   export: {}, guides: { safe: false, center: true, grid: false, snap: true },
-  defaultFont: 'sans-serif', recentColors: [], recentFonts: [], favFonts: [], drawer: 'assistant', assistant: 'ai', ai: { ...AI_DEFAULTS }, imageStyle: 'auto', fontNudgeOff: false, unsplashSecret: '', unsplashProxy: '',
+  defaultFont: 'sans-serif', recentColors: [], recentFonts: [], favFonts: [], drawer: 'assistant', assistant: 'ai', ai: { ...AI_DEFAULTS }, imageStyle: 'auto', fontNudgeOff: false, unsplashSecret: '', unsplashProxy: '', series: [],
 };
 /** Merges stored data over defaults, ignoring wrong types so a damaged data.json cannot break startup. */
 export function mergeSettings(raw: unknown): Settings {
@@ -30,7 +32,7 @@ export function mergeSettings(raw: unknown): Settings {
   if (typeof r.unsplashSecret === 'string') base.unsplashSecret = r.unsplashSecret;
   if (typeof r.unsplashProxy === 'string' && /^https:\/\//.test(r.unsplashProxy)) base.unsplashProxy = r.unsplashProxy.trim();
   if (typeof r.fontNudgeOff === 'boolean') base.fontNudgeOff = r.fontNudgeOff;
-  base.ai = mergeAi(r.ai);
+  base.ai = mergeAi(r.ai); base.series = mergeSeries(r.series);
   if (r.drawer === '' || r.drawer === 'templates' || r.drawer === 'add' || r.drawer === 'fonts' || r.drawer === 'assistant') base.drawer = r.drawer;
   return base;
 }

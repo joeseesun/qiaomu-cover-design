@@ -15,7 +15,8 @@ import { renderPattern } from './preview';
 import { MESH_PRESETS, MeshPreset } from './mesh';
 import { glow as kitGlow, grain } from './kit';
 import { Anchor, decorPlacement, defaultSubjectBox, SubjectBox, TitleBox } from './compose';
-import { clearOfZones, ensureReadable } from './quality';
+import { clearOfZones, ensureReadable, thumbCheck } from './quality';
+import { addSeries, pickVariants, Series } from './series';
 import { imageStyleById } from './prompts';
 import { Align, AssistantInput, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op, runOps } from './ops';
 import { Key } from './i18n';
@@ -794,7 +795,7 @@ export class CoverView extends FileView implements CoverApi {
     }
     if (jobs.length) this.setProgress(this.t(spec.subjectPrompt ? 'progressSubject' : 'progressImage'));
     await Promise.all(jobs);
-    notes.push(...this.qualityPass());
+    notes.push(...this.qualityPass(), ...this.thumbIssues());
     return notes;
   }
   /** A blank artboard says where to start instead of looking broken. Not part of the cover, so it is never exported. */
@@ -1004,7 +1005,7 @@ export class CoverView extends FileView implements CoverApi {
     const history = this.chat.slice(0, -1).filter(m => m.text).map(m => ({ role: m.role, text: m.text.slice(0, 400) }));
     return {
       prompt, zh: this.zh, fonts: this.plugin.fonts.all().map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
-      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: this.plugin.settings.imageStyle === 'none',
+      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: this.plugin.settings.imageStyle === 'none', series: this.plugin.settings.series,
     };
   }
   /** Sends a request to the selected assistant and applies what comes back. Shared by the chat box, retry and auto-design. */
@@ -1024,22 +1025,59 @@ export class CoverView extends FileView implements CoverApi {
       this.chat.push({ role: 'assistant', text: this.t('error', { message: e instanceof Error ? e.message : String(e) }) });
     } finally { this.busy = false; this.setProgress(); }
   }
-  /** Three or four other layouts for the same words, rendered offline in a blink, so a first pass is a choice and not a gamble. */
-  async variantThumbs(): Promise<Variant[]> {
+  /**
+   * Other layouts for the same words, rendered offline in a blink, so a first pass is a choice and not a gamble. They come from
+   * different style families and follow the copy (a number, a question, a list), and use the fonts each layout really gets.
+   */
+  async variantThumbs(n = 4): Promise<Variant[]> {
     const d = this.design, c = this.canvas; if (!d || !c) return [];
     const copy = this.copyText(); const hasPhoto = c.getObjects().some(o => (o as QObject).qcRole === 'image' && !o.clipPath);
-    const pool = templatesFor(this.platform()?.id).filter(t => t.id !== this.templateId && !['checklist', 'compare'].includes(t.id) && (hasPhoto || !t.photo));
+    const candidates = templatesFor(this.platform()?.id).filter(t => !['checklist', 'compare'].includes(t.id) && (hasPhoto || !t.photo)).map(t => t.id);
     const out: Variant[] = [];
-    for (const t of pool.slice(0, 4)) {
+    for (const id of pickVariants(candidates, this.templateId, { title: copy.title, subtitle: copy.subtitle, points: this.lastSpec?.points }, n)) {
+      const t = templateById(id); if (!t) continue;
       const sc = new StaticCanvas(this.doc.createElement('canvas'), { width: d.width, height: d.height, enableRetinaScaling: false });
+      usePairing(this.pairing(t.id));
       try {
-        const r = t.build({ width: d.width, height: d.height, title: copy.title, subtitle: copy.subtitle, badge: copy.badge, zh: this.zh });
+        const r = t.build({ width: d.width, height: d.height, title: copy.title, subtitle: copy.subtitle, badge: copy.badge, points: this.lastSpec?.points, zh: this.zh });
         for (const o of r.objects) sc.add(o);
         sc.backgroundColor = r.background.kind === 'solid' ? r.background.color : gradient(d.width, d.height, r.background.from, r.background.to, r.background.angle);
         sc.renderAll(); out.push({ id: t.id, label: this.zh ? t.zh : t.en, url: sc.toDataURL({ format: 'jpeg', quality: 0.72, multiplier: Math.min(1, 280 / d.width) }) });
-      } catch { /* a layout that cannot be previewed is simply not offered */ } finally { void sc.dispose(); }
+      } catch { /* a layout that cannot be previewed is simply not offered */ } finally { usePairing(undefined); void sc.dispose(); }
     }
     return out;
+  }
+  /** A/B on demand: three clearly different directions for the current words, shown in the assistant panel. */
+  async showVariants(): Promise<void> {
+    if (!this.canvas) return;
+    this.plugin.settings.drawer = 'assistant'; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom();
+    const message: ChatMessage = { role: 'assistant', text: this.t('abTitle') }; this.chat.push(message); this.onChat?.();
+    message.variants = await this.variantThumbs(3); this.onChat?.();
+  }
+  /* ---------- series: one look reused across covers ---------- */
+  /** Saves the current layout, colours and faces as a series (newest first; the first one is the default). */
+  saveSeries(): Series | undefined {
+    const d = this.design, c = this.canvas; if (!d?.template || !c) return undefined;
+    const t = templateById(d.template); const texts = c.getObjects().filter((o): o is Textbox & QObject => o instanceof Textbox);
+    const face = (role: string): string | undefined => { const f = texts.find(o => o.qcRole === role)?.fontFamily; return f && !['sans-serif', 'serif', 'monospace'].includes(f) ? f : undefined; };
+    const palette = { ...(this.palette ?? {}) }; const titleFont = face('title'), bodyFont = face('subtitle');
+    const list = this.plugin.settings.series;
+    const s: Series = { id: `s${Date.now().toString(36)}`, name: `${t ? (this.zh ? t.zh : t.en) : d.template} ${list.length + 1}`, template: d.template, palette, ...(titleFont ? { titleFont } : {}), ...(bodyFont ? { bodyFont } : {}) };
+    this.plugin.settings.series = addSeries(list, s); void this.plugin.saveSettings(); return s;
+  }
+  removeSeries(id: string): void { this.plugin.settings.series = this.plugin.settings.series.filter(s => s.id !== id); void this.plugin.saveSettings(); }
+  /** Re-lays the cover in a saved look, keeping the words, picture and decoration. */
+  async applySeries(id: string): Promise<void> {
+    const s = this.plugin.settings.series.find(x => x.id === id); if (!s || !templateById(s.template)) return;
+    await this.applyDesign({ template: s.template, palette: s.palette, ...(s.titleFont ? { titleFont: s.titleFont } : {}), ...(s.bodyFont ? { bodyFont: s.bodyFont } : {}) });
+    new Notice(this.t('seriesApplied', { name: s.name }));
+  }
+  /** What the cover looks like as a card in a phone feed: words too small to read, or a headline too long to take in. */
+  thumbIssues(): string[] {
+    const c = this.canvas, d = this.design; if (!c || !d) return [];
+    const texts = c.getObjects().filter((o): o is Textbox & QObject => o instanceof Textbox && ((o as QObject).qcRole === 'title' || ((o as QObject).qcRole === 'subtitle' && !(o instanceof BadgeBox))))
+      .map(o => ({ role: o.qcRole as 'title' | 'subtitle', size: o.fontSize * o.scaleY, text: o.qcWrapped ? unwrap(o.text) : o.text }));
+    return thumbCheck(texts, d.width, this.platform()?.id).map(x => x.kind === 'long' ? this.t('thumbLong') : this.t('thumbSmall', { role: this.t(x.role === 'title' ? 'roleTitle' : 'roleSubtitle'), px: x.px ?? 0, min: x.min ?? 0 }));
   }
   private patternCache = new Map<string, Promise<string>>();
   /** Thumbnail of a pattern at this canvas's size (cached per platform and size). */

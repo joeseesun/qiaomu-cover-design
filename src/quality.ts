@@ -38,3 +38,24 @@ export function clearOfZones(box: Box, zones: Box[], canvasH: number, pad: numbe
   }
   if (!moved || y < 0 || y + box.h > canvasH) return undefined; return y;
 }
+
+/**
+ * How big the words are when the cover is a card in a phone feed. Widths are the typical rendered card width in CSS px:
+ * a Xiaohongshu two-column card, a YouTube/Bilibili sidebar thumbnail, a WeChat share card.
+ */
+export const FEED_WIDTH: Record<string, number> = { xhs: 170, 'xhs-square': 170, portrait: 170, square: 170, youtube: 168, bilibili: 170, 'bilibili-43': 170, 'bilibili-hd': 170, wide: 168, vertical: 120, wechat: 150, x: 300 };
+export interface ThumbText { role: 'title' | 'subtitle'; size: number; text: string }
+export interface ThumbIssue { role: 'title' | 'subtitle'; kind: 'small' | 'long'; px?: number; min?: number }
+/** Below these the words blur into a smudge at feed size (glyph height in CSS px). */
+export const THUMB_MIN = { title: 11, subtitle: 6 };
+/** Problems a cover has at feed size: a headline or subtitle too small to read, or a headline too long to take in at a glance. */
+export function thumbCheck(texts: ThumbText[], canvasWidth: number, platformId?: string): ThumbIssue[] {
+  const k = (FEED_WIDTH[platformId ?? ''] ?? 150) / canvasWidth; const out: ThumbIssue[] = [];
+  for (const t of texts) {
+    const px = Math.round(t.size * k * 10) / 10; const min = THUMB_MIN[t.role];
+    if (px < min) out.push({ role: t.role, kind: 'small', px, min });
+  }
+  const title = texts.find(t => t.role === 'title');
+  if (title) { const flat = title.text.replace(/\s+/g, ''); const units = /[぀-鿿]/.test(flat) ? [...flat].length : flat.length / 2.2; if (units > 15) out.push({ role: 'title', kind: 'long' }); }
+  return out;
+}
