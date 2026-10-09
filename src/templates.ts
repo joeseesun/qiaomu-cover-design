@@ -145,6 +145,9 @@ export function fitTitle(text: string, width: number, maxHeight: number, max: nu
     }
     return undefined;
   };
+  // Lines the writer broke themselves are kept one per line: their break is the design, so shrink before wrapping again.
+  const paras = text.split('\n').length;
+  if (paras > 1 && paras <= 4) return scan(paras, min + 1) ?? scan(99, min + 1) ?? min;
   return (units <= 16 ? scan(2, Math.max(min, max * 0.5)) : undefined) ?? scan(99, min + 1) ?? min;
 }
 /** True when the last line is a lone character (CJK) or a very short word, which reads as a mistake. */

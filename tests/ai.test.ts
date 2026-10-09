@@ -209,3 +209,8 @@ test('the feed-size check flags tiny words and over-long headlines', () => {
   const bad = thumbCheck([{ role: 'title', size: 60, text: '新手做小红书最容易踩的十个坑和解决办法' }, { role: 'subtitle', size: 24, text: 'x' }], 1080, 'xhs');
   assert.deepEqual(bad.map(b => `${b.role}:${b.kind}`), ['title:small', 'subtitle:small', 'title:long']);
 });
+
+test('a headline the writer broke into lines keeps one line per paragraph', () => {
+  const text = '7 个技巧\n笔记效率翻倍'; const size = fitTitle(text, 700, 900, 190);
+  assert.deepEqual(wrapLines(text, 700, size), ['7 个技巧', '笔记效率翻倍'], String(size));
+});
