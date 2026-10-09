@@ -678,15 +678,35 @@ export class CoverView extends FileView implements CoverApi {
     if (spec?.titleFont && this.plugin.fonts.available(this.doc, spec.titleFont)) this.styleText('title', { font: spec.titleFont });
     if (spec?.bodyFont && this.plugin.fonts.available(this.doc, spec.bodyFont)) this.styleText('subtitle', { font: spec.bodyFont });
     const hasSubject = expectSubject || c.getObjects().some(o => (o as QObject).qcRole === 'subject');
-    // Only plain text-block layouts are re-stacked; styles with stickers, rules or frames keep the arrangement they were designed with.
-    if (canReflow(d.template)) { if (hasSubject) arrangeForSubject(c.getObjects(), d.width, d.height); else tightenCopy(c.getObjects(), d.width, d.height); }
-    this.reanchorDecor(); this.calm(); layoutPass(c.getObjects(), d.width, d.height);
+    this.followTitle(() => {
+      // Only plain text-block layouts are re-stacked; styles with stickers, rules or frames keep the arrangement they were designed with.
+      if (canReflow(d.template)) { if (hasSubject) arrangeForSubject(c.getObjects(), d.width, d.height); else tightenCopy(c.getObjects(), d.width, d.height); }
+      this.reanchorDecor(); this.calm(); layoutPass(c.getObjects(), d.width, d.height);
+    });
+  }
+  private following = false;
+  /**
+   * Shapes drawn for the headline itself (a highlighter or brush stroke, tagged qcKind 'mark-title') move and scale with it
+   * when a pass restacks the words, so they never stay behind on an empty spot.
+   */
+  private followTitle<T>(run: () => T): T {
+    const c = this.canvas; const title = c?.getObjects().find((o): o is Textbox => o instanceof Textbox && (o as QObject).qcRole === 'title');
+    const marks = c?.getObjects().filter(o => (o as QObject).qcKind === 'mark-title') ?? [];
+    if (this.following || !c || !title || !marks.length) return run();
+    const x0 = title.left, y0 = title.top, s0 = title.fontSize * title.scaleY;
+    this.following = true; let out: T; try { out = run(); } finally { this.following = false; }
+    const k = (title.fontSize * title.scaleY) / s0;
+    if (k !== 1 || title.left !== x0 || title.top !== y0) for (const m of marks) {
+      if (!c.getObjects().includes(m)) continue;
+      m.set({ left: title.left + (m.left - x0) * k, top: title.top + (m.top - y0) * k, scaleX: m.scaleX * k, scaleY: m.scaleY * k }); m.setCoords();
+    }
+    return out;
   }
   /** One hero, one headline, at most one accent: thins ornaments, keeps the subject off the words, keeps decoration off the text. */
   calm(): void {
     const c = this.canvas, d = this.design; if (!c || !d) return;
     const hasSubject = c.getObjects().some(o => (o as QObject).qcRole === 'subject');
-    if (hasSubject) calmLayout(() => c.getObjects(), o => { c.remove(o); }, d.width, d.height, d.template);
+    if (hasSubject) this.followTitle(() => calmLayout(() => c.getObjects(), o => { c.remove(o); }, d.width, d.height, d.template));
     for (const o of decorOnText(c.getObjects(), d.width, d.height)) c.remove(o);
     c.requestRenderAll();
   }
@@ -818,7 +838,8 @@ export class CoverView extends FileView implements CoverApi {
     this.onChat?.();
   }
   /** Runs after a design: keeps text off platform UI (avatar, duration badge, stats bar) and readable on its background. Returns what it fixed. */
-  qualityPass(): string[] {
+  qualityPass(): string[] { return this.followTitle(() => this.qualityChecks()); }
+  private qualityChecks(): string[] {
     const c = this.canvas, d = this.design; if (!c || !d) return [];
     const notes: string[] = []; const pf = this.platform();
     const texts = c.getObjects().filter((o): o is Textbox & QObject => o instanceof Textbox && !o.lockMovementX);

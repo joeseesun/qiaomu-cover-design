@@ -14,7 +14,7 @@ const items = (points: string[] | undefined, subtitle: string, max: number): str
   return xs.length >= 2 ? xs.slice(0, max) : [];
 };
 /** Tags a shape as part of the layout's signature, so the clean-up that runs when a subject picture arrives keeps it. */
-const mark = <T extends FabricObject>(o: T): T => Object.assign(o, { qcKind: 'mark' });
+const mark = <T extends FabricObject>(o: T, kind: 'mark' | 'mark-title' = 'mark'): T => Object.assign(o, { qcKind: kind });
 /** A hand-drawn arrow: one curved stroke and an open head, round caps. From (x0,y0) bending to (x1,y1). */
 function arrow(x0: number, y0: number, x1: number, y1: number, bend: number, color: string, weight: number): Path {
   const mx = (x0 + x1) / 2 + bend, my = (y0 + y1) / 2 - bend * 0.4;
@@ -29,7 +29,7 @@ function brushBlock(x: number, y: number, w: number, h: number, color: string, s
   for (let k = 1; k <= n; k++) d += ` L${(x + (w * k) / n).toFixed(1)} ${(y + h * (0.04 + rnd() * 0.16)).toFixed(1)}`;
   d += ` L${(x + w + h * 0.12).toFixed(1)} ${(y + h * 0.55).toFixed(1)}`;
   for (let k = n; k >= 0; k--) d += ` L${(x + (w * k) / n).toFixed(1)} ${(y + h * (0.84 + rnd() * 0.14)).toFixed(1)}`;
-  return mark(new Path(`${d} Z`, { fill: color, stroke: '', angle: -1.2 }));
+  return mark(new Path(`${d} Z`, { fill: color, stroke: '', angle: -1.2 }), 'mark-title');
 }
 
 export const GAODING: Template[] = [
@@ -93,7 +93,7 @@ export const GAODING: Template[] = [
       const subS = Math.max(24, size * 0.28); const subH = !checks.length && i.subtitle.trim() ? textHeight(i.subtitle, tw, subS, 1.25) + 30 * u : 0;
       const tagS = Math.max(22, size * 0.24); const tagH = tagS * 1.3 * 1.7 + 40 * u;
       const ty = (h - tagH - th - subH - rowH - (rowH ? 40 * u : 0)) / 2 + tagH; const last = lines[lines.length - 1] ?? '';
-      const ray = (k: number): Line => { const a = (-150 - k * 28) * Math.PI / 180; const cx = x0 + tagS * 0.2, cy = ty - tagH * 0.55; const r0 = tagS * 0.9, r1 = tagS * 1.6; return mark(new Line([cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1], { stroke: p.ink, strokeWidth: Math.max(3, 5 * u), strokeLineCap: 'round' })); };
+      const ray = (k: number): Line => { const a = (-150 - k * 28) * Math.PI / 180; const cx = x0 + tagS * 0.2, cy = ty - tagH * 0.55; const r0 = tagS * 0.9, r1 = tagS * 1.6; return mark(new Line([cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1], { stroke: p.ink, strokeWidth: Math.max(3, 5 * u), strokeLineCap: 'round' }), 'mark-title'); };
       const rowY = ty + th + 40 * u; let cx = x0;
       const row = checks.flatMap(t => { const box = [dot(cx + cs * 0.5, rowY + cs * 0.62, cs * 0.5, p.accent), textbox('✓', cx + cs * 0.1, rowY + cs * 0.06, cs * 0.8, { fontSize: cs * 0.9, fill: p.ink, fontWeight: 'bold', textAlign: 'center', lineHeight: 1 }), textbox(t, cx + cs * 1.3, rowY, lineW(t, cs, 'bold', 0) + cs, { fontSize: cs, fill: p.ink, fontWeight: 'bold', lineHeight: 1.1 })]; cx += cs * 2.2 + lineW(t, cs, 'bold', 0); return box; });
       return { background: solid(p.bg), objects: keep<FabricObject>(
