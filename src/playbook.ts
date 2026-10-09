@@ -58,7 +58,7 @@ export const PLAYBOOKS: Playbook[] = [
       '文字 YouTube 最多 3~5 个词（MrBeast 不超过 12 个字符）；B 站 6~12 字，用「谁 + 做了什么 + 结果」。',
       '主体占画面约 40%：夸张表情加直视镜头的人脸，或一个有冲击力的物体；视觉元素不超过 3 个（一脸、一物、一问）。',
       '高对比、高饱和：黄/白字加 8~15px 黑描边，深蓝/红/橙底；主体比背景亮或暗至少 30%。',
-      '背景极简：纯色或渐变，复杂背景虚化或替换；用 70% 主体 + 30% 辅助元素。',
+      '背景极简：纯色为主，复杂背景虚化或替换；用 70% 主体 + 30% 辅助元素。',
       '制造好奇缺口：箭头、圆圈、问号、被遮住的一部分；具体数字（$10,457、30 天）比“很多”点击更高。',
       '右下角留空（时长标签）；B 站底部约 16% 会被播放数据遮挡；重要内容不要贴边。',
       'B 站偏“内容感”：真实画面/关键帧、明确主体、明亮、加文字；背景加半透明遮罩降饱和以托出主体。',
@@ -94,7 +94,7 @@ export const PLAYBOOKS: Playbook[] = [
 ];
 
 const P = (p: Pattern): Pattern => p;
-const warmPalette = { bg: '#fff7e6', bg2: '#ffe9c2', ink: '#1a1a1a', sub: '#6b7280', accent: '#ef4444', accentInk: '#ffffff' };
+const warmPalette = { bg: '#fff7e6', bg2: '#fff7e6', ink: '#1a1a1a', sub: '#6b7280', accent: '#ef4444', accentInk: '#ffffff' };
 
 export const PATTERNS: Pattern[] = [
   /* ---- Xiaohongshu ---- */
@@ -103,7 +103,7 @@ export const PATTERNS: Pattern[] = [
     decor: [{ kind: 'sunburst', x: -0.25, y: -0.18, w: 0.9, tone: 'accent', opacity: 0.12 }, { kind: 'underline', at: 'title', x: 0, y: 0, w: 0.8, tone: 'accent' }, { kind: 'sparkle', x: 0.82, y: 0.08, w: 0.12 }],
     fonts: ['阿里巴巴普惠体', '思源黑体'], copy: 'badge 写数字；标题用「个/步/招 + 利益点」，≤12 字；副标题给出处或时间成本。' }),
   P({ id: 'xhs-pit', family: 'xhs', zh: '避坑警告', en: 'Mistakes to avoid', use: '避坑、踩雷、别再…；情绪强，停留高', enUse: 'Warnings and mistakes; high emotion',
-    sample: { title: '新手最容易踩的 5 个坑', subtitle: '第 3 个 90% 的人都中招', badge: '避坑' }, template: 'pop', palette: { bg: '#ffd23f', bg2: '#ffd23f', ink: '#ffffff', sub: '#111111', accent: '#ff4f8b', accentInk: '#ffffff' },
+    sample: { title: '新手最容易踩的 5 个坑', subtitle: '第 3 个 90% 的人都中招', badge: '避坑' }, template: 'pop', palette: { bg: '#ffd23f', bg2: '#ffd23f', ink: '#151515', sub: '#151515', accent: '#ff4f8b', accentInk: '#ffffff' },
     decor: [],
     fonts: ['站酷庆科黄油体', '得意黑', '思源黑体'], copy: '标题带“别再/千万别/踩坑”，数字写进标题；badge 写“避坑/警告”。' }),
   P({ id: 'xhs-bigtype', family: 'xhs', zh: '大字报', en: 'Big type', use: '纯文字收藏型：方法论、观点、金句；高对比大字', enUse: 'Text-only, save-worthy methods',
@@ -135,15 +135,15 @@ export const PATTERNS: Pattern[] = [
     decor: [{ kind: 'glow', at: 'subject', x: 0, y: 0, w: 2.1, tone: 'accent', opacity: 0.55 }, { kind: 'ring', at: 'subject', x: 0, y: 0, w: 1.15, tone: 'accent', opacity: 0.35 }, { kind: 'arrow', x: 0.42, y: 0.52, w: 0.14, tone: 'accent', rotate: 12 }],
     picture: { kind: 'subject', at: 'right', hint: 'macro hero shot of a single glossy product, dramatic rim light, floating, clean dark studio' }, fonts: ['得意黑', 'Anton'], copy: '标题写「产品名 + 真实/到底/值不值」。' }),
   P({ id: 'yt-number', family: 'video', zh: '数字结果', en: 'Number result', use: '涨粉、赚钱、省时间；具体数字提高 15~25% 点击', enUse: 'Concrete results and numbers',
-    sample: { title: '天涨粉十万', subtitle: '我做对了这三件事', badge: '30' }, template: 'number', palette: { bg: '#facc15', bg2: '#fde047', ink: '#111111', sub: '#3f3f46', accent: '#dc2626', accentInk: '#ffffff' },
+    sample: { title: '天涨粉十万', subtitle: '我做对了这三件事', badge: '30' }, template: 'number', palette: { bg: '#facc15', bg2: '#facc15', ink: '#111111', sub: '#3f3f46', accent: '#dc2626', accentInk: '#ffffff' },
     decor: [{ kind: 'sunburst', x: 0.35, y: -0.2, w: 0.9, tone: 'ink', opacity: 0.08 }, { kind: 'underline', at: 'title', x: 0, y: 0, w: 0.7, tone: 'accent' }],
     fonts: ['得意黑', 'Anton'], copy: 'badge 写核心数字；标题写数字的单位和结果。' }),
   P({ id: 'yt-versus', family: 'video', zh: 'A 对 B', en: 'Versus', use: '对比评测、二选一；冲突感强', enUse: 'Head-to-head comparisons',
     sample: { title: 'Cursor vs Trae', subtitle: 'Cursor | Trae' }, template: 'compare', palette: {}, decor: [],
     fonts: ['Anton', '得意黑'], copy: '副标题写成「A | B」；标题 ≤4 个词。' }),
   P({ id: 'bili-knowledge', family: 'video', zh: '知识科普', en: 'Explainer', use: 'B 站知识区：有信息感，明确主体，谁+做了什么+结果', enUse: 'Bilibili explainers: informative with a clear subject',
-    sample: { title: '字节的 AI 编程工具', subtitle: '到底强在哪', badge: '实测' }, template: 'bili', palette: { bg: '#fb7299', bg2: '#fb923c', ink: '#ffffff', sub: '#1f2937', accent: '#facc15', accentInk: '#1f2937' },
-    decor: [{ kind: 'halftone', x: -0.02, y: 0.55, w: 0.24, tone: 'accentInk', opacity: 0.25 }, { kind: 'sparkle', at: 'subject', x: 0.5, y: -0.42, w: 0.2, tone: 'accent' }],
+    sample: { title: '字节的 AI 编程工具', subtitle: '到底强在哪', badge: '实测' }, template: 'bili', palette: {},
+    decor: [],
     picture: { kind: 'subject', at: 'right', hint: 'a single clear object that represents the topic, stylised 3D render, bright saturated colours, soft studio lighting' }, fonts: ['得意黑', '站酷庆科黄油体', '思源黑体'], copy: '标题 6~12 字，「谁+做了什么+结果」；不要夸张到与内容不符。' }),
   P({ id: 'bili-game', family: 'video', zh: '游戏高光', en: 'Game highlight', use: '游戏/动画/热血；霓虹、冲击、角色', enUse: 'Games and action; neon and punch',
     sample: { title: '一刀秒杀全场', badge: '高能' }, template: 'impact', palette: { bg: '#12082e', bg2: '#4c1d95', ink: '#ffffff', sub: '#e9d5ff', accent: '#22d3ee', accentInk: '#06121f' },
@@ -161,12 +161,12 @@ export const PATTERNS: Pattern[] = [
   P({ id: 'wx-editorial', family: 'banner', zh: '杂志长文', en: 'Editorial', use: '深度文章、观点、人文；衬线大标题加细线', enUse: 'Essays and opinion',
     sample: { title: '关于独立开发，我想了三年', subtitle: '一些不太成熟的观察', badge: '深度' }, template: 'mag', palette: { bg: '#efe7d8', bg2: '#e5dac4', ink: '#17130d', sub: '#6b5f4b', accent: '#b6402a', accentInk: '#fff7ea' },
     decor: [], fonts: ['朱雀仿宋', '思源宋体', '霞鹜文楷'], copy: '标题放在中间正方形内；一句话观点，不要标点堆砌。' }),
-  P({ id: 'wx-tech', family: 'banner', zh: '产品科技', en: 'Product glass', use: 'AI、工具、效率；粉蓝弥散底 + 磨砂玻璃卡片，干净现代', enUse: 'AI and tools on a pastel mesh with a glass card',
-    sample: { title: 'TRAE', subtitle: '字节的 AI 编程工具，到底强在哪', badge: '实测' }, template: 'glass', palette: {},
+  P({ id: 'wx-tech', family: 'banner', zh: '产品科技', en: 'Product arch', use: 'AI、工具、效率；奶油底 + 拱门窗放产品主体，干净有质感', enUse: 'AI and tools with the product in an arch window on cream',
+    sample: { title: 'TRAE', subtitle: '字节的 AI 编程工具，到底强在哪', badge: '实测' }, template: 'split', palette: {},
     decor: [],
     picture: { kind: 'subject', at: 'right', hint: 'a friendly stylised 3D clay robot or a glowing floating code window, soft studio lighting, pastel colours' }, fonts: ['得意黑', '思源黑体'], copy: '主标题极短且巨大（产品名/一个词）；副标题放问句或结论。' }),
   P({ id: 'x-banner', family: 'banner', zh: 'X 横幅', en: 'X header', use: 'X 个人横幅；留出左下角头像，主体偏右', enUse: 'X profile header; keep the avatar corner clear',
-    sample: { title: 'Build in public', subtitle: 'AI · Design · Indie', badge: '@you' }, template: 'acid', palette: {},
+    sample: { title: 'Build in public', subtitle: 'AI · Design · Indie', badge: '@you' }, template: 'stack', palette: {},
     decor: [], fonts: ['抖音美好体', '阿里巴巴普惠体'], copy: '一句话定位；文字偏右上，避开左下角。' }),
 ];
 
@@ -176,7 +176,7 @@ const sp = (id: string, family: Family, zh: string, en: string, use: string, enU
 PATTERNS.push(
   sp('xhs-collage', 'xhs', '拼贴手账', 'Paper collage', '生活、手账、种草；牛皮纸、撕纸和胶带，亲切有手感', 'Lifestyle and journaling on kraft paper', 'collage', { title: '周末手账', subtitle: '把日子过成喜欢的样子', badge: '日常' }, '标题像手写便签，≤8 字；副标题写一句感受。', ['霞鹜文楷', '站酷快乐体']),
   sp('xhs-print', 'xhs', '印刷海报', 'Print poster', '观点、文化、设计；黑白 + 朱红，裁切线与条码，欧洲字体海报的质感', 'Opinion and design with a European typographic look', 'print', { title: '设计的本质是取舍', subtitle: 'LESS BUT BETTER', badge: '01' }, '标题 ≤10 字，一个判断；副标题可用英文短句。'),
-  sp('xhs-acid', 'xhs', '酸性潮流', 'Acid mesh', '潮流、AI、音乐、科技；弥散光斑 + 颗粒 + 叠影大字', 'Trends, AI and music with mesh glows and echo type', 'acid', { title: 'AI 时代的设计师', subtitle: '三个正在发生的变化', badge: '新' }, '标题 ≤8 字，有冲击；副标题给数字或结论。', ['得意黑', '站酷庆科黄油体']),
+  sp('xhs-acid', 'xhs', '酸性潮流', 'Acid mesh', '潮流、AI、音乐、科技；弥散光斑 + 颗粒 + 居中大字', 'Trends, AI and music with mesh glows', 'acid', { title: 'AI 时代的设计师', subtitle: '三个正在发生的变化', badge: '新' }, '标题 ≤8 字，有冲击；副标题给数字或结论。', ['得意黑', '站酷庆科黄油体']),
   sp('xhs-memo', 'xhs', '学习笔记', 'Study notes', '学习、干货、教程；横线笔记纸 + 荧光笔划重点', 'Study notes with a highlighter on ruled paper', 'memo', { title: '一周搞定 Python', subtitle: '每天 30 分钟的学习路径', badge: '笔记' }, '标题带数字和时间；副标题写适合谁。', ['霞鹜文楷']),
   sp('xhs-mag', 'xhs', '杂志封面', 'Magazine cover', '深度、人物、专题；衬线巨标题 + 期号虚影，像一本真杂志', 'Depth and profiles with a serif headline and ghost issue numeral', 'mag', { title: '关于独立开发，我想了三年', subtitle: '一些不太成熟的观察', badge: '专题' }, '标题像杂志封面标题，≤14 字；副标题是一句导语。', ['朱雀仿宋', '思源宋体']),
   sp('yt-ticker', 'video', '跑马灯', 'Ticker', '奶黄底 + 斜向滚动字带 + 硬阴影大字，视频信息流里很抢眼', 'Diagonal ticker bands with hard-shadow type for feeds', 'ticker', { title: 'AI 写代码', subtitle: '一次跑通整段', badge: '实测' }, '标题 ≤4 个词；badge 是滚动字带上的关键词。', ['得意黑', 'Anton']),
@@ -189,15 +189,29 @@ PATTERNS.push(
   sp('wx-quote', 'banner', '金句海报', 'Quote poster', '一句话撑满的头图；墨黑底 + 金色大引号', 'A single statement on ink black with a gold quote mark', 'quote', { title: '你不是没时间，只是没把它排在前面。', subtitle: '—— 时间管理读书笔记' }, '金句 ≤20 字；副标题写出处。', ['朱雀仿宋', '思源宋体']),
   sp('wx-cinema', 'banner', '电影感', 'Cinematic', '深度长文、人物特稿；黑边 + 暗角', 'Long reads and profiles with letterbox bars', 'cinema', { title: '一个人的纪录片', subtitle: '关于坚持的 36 小时', badge: 'DOCUMENTARY' }, '标题像片名，≤8 字。', ['朱雀仿宋']),
 );
-const ORDER = ['xhs-pit', 'xhs-bigtype', 'xhs-collage', 'xhs-print', 'xhs-acid', 'xhs-memo', 'xhs-quote', 'xhs-mag', 'xhs-number', 'xhs-checklist', 'xhs-lifestyle', 'xhs-compare',
-  'yt-face', 'yt-ticker', 'yt-number', 'yt-product', 'bili-knowledge', 'bili-tutorial', 'yt-versus', 'bili-vlog', 'yt-neon', 'bili-game', 'yt-cinema',
-  'wx-editorial', 'wx-tech', 'wx-print', 'wx-swiss', 'wx-calm', 'x-banner', 'wx-bento', 'wx-quote', 'wx-cinema'];
+PATTERNS.push(
+  sp('xhs-highlight', 'xhs', '划重点', 'Highlighter', '干货、观点、方法；白纸黑字 + 荧光笔划过每行，信息感最强', 'Tips and opinions with a highlighter under every line', 'highlight', { title: '普通人做副业的 3 条底线', subtitle: '第 2 条最容易被忽略', badge: '干货' }, '标题 8~12 字，带数字或判断；badge 写“干货/必看”。'),
+  sp('xhs-notes', 'xhs', '备忘录截图', 'Notes screenshot', '经验、清单、复盘；像随手记在手机备忘录里，亲切可信', 'Experience and lists as a phone notes screenshot', 'notes', { title: '裸辞三个月后的真实感受', subtitle: '写给想辞职的你', badge: '今天 · 笔记', points: ['存款撑多久', '作息怎么排', '下一步做什么'] }, '标题像一句心里话；points 写 3~4 条 ≤10 字的清单；badge 写日期感的短语。'),
+  sp('xhs-chat', 'xhs', '对话截图', 'Chat Q&A', '问答、AI、情感、职场；副标题提问，标题回答', 'Q&A, AI and work told as a chat', 'chat', { title: '先把简历第一行改掉', subtitle: '为什么我投了 100 份都没回音？', badge: 'HR 朋友' }, 'subtitle 写成用户的提问（带问号）；title 是一句干脆的回答 ≤12 字；badge 写对话对象。'),
+  sp('xhs-ticket', 'xhs', '票根活动', 'Ticket', '活动、课程、展览、旅行攻略；入场券的仪式感', 'Events, courses and trips as an admission ticket', 'ticket', { title: '周末逛展指南', subtitle: '上海 10 月必看的 5 个展', badge: '入场券' }, '标题 ≤10 字；副标题写时间地点或数量；badge 写票种。'),
+  sp('xhs-polaroid', 'xhs', '拍立得', 'Polaroid', '旅行、Vlog、生活记录；相纸里放一张真实照片', 'Travel and everyday life with a real photo in an instant print', 'polaroid', { title: '一个人的京都三日', subtitle: '不赶路的旅行路线', badge: 'KYOTO · 10.09' }, '标题像日记；badge 写地点和日期，会写在相纸下沿。'),
+  sp('yt-keyword', 'video', '一词冲击', 'Keyword punch', '结果、观点、挑战；饱和纯色 + 超粗白字 + 黄色关键词', 'Results and challenges with heavy white type and one yellow keyword', 'keyword', { title: '一周只工作 4 天', subtitle: '真实结果', badge: '实验' }, '标题 ≤8 字或 ≤4 个英文词；subtitle 是 2~4 字的黄色关键词（结果/真相/别买）。', ['得意黑', 'Anton']),
+  sp('bili-explainer', 'video', 'B 站知识区', 'Bilibili explainer', '科普、测评、知识区；粉色分区标签 + 小电视画框放主体', 'Explainers with a section tag and a little-TV frame for the subject', 'bili', { title: '字节的 AI 编程工具', subtitle: '到底强在哪', badge: '知识区' }, '标题 6~12 字「谁+做了什么+结果」；badge 写分区或系列名。'),
+  sp('bili-window', 'video', '窗口教程', 'App window', '教程、工具、编程；macOS 窗口里的大标题', 'Tutorials and tools inside a macOS window', 'window', { title: '5 分钟学会 Obsidian', subtitle: '从零到能用的最短路径', badge: 'obsidian.md' }, '标题写「时间 + 学会什么」；badge 写文件名或工具名，像窗口标题栏。'),
+  sp('wx-newspaper', 'banner', '头版头条', 'Front page', '评论、深度、年度盘点；报头 + 分栏，把观点做成头条', 'Opinion and reviews as a newspaper front page', 'newspaper', { title: '2026，AI 改变了什么', subtitle: '一份不太乐观的年度观察', badge: '乔木周报 12' }, '标题像新闻标题 ≤14 字；badge 写报名（可带期号）。', ['思源宋体', '朱雀仿宋']),
+  sp('wx-serial', 'banner', '栏目头图', 'Column header', '系列文章、周刊、播客；左侧栏目条 + 期号，转发裁成方图时标题仍在中间', 'Recurring series with a column band and issue number', 'serial', { title: '本周值得看的 AI 工具', subtitle: '每周五更新', badge: '工具周刊 37' }, 'badge 写「栏目名 + 期号」；标题 ≤14 字。'),
+  sp('wx-riso', 'banner', '孔版印刷', 'Risograph', '文化、展览、设计、潮流；粉蓝双色叠印，有手作感', 'Culture and design in pink and blue overprint', 'riso', { title: '小众杂志正在回来', subtitle: '独立出版的第二春', badge: 'ZINE' }, '标题 ≤10 字；badge 写英文短词。'),
+);
+// Big type and flat colour first; mesh-gradient looks last (they read as generic in a feed).
+const ORDER = ['xhs-highlight', 'xhs-bigtype', 'xhs-pit', 'xhs-notes', 'xhs-chat', 'xhs-number', 'xhs-print', 'xhs-ticket', 'xhs-polaroid', 'xhs-memo', 'xhs-collage', 'xhs-mag', 'xhs-checklist', 'xhs-lifestyle', 'xhs-quote', 'xhs-compare', 'xhs-acid',
+  'yt-keyword', 'yt-number', 'bili-explainer', 'bili-window', 'bili-tutorial', 'bili-vlog', 'yt-face', 'yt-ticker', 'yt-product', 'bili-knowledge', 'yt-versus', 'yt-neon', 'bili-game', 'yt-cinema',
+  'wx-editorial', 'wx-serial', 'wx-newspaper', 'wx-swiss', 'wx-print', 'wx-tech', 'wx-riso', 'wx-calm', 'x-banner', 'wx-bento', 'wx-quote', 'wx-cinema'];
 PATTERNS.sort((a, b) => (ORDER.indexOf(a.id) + 1 || 99) - (ORDER.indexOf(b.id) + 1 || 99));
 
 export const PATTERN_IDS = PATTERNS.map(p => p.id);
 export const patternById = (id: string | undefined): Pattern | undefined => PATTERNS.find(p => p.id === id);
 export const playbookFor = (platformId: string | undefined): Playbook => PLAYBOOKS.find(b => b.platforms.includes(platformId ?? '')) ?? PLAYBOOKS[0]!;
-const HIDDEN_PATTERNS = new Set(['yt-face', 'yt-product', 'bili-game', 'yt-neon', 'yt-cinema', 'wx-cinema', 'yt-versus', 'xhs-compare', 'xhs-quote', 'wx-quote', 'yt-ticker']); // dark / loud: never listed
+const HIDDEN_PATTERNS = new Set(['bili-knowledge', 'yt-face', 'yt-product', 'bili-game', 'yt-neon', 'yt-cinema', 'wx-cinema', 'yt-versus', 'xhs-compare', 'xhs-quote', 'wx-quote', 'yt-ticker']); // dark / loud: never listed
 export const patternsFor = (family: Family): Pattern[] => PATTERNS.filter(p => p.family === family && !HIDDEN_PATTERNS.has(p.id));
 
 /**

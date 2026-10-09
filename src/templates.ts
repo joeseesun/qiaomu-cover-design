@@ -962,14 +962,13 @@ const STUDIO: Template[] = [
     photo: true,
     slot: i => { const { w, h } = metrics(i); return w / h > 1.2 ? { x: w * 0.56, y: 0, w: w * 0.44, h, radius: 0 } : { x: 0, y: h * 0.5, w, h: h * 0.5, radius: 0 }; },
     build(i) {
-      const p = palette(i, { bg: '#1740ff', bg2: '#0a1f9e', ink: '#ffffff', sub: '#111111', accent: '#ffd400', accentInk: '#111111' });
+      const p = palette(i, { bg: '#1740ff', bg2: '#1740ff', ink: '#ffffff', sub: '#111111', accent: '#ffd400', accentInk: '#111111' });
       const { u, m, w, h } = metrics(i); const side = w / h > 1.2; const x0 = m * 1.1; const tw = side ? w * 0.56 - x0 : w - x0 * 2; const shown = upper(i.title);
       const size = fitTitle(shown, tw, h * (side ? 0.56 : 0.3), 260 * u, 44, 1.0); const th = textHeight(shown, tw, size, 1.0);
       const tagS = Math.max(28, size * 0.34); const tagH = i.subtitle.trim() ? tagS * 1.8 + 26 * u : 0; const bs = Math.max(20, size * 0.18); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 20 * u : 0;
       const top = side ? Math.max(m + badgeH + tagH, (h - th - tagH) / 2 + tagH) : m * 1.2 + badgeH + tagH;
-      return { background: linear(p, 160), objects: keep<FabricObject>(
-        kitGlow(side ? w * 0.78 : w * 0.5, side ? h * 0.52 : h * 0.78, Math.min(w, h) * 0.62, '#7fb2ff', 0.7), grain(w, h, 0.06, 89),
-        side ? scrimFade(0, 0, w * 0.66, h, true, 'rgba(0,0,30,0.32)', 'rgba(0,0,30,0)') : scrimFade(0, 0, w, h * 0.6, false, 'rgba(0,0,30,0.32)', 'rgba(0,0,30,0)'),
+      return { background: solid(p.bg), objects: keep<FabricObject>(
+        grain(w, h, 0.06, 89),
         ...badge(i.badge, x0, m, { ...p, accent: '#ffffff', accentInk: p.bg }, bs),
         ...(i.subtitle.trim() ? [pill(i.subtitle, x0, top - tagH, p.accent, p.accentInk, tagS, { qcRole: 'subtitle', radius: 0.14, angle: -2 })] : []),
         textbox(shown, x0, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.0, charSpacing: -18, shadow: new Shadow({ color: 'rgba(0,0,40,0.35)', blur: 26 * u, offsetX: 0, offsetY: 8 * u }) }),
@@ -1032,14 +1031,14 @@ const STUDIO: Template[] = [
   {
     id: 'window', zh: '窗口教程', en: 'App window', fit: [...VIDEO, ...XHS, ...BANNER], zhUse: '柔和渐变底上一扇 macOS 风格窗口：红黄绿三点 + 文件名标签 + 窗口里的大标题；教程、工具、编程、效率', enUse: 'A macOS-style window on a soft gradient: traffic lights, a file tab and the headline inside; tutorials, tools and code',
     build(i) {
-      const p = palette(i, { bg: '#c7d2fe', bg2: '#fbcfe8', ink: '#111827', sub: '#4b5563', accent: '#6366f1', accentInk: '#ffffff' });
+      const p = palette(i, { bg: '#dfe3fb', bg2: '#dfe3fb', ink: '#111827', sub: '#4b5563', accent: '#6366f1', accentInk: '#ffffff' });
       const { u, m, w, h, wide } = metrics(i); const cx = m * (wide ? 1.4 : 0.9); const cw = w - cx * 2; const ch = h * (wide ? 0.76 : 0.6); const cy = (h - ch) / 2;
       const bar = Math.max(44, 66 * u); const pad = Math.max(m * 0.9, 48 * u); const tw = cw - pad * 2; const r = Math.max(14, 24 * u);
       const size = fitTitle(i.title, tw, (ch - bar) * 0.52, 180 * u, 36, 1.08); const th = textHeight(i.title, tw, size, 1.08);
       const subSize = Math.max(24, size * 0.3); const subH = i.subtitle.trim() ? textHeight(i.subtitle, tw, subSize, 1.25) + 28 * u : 0; const kick = Math.max(6, 9 * u) + 30 * u;
       const ty = cy + bar + (ch - bar - th - subH - kick) / 2 + kick;
-      return { background: linear(p, 135), objects: keep<FabricObject>(
-        kitGlow(w * 0.85, h * 0.1, Math.min(w, h) * 0.6, '#ffffff', 0.5), grain(w, h, 0.06, 103),
+      return { background: solid(p.bg), objects: keep<FabricObject>(
+        ...dotGrid(w - m * 0.5 - 7 * 34 * u, m * 0.5, 8, 5, 34 * u, 4 * u, p.accent, 0.4, false), grain(w, h, 0.06, 103),
         rect(cx, cy, cw, ch, '#ffffff', { rx: r, ry: r, shadow: new Shadow({ color: 'rgba(49,46,129,0.22)', blur: 60 * u, offsetX: 0, offsetY: 24 * u }) }),
         rect(cx, cy, cw, bar, '#f3f4f6', { rx: r, ry: r }), rect(cx, cy + bar / 2, cw, bar / 2, '#f3f4f6'), rule(cx, cy + bar, cw, '#e5e7eb', Math.max(1, 2 * u)),
         dot(cx + bar * 0.55, cy + bar / 2, bar * 0.13, '#ff5f57'), dot(cx + bar * 0.95, cy + bar / 2, bar * 0.13, '#febc2e'), dot(cx + bar * 1.35, cy + bar / 2, bar * 0.13, '#28c840'),
@@ -1165,7 +1164,9 @@ for (let k = TEMPLATES.length - 1; k >= 0; k--) if (RETIRED.has(TEMPLATES[k]!.id
 const MOODY = new Set(['neon', 'cinema', 'quote', 'aurora']); // dark by nature: still available, but never the first thing a new user sees
 TEMPLATES.unshift(...STUDIO.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => MOODY.has(t.id)), ...STUDIO.filter(t => MOODY.has(t.id)));
 // The first screen of the gallery alternates quiet and loud, paper and colour, so the range is visible without scrolling.
-const LEAD = ['folio', 'highlight', 'keyword', 'sage', 'notes', 'riso', 'numeral', 'ticket', 'polaroid', 'serial', 'chat', 'window', 'newspaper', 'stack', 'bili', 'pop']; TEMPLATES.sort((x, y) => (LEAD.indexOf(x.id) + 1 || 99) - (LEAD.indexOf(y.id) + 1 || 99));
+const LEAD = ['folio', 'highlight', 'keyword', 'sage', 'notes', 'riso', 'numeral', 'ticket', 'polaroid', 'serial', 'chat', 'window', 'newspaper', 'stack', 'bili', 'pop'];
+// Looks built on mesh gradients and soft glows read as generic in a feed, so they are offered last.
+const GRADIENT_LED = new Set(['acid', 'glass', 'photo', 'aurora']); TEMPLATES.sort((x, y) => (LEAD.indexOf(x.id) + 1 || (GRADIENT_LED.has(x.id) ? 199 : 99)) - (LEAD.indexOf(y.id) + 1 || (GRADIENT_LED.has(y.id) ? 199 : 99)));
 
 /**
  * Typographic finish applied to every template, so the system is consistent rather than each layout inventing its own rules:

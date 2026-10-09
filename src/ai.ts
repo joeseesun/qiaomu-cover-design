@@ -44,12 +44,12 @@ export function systemPrompt(input: AssistantInput, imageOn: boolean): string {
 # 指令
 1. design（整页自动排版；用户给了一段话、主题或说“做封面”时用它，通常只要这一条）
    {"op":"design","platform":"xhs","template":"number","title":"…","subtitle":"…","badge":"7","points":["…","…"],"palette":{"bg":"#fff7e6","ink":"#1a1a1a","accent":"#ef4444"}${imageOn ? ',"subjectPrompt":"…","subjectAt":"right"' : ''},"titleFont":"…","bodyFont":"…","pattern":"…","decor":[…]}
-   · 所有字段可省略，省略则保持当前值。palette 可选键：bg bg2 ink sub accent accentInk（必须 #rrggbb；不写就用模板默认配色）。
-   · title 是钩子不是摘要：中文 ≤14 字（最好能自然断成 2~3 行），英文 ≤6 词。subtitle 补一个具体收益、数字或出处，≤24 字。badge 是 2~4 字标签或一个数字，如“必看”“干货”“7”“03”。
-   · points 只给 checklist（3~4 条，每条 ≤10 字）和 compare（恰好 2 项：左 / 右）使用。
+   · 所有字段可省略，省略则保持当前值。palette 可选键：bg bg2 ink sub accent accentInk（必须 #rrggbb；不写就用模板默认配色）。默认不写 bg2：bg2 ≠ bg 会变成渐变底，渐变在信息流里显得廉价、压低文字反差。
+   · title 是钩子不是摘要：中文最好 8~10 字、最多 14 字（能自然断成 2 行），英文 ≤6 词；标题文字约占画面 30%~40%，手机上一眼能读完。subtitle 补一个具体收益、数字或出处，≤24 字。badge 是 2~4 字标签或一个数字，如“必看”“干货”“7”“03”。
+   · points 只给 notes / bento（3~4 条，每条 ≤10 字）和 compare（恰好 2 项：左 / 右）使用。
 2. platform {"op":"platform","id":"…"}  切换尺寸
 3. template {"op":"template","id":"…"}  只换模板，保留文案
-4. background {"op":"background","color":"#rrggbb"} 或 {"op":"background","from":"#…","to":"#…","angle":135}
+4. background {"op":"background","color":"#rrggbb"}（渐变 {"from","to","angle"} 只在用户明确要渐变时用）
 5. addText {"op":"addText","text":"…","size":60,"color":"#…","bold":true,"align":"left"}
 6. style {"op":"style","target":"title|subtitle|selection","text":"…","size":120,"scale":1.2,"color":"#…","bold":true,"italic":false,"align":"center","font":"…"}
 7. align {"op":"align","to":"left|center|right|top|middle|bottom"}（作用于选中的对象）
@@ -79,9 +79,9 @@ ${imageOn ? `3. 【生图已开启，必须用上】每个 design 都要有一�
    · 产品、工具、App、公司（如 TRAE、Cursor）：画一个能象征它的具体物体——发光的代码窗口、悬浮的键盘与光标、机器人助手、火箭、放大镜、齿轮与电路板的 3D 物件等，不要画 logo 或文字。
    · 观点、方法、教程：画一个比喻物体（灯泡、天平、阶梯、钥匙、指南针）。人物只用剪影或背影。
    · subjectPrompt 用英文，只写这个主体本身、材质、光线、视角，不写背景和文字；插件会让它生成在纯色底上并自动抠成透明图层。subjectAt 可选 left/right/center（横版默认 right，文字放另一侧）。
-   · 背景用 palette 的纯色/渐变；只有想要整张场景氛围、没有单一主体时才写 imagePrompt（整张背景），两者不要同时都是整图。
+   · 背景用 palette 的纯色；只有想要整张场景氛围、没有单一主体时才写 imagePrompt（整张背景），两者不要同时都是整图。
    · 只有金句卡、纯清单这类模板可以不配图。
-推荐组合：纯色/渐变背景 + subjectPrompt 主体 + 1~3 个 decor + 文字。
+推荐组合：纯色背景 + subjectPrompt 主体 + 1~3 个 decor + 文字。
 ` : '3. 当前未接入生图，所以只用 palette 背景 + decor + 文字；把 decor 画得有设计感（大色块、重复图形、箭头、标注框）来弥补没有图片。'}
 # 大师法则（所有版面必须遵守，来自瑞士风格与 Paula Scher、Müller-Brockmann 等的实践）
 1. 一个焦点：整张图只有一个绝对主角（标题或主体）。标题与副标题字号比至少 2.5:1，让视线有“先看哪里”的答案。
@@ -91,7 +91,7 @@ ${imageOn ? `3. 【生图已开启，必须用上】每个 design 都要有一�
 5. 一个强调色：背景 + 文字 + 一个强调色，深浅反差要大；不要再加第二个强调色。
 6. 尺度制造张力：关键词/数字可以极大，主体可以出血裁切；平淡的“都差不多大”最容易显得廉价。
 7. 字体有性格：标题用有性格的字体，其余用中性字体，全图最多两种字体。
-# 视觉准则（来自 2025 设计趋势调研）\n一张封面只有一个视觉钩子；标题至少占画面 1/4；最多 3 种颜色，强调色只占 5–8%；默认浅色低饱和底；不要黑描边字、爆炸星、放射光、霓虹发光、跑马灯。\n# 版式方法论（先定结构，再选风格；插件会按这些数值自动校验，违反的会被改回来）
+# 视觉准则（来自 2025 设计趋势调研）\n一张封面只有一个视觉钩子；标题至少占画面 1/4；最多 3 种颜色，强调色只占 5–8%；默认浅色低饱和底；不要黑描边字、爆炸星、放射光、霓虹发光、跑马灯。\n好封面靠「大字 + 纯色 + 强反差」，不靠渐变：渐变只当光（主体背后的一点光晕、照片上的压暗），绝不当主题色；不要紫蓝渐变、粉紫弥散这类“模板味”配色。\n# 版式方法论（先定结构，再选风格；插件会按这些数值自动校验，违反的会被改回来）
 A. 先问三件事：这张图的“一句话”是什么（≤14 字，最多两行）？谁是焦点（标题或主体，只能一个）？看图的人在多小的尺寸下看（手机信息流约 150~360 px 宽）？
 B. 网格与边距：四边留白 ≥ 画布短边的 6%，重要内容离边 ≥ 10%；所有文字共用同一条左边线（或同一条中轴线），间距用 8 的倍数；不要把文字塞进卡片边缘。
 C. 层级数字：主标题 : 副标题 ≥ 3 : 1（字号），角标约为主标题的 0.3~0.4；主标题行距 1.05~1.2；标题与副标题的间距约 0.25~0.35 倍标题字号；同组内容靠近，不同组拉开（亲密性）。最多 3 个文字角色：角标、主标题、副标题。
@@ -106,12 +106,24 @@ ${fontGuide(input)}
 ${playbookPrompt(input.platform, imageOn)}
 
 # 选模板与配色
-- 选模板：数字榜单→number；步骤要点→checklist；前后/评测→compare；金句→quote；视频缩略图→impact / bili / photo；生活方式→soft / sticker；知识观点→minimal / editorial；强情绪→poster / bold；有配图→photo（background）或 split / impact（side）。
+- 选模板（先看内容类型，再看平台；首选简洁大字和纯色底的版式）：
+  · 干货 / 观点 / 方法 → highlight（荧光标题）、folio（编辑大标题）、mega（大字满版）、swiss
+  · 数字榜单 / 数字结果 → numeral 或 number（badge 写数字）
+  · 经验 / 清单 / 复盘 → notes（备忘录，points 写清单）、bento、memo
+  · 问答 / 情感 / 职场 → chat（subtitle 写提问，title 写回答）
+  · 避坑 / 强情绪 → pop、poster、bold
+  · 活动 / 课程 / 展览 / 旅行攻略 → ticket；旅行 / Vlog 有照片 → polaroid（side 图放进相纸）
+  · 教程 / 工具 / 编程 → window；B 站知识区 / 测评 → bili（主体放小电视里）
+  · YouTube / B 站结果型缩略图 → keyword（subtitle 是黄色关键词，主体放右侧）
+  · 深度长文 / 人物 / 评论 → mag、newspaper、calm、seal（国风）
+  · 系列文章 / 周刊 / 播客头图 → serial（badge 写“栏目名 + 期号”）
+  · 文化 / 设计 / 潮流 → riso、print、collage；口号 / 金句 → stack（短标题）
+  · 渐变类（acid、glass、aurora、photo 无图时）只在用户点名要“弥散 / 玻璃 / 极光 / 暗黑发布会”时用。
 - 配色：同一张图里只用一个强调色；深底配亮字，浅底配深字，保证文字和背景明显反差。
 ${imageOn ? `
 # 生图
-design 里可写 imagePrompt（英文，写清主体、风格、光线、构图，不要写任何文字内容；插件会自动追加“无文字、留白”要求）。
-- imageRole=background：整张图做底，插件会自动改用 photo 模板（impact 也可）。imageRole=side：图放进模板的图位，只适合 split、impact（横版）、number（竖版）。
+design 里可写 imagePrompt（英文，按「主体 + 风格 + 色调 + 构图 + 细节」五段写，不要写任何文字内容；要给标题留出干净的空白区，并写明留在哪一侧；插件会自动追加“无文字、无水印、不模糊不变形”要求）。
+- imageRole=background：整张图做底，插件会自动改用 photo 模板（impact 也可）。imageRole=side：图放进模板的图位，只适合有图位的模板：split、keyword、polaroid、bili、number（竖版）。
 - 默认都要配图（见上面的图层策略）；只有金句卡、纯清单、或用户明确要纯文字时才不配。
 - 可参考的风格：${styles}。用户指定了风格就必须采用。
 ` : '\n# 生图\n当前未接入生图模型，不要写 imagePrompt，也不要用 image 指令。\n'}${input.imageStyle ? `\n用户偏好的配图风格：${input.imageStyle}\n` : ''}

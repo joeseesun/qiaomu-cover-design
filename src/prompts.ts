@@ -62,15 +62,15 @@ export const IMAGE_STYLES: ImageStyle[] = [
   { id: 'flat', zh: '扁平插画', en: 'Flat vector', prompt: 'flat vector illustration, bold simple shapes, limited palette, clean composition' },
   { id: 'photo', zh: '电影摄影', en: 'Cinematic photo', prompt: 'cinematic photograph, 35mm, shallow depth of field, dramatic rim light, rich colour grading' },
   { id: 'neon', zh: '赛博霓虹', en: 'Neon cyber', prompt: 'cyberpunk neon scene, dark background, magenta and cyan glow, volumetric light, reflections' },
-  { id: 'minimal', zh: '极简几何', en: 'Minimal geometry', prompt: 'minimal geometric composition, soft gradients, floating shapes, generous negative space' },
+  { id: 'minimal', zh: '极简几何', en: 'Minimal geometry', prompt: 'minimal geometric composition, flat colour fields, floating shapes, generous negative space' },
   { id: 'watercolor', zh: '水彩手绘', en: 'Watercolour', prompt: 'hand-painted watercolour, paper texture, soft bleeding colours, airy' },
   { id: 'memphis', zh: '孟菲斯波普', en: 'Memphis pop', prompt: 'memphis pop design, bold colours, playful squiggles and shapes, high energy' },
   { id: 'guofeng', zh: '国潮', en: 'Guochao', prompt: 'Chinese guochao style, ink wash texture, vermilion and gold accents, modern graphic layout' },
-  { id: 'isometric', zh: '等距科技', en: 'Isometric tech', prompt: 'isometric tech illustration, glowing interface cards, clean gradients, soft shadows' },
+  { id: 'isometric', zh: '等距科技', en: 'Isometric tech', prompt: 'isometric tech illustration, interface cards, clean flat shading, soft shadows' },
   { id: 'collage', zh: '拼贴杂志', en: 'Paper collage', prompt: 'paper cut-out collage, halftone dots, retro magazine texture, torn edges' },
 ];
 /** Always added: a model-drawn headline would clash with the real one and cannot be edited. */
-export const IMAGE_RULES = 'No text, no letters, no numbers, no logos, no watermark. Keep a calm, uncluttered area where a headline can sit.';
+export const IMAGE_RULES = 'No text, no letters, no numbers, no logos, no watermark. No blur, no distortion, no extra fingers, no low-quality artefacts. Keep a calm, uncluttered area where a headline can sit.';
 export function imageStyleById(id: string): ImageStyle { return IMAGE_STYLES.find(s => s.id === id) ?? IMAGE_STYLES[0]!; }
 
 /** For the cut-out subject: a flat key colour the local keyer can remove. Must match KEY_COLOR in cutout.ts. */
