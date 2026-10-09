@@ -96,3 +96,11 @@ export function onEnter(el: HTMLElement, fn: (event: KeyboardEvent) => void, all
   el.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && (allowShift || !e.shiftKey)) fn(e); });
 }
 export function bytes(n: number): string { return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`; }
+
+/** One consistent empty state: an icon, what happened, what to do next, and buttons for the likely next step. Spans a whole grid row. */
+export function emptyState(parent: HTMLElement, o: { icon: string; title: string; hint?: string; actions?: { label: string; run: () => void; primary?: boolean }[] }): HTMLElement {
+  const box = parent.createDiv('qc-empty'); setIcon(box.createDiv('qc-empty-glyph'), o.icon);
+  box.createDiv({ text: o.title, cls: 'qc-empty-title' }); if (o.hint) box.createDiv({ text: o.hint, cls: 'qc-empty-hint' });
+  if (o.actions?.length) { const row = box.createDiv('qc-empty-actions'); for (const a of o.actions) textButton(row, a.label, a.run, `qc-btn-sm${a.primary ? ' qc-primary' : ''}`); }
+  return box;
+}

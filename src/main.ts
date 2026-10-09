@@ -5,6 +5,9 @@ import { homeProvider, HomeProvider, notifyHomeChanged } from './integrations/qi
 import { DEFAULTS, mergeSettings, Settings } from './config';
 import { FontService } from './fonts';
 import { AssistantProvider, interpret } from './ops';
+import { AiService } from './ai';
+import { syncProfiles } from './aiparse';
+import { shutdownCodex } from './codex';
 import { NewCoverModal, PickFile } from './modals';
 import { CoverSettings, SettingsTab } from './settings';
 import { PROPS, CoverView, VIEW } from './view';
@@ -14,7 +17,9 @@ import { SerialWriter } from './model';
 
 export default class CoverPlugin extends Plugin {
   qiaomuHome?: HomeProvider;
-  settings: Settings = structuredClone(DEFAULTS); fonts!: FontService;
+  settings: Settings = structuredClone(DEFAULTS); fonts!: FontService; ai = new AiService(() => this.settings.ai);
+  /** Text a new cover should be designed from once its view has loaded, keyed by file path. */
+  private briefs = new Map<string, string>();
   private writer = new SerialWriter(); private assistants = new Map<string, AssistantProvider>(); private settingsTab?: CoverSettings; private fontTimer?: number;
 
   t(key: Key, params?: Record<string, string | number>): string { return translate(this.lang(), key, params); }
@@ -29,16 +34,28 @@ export default class CoverPlugin extends Plugin {
   }
   assistantList(): AssistantProvider[] {
     const offline: AssistantProvider = { id: 'offline', name: this.t('assistantOffline'), run: input => Promise.resolve(interpret(input)) };
-    return [offline, ...this.assistants.values()];
+    const model: AssistantProvider = { id: 'ai', name: this.t('assistantAi'), run: input => {
+      if (this.ai.ready()) return this.ai.plan(input);
+      const result = interpret(input); return Promise.resolve(result.ops.length ? result : { reply: this.t('aiNotReady'), ops: [] });
+    } };
+    return [model, offline, ...this.assistants.values()];
+  }
+  takeBrief(path: string): string | undefined { const brief = this.briefs.get(path); this.briefs.delete(path); return brief; }
+  /** Designs a cover for a block of text without asking anything else. */
+  async coverFromText(name: string, text: string, note?: TFile): Promise<void> {
+    if (!this.ai.ready()) { new Notice(this.t('aiNotReady')); this.openSettings('assistant'); return; }
+    await this.createDesign(name, 'minimal', note, name, undefined, text);
   }
   activeCover(): CoverView | undefined { return this.app.workspace.getActiveViewOfType(CoverView) ?? undefined; }
 
+  /** After fonts are installed: re-pair the fonts of every open cover. */
+  repairOpenCovers(): void { for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) (leaf.view as CoverView).repairFonts(); }
   async onload(): Promise<void> {
     this.settings = mergeSettings(await this.loadData());
-    this.fonts = new FontService(this.app, () => this.settings.fontFolder);
+    this.fonts = new FontService(this.app, () => this.settings.fontFolder, () => this.manifest.dir ?? '');
     this.registerView(VIEW, leaf => new CoverView(leaf, this));
     this.registerExtensions(['qcover'], VIEW);
-    this.app.workspace.onLayoutReady(() => { void this.fonts.loadVault(activeDocument); });
+    this.app.workspace.onLayoutReady(() => { void this.fonts.loadBundledIndex(); void this.fonts.loadVault(activeDocument); });
     const touchFonts = (file: unknown): void => {
       if (!(file instanceof TFile) || !file.path.startsWith(`${normalizePath(this.settings.fontFolder)}/`)) return;
       window.clearTimeout(this.fontTimer); this.fontTimer = window.setTimeout(() => void this.fonts.loadVault(activeDocument), 400);
@@ -50,15 +67,26 @@ export default class CoverPlugin extends Plugin {
       actions: () => [{ id: 'new-cover', label: this.t('create'), icon: 'image-plus', run: () => this.openNew() }],
       search: (query, limit) => this.designs().filter(f => f.basename.toLowerCase().includes(query.toLowerCase())).slice(0, Math.max(0, limit)).map(file => ({ id: file.path, title: file.basename, icon: 'image', open: () => this.openDesign(file) })),
     });
-    const notify = (file: unknown): void => { if (file instanceof TFile && file.extension === 'qcover') notifyHomeChanged(this.app, this.manifest.id); };
+    let notifyTimer: number | undefined; // saves fire every few hundred ms while editing; the home page only needs to hear about it once things settle
+    const notify = (file: unknown): void => { if (file instanceof TFile && file.extension === 'qcover') { window.clearTimeout(notifyTimer); notifyTimer = window.setTimeout(() => notifyHomeChanged(this.app, this.manifest.id), 1500); } };
     this.registerEvent(this.app.vault.on('create', notify)); this.registerEvent(this.app.vault.on('modify', notify)); this.registerEvent(this.app.vault.on('delete', notify));
 
     this.addCommand({ id: 'new-cover', name: this.t('create'), callback: () => this.openNew() });
-    this.addCommand({ id: 'open-designer', name: this.t('open'), callback: () => this.chooseDesign() });
+    this.addCommand({ id: 'open-designer', name: this.t('open'), callback: () => void this.startBlank().catch(e => this.report(e)) });
+    this.addCommand({ id: 'open-existing', name: this.t('openExisting'), callback: () => this.chooseDesign() });
     this.addCommand({ id: 'cover-from-note', name: this.t('fromNote'), checkCallback: checking => {
       const note = this.app.workspace.getActiveFile(); const editor = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
       if (!note || note.extension !== 'md') return false;
       if (!checking) new NewCoverModal(this, note, editor?.getSelection() || note.basename).open();
+      return true;
+    } });
+    this.addCommand({ id: 'ai-cover-from-note', name: this.t('aiFromNote'), checkCallback: checking => {
+      const note = this.app.workspace.getActiveFile(); const editor = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
+      if (!note || note.extension !== 'md') return false;
+      if (!checking) void (async () => {
+        const text = (editor?.getSelection() || (editor ? editor.getValue() : await this.app.vault.cachedRead(note))).slice(0, 6000);
+        await this.coverFromText(note.basename, text, note);
+      })().catch(e => this.report(e));
       return true;
     } });
     this.addCommand({ id: 'export-active', name: this.t('quickExport'), checkCallback: checking => {
@@ -66,7 +94,7 @@ export default class CoverPlugin extends Plugin {
       if (!checking) void view.action(() => view.quickExport());
       return true;
     } });
-    this.addRibbonIcon('image', this.t('open'), () => this.chooseDesign());
+    this.addRibbonIcon('image', this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
     this.settingsTab = new CoverSettings(this.app, this); this.addSettingTab(this.settingsTab);
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (file instanceof TFile && file.extension === 'md') menu.addItem(item => item.setTitle(this.t('fromNote')).setIcon('image').onClick(() => new NewCoverModal(this, file, file.basename).open()));
@@ -81,8 +109,18 @@ export default class CoverPlugin extends Plugin {
     // Hide the host status bar only while a cover tab is in front.
     this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => { document.body.toggleClass('qc-cover-active', leaf?.view.getViewType() === VIEW); }));
   }
-  onunload(): void { document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
+  onunload(): void { shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
 
+  /** Covers opened with one click and not yet touched. They vanish again if closed untouched, so trying the designer leaves no clutter. */
+  scratch = new Set<string>();
+  /** Opens the designer on a fresh blank cover straight away (or brings an open one forward). Nothing to choose first. */
+  async startBlank(): Promise<void> {
+    const open = this.app.workspace.getLeavesOfType(VIEW); const recent = open.find(l => l === this.app.workspace.getMostRecentLeaf()) ?? open[0];
+    if (recent) { await this.app.workspace.revealLeaf(recent); return; }
+    const p = platformById(this.settings.defaultPlatform) ?? platformById(DEFAULT_PLATFORM)!;
+    const design: Design = { format: 'qiaomu-cover-design', schema: 1, width: p.width, height: p.height, platform: p.id, bg: { kind: 'solid', color: '#ffffff' }, canvas: { version: '7.4.0', background: '#ffffff', objects: [] } };
+    const file = await this.createFile(this.t('untitled'), design); this.scratch.add(file.path);
+  }
   openNew(note?: TFile, title = ''): void { new NewCoverModal(this, note, title).open(); }
   openSettings(tab?: SettingsTab): void {
     const setting = (this.app as App & { setting?: { open(): void; openTabById(id: string): void } }).setting;
@@ -114,15 +152,17 @@ export default class CoverPlugin extends Plugin {
     while (this.app.vault.getAbstractFileByPath(path)) path = `${base} ${i++}.${extension}`;
     return path;
   }
-  async createDesign(name: string, template: string, note?: TFile, title?: string, platformId?: string): Promise<TFile> {
-    return this.createFile(name, this.initialDesign(template, title || name, this.t('subtext'), note?.path, platformId));
+  async createDesign(name: string, template: string, note?: TFile, title?: string, platformId?: string, brief?: string): Promise<TFile> {
+    return this.createFile(name, this.initialDesign(template, title || name, this.t('subtext'), note?.path, platformId), brief);
   }
-  private async createFile(name: string, design: Design): Promise<TFile> {
+  private async createFile(name: string, design: Design, brief?: string): Promise<TFile> {
     let created: TFile | undefined;
     await this.writer.run(async () => {
       const folder = folderPath(this.settings.designFolder); await this.ensureFolder(folder);
       created = await this.app.vault.create(this.unique(folder, name, 'qcover'), JSON.stringify(design, null, 2));
     });
+    if (brief?.trim()) this.briefs.set(created!.path, brief.trim());
+    if (this.settings.drawer !== 'assistant') { this.settings.drawer = 'assistant'; await this.saveSettings(); } // a new cover always starts with the designer open
     await this.openDesign(created!); return created!;
   }
   async duplicateDesign(name: string, design: Design): Promise<TFile> { return this.createFile(name, structuredClone(design)); }
@@ -132,7 +172,7 @@ export default class CoverPlugin extends Plugin {
     const bg = result.background;
     return { format: 'qiaomu-cover-design', schema: 1, width: p.width, height: p.height, source, platform: p.id, bg, canvas: { version: '7.4.0', background: bg.kind === 'solid' ? bg.color : bg.from, objects: result.objects.map(o => o.toObject(PROPS)) } };
   }
-  saveSettings(): Promise<void> { return this.saveData(this.settings); }
+  saveSettings(): Promise<void> { syncProfiles(this.settings.ai); return this.saveData(this.settings); }
   rememberFont(family: string): void { this.settings.recentFonts = [family, ...this.settings.recentFonts.filter(f => f !== family)].slice(0, 12); void this.saveSettings(); }
   rememberColor(color: string): void {
     if (!/^#[\da-f]{6}$/i.test(color)) return;

@@ -12,6 +12,8 @@ export interface Design {
   format: 'qiaomu-cover-design'; schema: 1; width: number; height: number; source?: string;
   /** Platform preset id. Informational: width/height remain the source of truth. */
   platform?: string; bg?: Background; export?: Partial<ExportPrefs>;
+  /** Id of the template this cover was laid out from. Lets a platform switch re-lay it out instead of just scaling it. */
+  template?: string;
   canvas: Record<string, unknown>;
 }
 export const MAX_SIDE = 4096;
@@ -52,7 +54,7 @@ function checkCanvas(value: unknown, depth = 0): void {
 export function parseDesign(raw: string): Design {
   if (raw.length > 40_000_000) throw new Error('invalid-design');
   const d = JSON.parse(raw) as Design;
-  if (!d || d.format !== 'qiaomu-cover-design' || d.schema !== 1 || !validSize(d.width,d.height) || !d.canvas || !Array.isArray(d.canvas.objects) || d.canvas.objects.length > 500 || (d.source !== undefined && typeof d.source !== 'string') || (d.platform !== undefined && typeof d.platform !== 'string') || (d.bg !== undefined && !validBackground(d.bg)) || (d.export !== undefined && (typeof d.export !== 'object' || d.export === null))) throw new Error('invalid-design');
+  if (!d || d.format !== 'qiaomu-cover-design' || d.schema !== 1 || !validSize(d.width,d.height) || !d.canvas || !Array.isArray(d.canvas.objects) || d.canvas.objects.length > 500 || (d.source !== undefined && typeof d.source !== 'string') || (d.platform !== undefined && typeof d.platform !== 'string') || (d.template !== undefined && typeof d.template !== 'string') || (d.bg !== undefined && !validBackground(d.bg)) || (d.export !== undefined && (typeof d.export !== 'object' || d.export === null))) throw new Error('invalid-design');
   checkCanvas(d.canvas);
   return d;
 }

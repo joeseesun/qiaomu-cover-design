@@ -1,9 +1,12 @@
-import { App, normalizePath, TFile } from 'obsidian';
+import { App, normalizePath, requestUrl, TFile } from 'obsidian';
+import { LibFont, looksLikeFont, unzipEntry } from './fontlib';
 import { cache } from 'fabric';
 import { safeName } from './model';
 
-export type FontSource = 'system' | 'vault' | 'generic';
-export interface FontEntry { family: string; source: FontSource; zh?: string; styles?: number }
+export type FontSource = 'system' | 'vault' | 'generic' | 'bundled';
+export interface FontEntry { family: string; source: FontSource; zh?: string; styles?: number; mood?: string; cjk?: boolean; hint?: string }
+/** A font that ships inside the plugin folder (assets/fonts): subset WOFF2, loaded the first time it is needed. */
+export interface BundledFont { id: string; family: string; en: string; mood: string; zh: string; hint: string; file: string; kb: number; cjk: boolean; license: string; home: string }
 export const FONT_EXTENSIONS = ['ttf', 'otf', 'woff', 'woff2'];
 const MIME: Record<string, string> = { ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2' };
 
@@ -41,13 +44,35 @@ export class FontService {
   private faces = new WeakMap<Document, Map<string, { face: FontFace; mtime: number }>>();
   private listeners = new Set<() => void>();
   private scan?: Promise<void>;
-  constructor(private app: App, private folder: () => string) {}
+  bundled: BundledFont[] = []; private bundledLoaded = new WeakMap<Document, Map<string, Promise<void>>>();
+  constructor(private app: App, private folder: () => string, private dir: () => string = () => '') {}
+  /** Reads the list of bundled fonts. Missing folder just means none: the plugin still works with system and downloaded fonts. */
+  async loadBundledIndex(): Promise<void> {
+    try { const raw = await this.app.vault.adapter.read(normalizePath(`${this.dir()}/fonts/index.json`)); const list = JSON.parse(raw) as BundledFont[]; this.bundled = Array.isArray(list) ? list.filter(f => f && typeof f.family === 'string' && typeof f.file === 'string') : []; } catch { this.bundled = []; }
+    this.emit();
+  }
+  /** Already usable without downloading: in the vault font folder or shipped with the plugin. */
+  hasFont(family: string): boolean { return this.vault.some(v => v.family === family) || this.hasBundled(family); }
+  /** A bundled font that is installed but not yet loaded into this document: measuring text with it now would use a fallback face. */
+  needsLoad(doc: Document, family: string): boolean { return this.hasBundled(family) && !this.bundledReady.get(doc)?.has(family); }
+  private bundledReady = new WeakMap<Document, Set<string>>();
+  hasBundled(family: string): boolean { return this.bundled.some(b => b.family === family); }
+  private loadBundledFace(doc: Document, b: BundledFont): Promise<void> {
+    let map = this.bundledLoaded.get(doc); if (!map) { map = new Map(); this.bundledLoaded.set(doc, map); }
+    let p = map.get(b.family); if (p) return p;
+    p = (async () => {
+      const data = await this.app.vault.adapter.readBinary(normalizePath(`${this.dir()}/fonts/${b.file}`)); const url = URL.createObjectURL(new Blob([data], { type: 'font/woff2' }));
+      try { const face = new FontFace(b.family, `url(${url})`, { display: 'block' }); await face.load(); (doc.fonts as MutableFonts).add(face); cache.clearFontCache(b.family); let set = this.bundledReady.get(doc); if (!set) { set = new Set(); this.bundledReady.set(doc, set); } set.add(b.family); } finally { URL.revokeObjectURL(url); }
+    })();
+    map.set(b.family, p); p.catch(() => map!.delete(b.family)); return p;
+  }
   onChange(fn: () => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   private emit(): void { for (const fn of this.listeners) fn(); }
 
   all(): FontEntry[] {
     const seen = new Set<string>(); const out: FontEntry[] = [];
-    for (const entry of [...this.vault, ...GENERIC, ...this.system]) { const key = entry.family.toLowerCase(); if (!seen.has(key)) { seen.add(key); out.push(entry); } }
+    const bundled: FontEntry[] = this.bundled.map(b => ({ family: b.family, source: 'bundled' as const, ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
+    for (const entry of [...bundled, ...this.vault, ...GENERIC, ...this.system]) { const key = entry.family.toLowerCase(); if (!seen.has(key)) { seen.add(key); out.push(entry); } }
     return out;
   }
   find(family: string): FontEntry | undefined { const key = family.toLowerCase(); return this.all().find(e => e.family.toLowerCase() === key); }
@@ -74,7 +99,12 @@ export class FontService {
   }
 
   /** Reads font files from the vault folder and registers them with the given document. */
-  async loadVault(doc: Document): Promise<void> {
+  /** One scan at a time: several installs and file events used to run it side by side and decode each big font twice. */
+  private vaultChain: Promise<void> = Promise.resolve();
+  loadVault(doc: Document): Promise<void> {
+    const run = this.vaultChain.then(() => this.loadVaultNow(doc)); this.vaultChain = run.catch(() => undefined); return run;
+  }
+  private async loadVaultNow(doc: Document): Promise<void> {
     const prefix = `${normalizePath(this.folder())}/`;
     const files = this.app.vault.getFiles().filter(f => f.path.startsWith(prefix) && FONT_EXTENSIONS.includes(f.extension.toLowerCase()));
     const present = new Set(files.map(f => f.path));
@@ -104,8 +134,11 @@ export class FontService {
     for (const [path, font] of this.bytes) {
       if (faces.has(path)) continue;
       try {
-        const face = new FontFace(font.family, font.data.slice(0), { display: 'block' });
-        await face.load(); (doc.fonts as MutableFonts).add(face); faces.set(path, { face, mtime: font.mtime }); cache.clearFontCache(font.family);
+        // From a blob URL rather than a copied buffer: no 8 MB copy, and the browser decodes the font as a normal resource load.
+        const url = URL.createObjectURL(new Blob([font.data]));
+        const face = new FontFace(font.family, `url(${url})`, { display: 'block' });
+        try { await face.load(); } finally { URL.revokeObjectURL(url); } (doc.fonts as MutableFonts).add(face); faces.set(path, { face, mtime: font.mtime }); cache.clearFontCache(font.family);
+        await new Promise(r => window.setTimeout(r, 16)); // big CJK faces parse on the main thread; let the UI breathe between them
       } catch { /* a corrupt file must not block the others */ }
     }
   }
@@ -128,6 +161,35 @@ export class FontService {
     await this.loadVault(doc);
     return added;
   }
+  /** True when a font with this family name is already in the vault font folder. */
+  hasVault(family: string): boolean { return this.vault.some(v => v.family === family); }
+  /** Downloads a library font (trying each mirror in turn), unpacks it if zipped and saves it into the vault font folder. */
+  async installLib(font: LibFont, doc: Document, onProgress?: (note: string) => void): Promise<void> {
+    let data: ArrayBuffer | undefined; let last: unknown;
+    // Mirrors are tried in turn, each with a deadline, so one slow or blocked host can never leave the button spinning.
+    for (const [i, url] of font.urls.entries()) {
+      try {
+        onProgress?.(`${i + 1}/${font.urls.length}`);
+        const res = await Promise.race([requestUrl({ url, throw: false }), new Promise<never>((_, rej) => window.setTimeout(() => rej(new Error('timeout')), 40_000))]);
+        if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
+        data = font.entry ? await unzipEntry(res.arrayBuffer, font.entry) : res.arrayBuffer;
+        if (!looksLikeFont(data)) throw new Error('not-a-font'); break;
+      } catch (e) { last = e; data = undefined; }
+    }
+    if (!data) throw last instanceof Error ? last : new Error('download-failed');
+    const folder = normalizePath(this.folder()); await ensureFolder(this.app, folder);
+    const path = normalizePath(`${folder}/${safeName(font.family)}.${font.ext}`);
+    const existing = this.app.vault.getFileByPath(path);
+    if (existing) await this.app.vault.modifyBinary(existing, data); else await this.app.vault.createBinary(path, data);
+    await this.loadVault(doc);
+  }
+  /** Saves font bytes into the vault font folder under `family` and loads them. Used by the Google Fonts install. */
+  async installBuffer(family: string, ext: 'woff2' | 'ttf' | 'otf', data: ArrayBuffer, doc: Document): Promise<void> {
+    const folder = normalizePath(this.folder()); await ensureFolder(this.app, folder);
+    const path = normalizePath(`${folder}/${safeName(family)}.${ext}`); const existing = this.app.vault.getFileByPath(path);
+    if (existing) await this.app.vault.modifyBinary(existing, data); else await this.app.vault.createBinary(path, data);
+    await this.loadVault(doc);
+  }
   async remove(family: string, doc: Document): Promise<void> {
     const prefix = `${normalizePath(this.folder())}/`;
     for (const file of this.app.vault.getFiles()) {
@@ -144,6 +206,7 @@ export class FontService {
   /** Ensures a family is ready to draw. Resolves false when it cannot be found. */
   async ensure(doc: Document, family: string): Promise<boolean> {
     if (!family || GENERIC.some(g => g.family === family)) return true;
+    const b = this.bundled.find(x => x.family === family); if (b) { try { await this.loadBundledFace(doc, b); return true; } catch { /* fall through to the other checks */ } }
     try {
       const loaded = await doc.fonts.load(`16px "${family.replace(/"/g, '')}"`, '封面Aa');
       if (loaded.length) return true;
@@ -152,7 +215,7 @@ export class FontService {
   }
   available(doc: Document, family: string): boolean {
     if (!family || GENERIC.some(g => g.family === family)) return true;
-    return this.vault.some(v => v.family === family) || this.system.some(s => s.family === family) || installed(doc, family);
+    return this.vault.some(v => v.family === family) || this.hasBundled(family) || this.system.some(s => s.family === family) || installed(doc, family);
   }
 }
 

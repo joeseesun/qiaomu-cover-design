@@ -49,3 +49,20 @@ npm run dev
 [测试与发布状态](docs/VERIFICATION.md) · [来源与许可](THIRD_PARTY.md) · [问题反馈](https://github.com/joeseesun/qiaomu-cover-design/issues)
 
 MIT © 向阳乔木。
+
+
+## AI 设计师（一句话出整版封面）
+
+设置 → AI 设计师里填入 OpenAI 兼容接口或 Claude 的地址、密钥和模型名，即可在左侧「AI 设计」里粘贴一段话：模型会选平台、模板、文案和配色并自动排版；开启生图后还会生成背景或图位配图。内置 18 个模板（含数字干货、油管冲击、B 站热血、对比、金句卡、新粗野等）和按平台分组的起手提示词。命令「用 AI 把当前笔记 / 选中文字做成封面」可直接从笔记生成。
+
+模型只能返回有限的画布指令（不能导出、读写文件）；文字与画布摘要只会发送到你填写的地址。不接入模型时插件完全离线。
+
+
+## Offline asset pack
+
+`assets/pack.json.gz` (Fluent Emoji Flat stickers, MIT, and Lucide line icons, ISC) must be installed beside `main.js` as `assets-pack.json.gz`. Rebuild it with `python3 scripts/build-asset-pack.py`.
+
+
+## Bundled fonts
+
+`assets/fonts/` (subset WOFF2 of open-licence fonts plus `index.json`) must be installed beside `main.js` as a `fonts/` folder. Rebuild it with `scripts/build-font-pack.py` (needs fonttools and brotli).

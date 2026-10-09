@@ -5,9 +5,29 @@
  */
 import { PLATFORMS, platformName } from './platforms';
 import { TEMPLATES } from './templates';
+import type { Palette } from './templates';
 
 export type Align = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+/** One-shot layout: everything a lazy user needs decided for them. Missing fields keep the current value. */
+/** One piece from the decoration library. x/y/w are fractions of the canvas (top-left corner, width; may bleed past the edge); height follows the piece's own ratio. */
+export interface DecorSpec { kind: string; /** canvas (default): x/y top-left, w of canvas width. subject: centred on the subject, w in subject widths, x/y offsets in subject sizes. title: under the title's last line, x in line widths, w in line widths, y a canvas-height offset. */ at?: 'canvas' | 'subject' | 'title'; x: number; y: number; w: number; rotate?: number; tone?: 'accent' | 'ink' | 'sub' | 'bg2' | 'accentInk'; opacity?: number }
+export interface DesignSpec {
+  platform?: string; template?: string; title?: string; subtitle?: string; badge?: string; points?: string[]; palette?: Partial<Palette>;
+  /** English picture prompt. Ignored unless an image model is configured. */
+  imagePrompt?: string; imageRole?: 'background' | 'side';
+  /** English prompt for a single subject that becomes its own transparent layer (generated on a flat key colour, then cut out locally). */
+  subjectPrompt?: string; subjectAt?: 'left' | 'right' | 'center';
+  /** Family name of an installed font for the headline (must be one the assistant was told about). */
+  titleFont?: string;
+  bodyFont?: string;
+  /** Id of a cover pattern from the platform playbook; fills any gaps with its template, palette and decoration. */
+  pattern?: string;
+  /** Pieces from the built-in decoration library, drawn in the palette's colours. Needs no image model. */
+  decor?: DecorSpec[];
+}
 export type Op =
+  | ({ op: 'design' } & DesignSpec)
+  | { op: 'image'; prompt: string; role?: 'background' | 'side' }
   | { op: 'platform'; id: string }
   | { op: 'template'; id: string }
   | { op: 'background'; color?: string; from?: string; to?: string; angle?: number }
@@ -19,6 +39,8 @@ export type Op =
 
 /** What the view offers to the assistant. */
 export interface CoverApi {
+  applyDesign(spec: DesignSpec): Promise<string[]>;
+  generateImage(prompt: string, role: 'background' | 'side'): Promise<string>;
   setPlatform(id: string): boolean;
   applyTemplate(id: string): boolean;
   setBackground(spec: { color?: string; from?: string; to?: string; angle?: number }): boolean;
@@ -28,7 +50,14 @@ export interface CoverApi {
   exportNow(o: { format?: 'png' | 'jpeg' | 'webp'; scale?: number }): Promise<string>;
   undo(): Promise<void>; redo(): Promise<void>;
 }
-export interface AssistantInput { prompt: string; zh: boolean; fonts: string[]; platform?: string; size: { width: number; height: number }; selected?: string }
+export interface CanvasItem { role?: string; text?: string; size?: number; color?: string; kind: string }
+export interface AssistantInput {
+  prompt: string; zh: boolean; fonts: string[]; platform?: string; size: { width: number; height: number }; selected?: string;
+  /** What is on the canvas now, so "make the title bigger" has something to refer to. */
+  canvas?: CanvasItem[]; history?: { role: 'user' | 'assistant'; text: string }[]; imageStyle?: string;
+  /** The cover pattern currently in use; the assistant keeps it unless asked to change style. */
+  pattern?: string; /** The user chose "no picture": layout only. */ noPicture?: boolean;
+}
 export interface AssistantResult { reply: string; ops: Op[] }
 export interface AssistantProvider { id: string; name: string; run(input: AssistantInput): Promise<AssistantResult> }
 
@@ -36,6 +65,8 @@ export async function runOps(api: CoverApi, ops: Op[], zh: boolean): Promise<str
   const done: string[] = [];
   for (const op of ops.slice(0, 20)) {
     switch (op.op) {
+      case 'design': done.push(...await api.applyDesign(op)); break;
+      case 'image': done.push(await api.generateImage(op.prompt, op.role ?? 'background')); break;
       case 'platform': if (api.setPlatform(op.id)) done.push(zh ? `已切换平台：${op.id}` : `Platform: ${op.id}`); break;
       case 'template': if (api.applyTemplate(op.id)) done.push(zh ? `已套用模板：${op.id}` : `Template: ${op.id}`); break;
       case 'background': if (api.setBackground(op)) done.push(zh ? '已更新背景' : 'Background updated'); break;
