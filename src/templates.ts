@@ -3,6 +3,7 @@ import { arch, barcode, blob, burst, cropMarks, dotGrid, glow as kitGlow, grain,
 import { ghost } from './kit';
 import { Circle, FabricObject, getEnv, Gradient, Line, Polygon, Rect, Shadow, Textbox, TextboxProps, Triangle } from 'fabric';
 import { Background } from './model';
+import { GAODING } from './gaoding';
 
 /** Colours a template reads. An assistant (or the user) can override any of them without touching layout. */
 export interface Palette { bg: string; bg2: string; ink: string; sub: string; accent: string; accentInk: string }
@@ -1179,9 +1180,9 @@ const STUDIO: Template[] = [
 const RETIRED = new Set(['editorial', 'center', 'sticker', 'dark', 'gradient', 'checklist', 'soft', 'compare', 'split', 'impact', 'bili']);
 for (let k = TEMPLATES.length - 1; k >= 0; k--) if (RETIRED.has(TEMPLATES[k]!.id)) TEMPLATES.splice(k, 1);
 const MOODY = new Set(['neon', 'cinema', 'quote', 'aurora']); // dark by nature: still available, but never the first thing a new user sees
-TEMPLATES.unshift(...STUDIO.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => MOODY.has(t.id)), ...STUDIO.filter(t => MOODY.has(t.id)));
+TEMPLATES.unshift(...GAODING, ...STUDIO.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => MOODY.has(t.id)), ...STUDIO.filter(t => MOODY.has(t.id)));
 // The first screen of the gallery alternates quiet and loud, paper and colour, so the range is visible without scrolling.
-const LEAD = ['folio', 'highlight', 'keyword', 'sage', 'notes', 'riso', 'numeral', 'ticket', 'polaroid', 'serial', 'chat', 'window', 'newspaper', 'stack', 'bili', 'pop'];
+const LEAD = ['folio', 'brush', 'keyword', 'regeng', 'highlight', 'frame', 'sage', 'notes', 'interview', 'riso', 'kicker', 'numeral', 'calendar', 'ticket', 'corner', 'polaroid', 'serial', 'chat', 'window', 'newspaper', 'stack', 'bili', 'pop'];
 // Looks built on mesh gradients and soft glows read as generic in a feed, so they are offered last.
 const GRADIENT_LED = new Set(['acid', 'glass', 'photo', 'aurora']); TEMPLATES.sort((x, y) => (LEAD.indexOf(x.id) + 1 || (GRADIENT_LED.has(x.id) ? 199 : 99)) - (LEAD.indexOf(y.id) + 1 || (GRADIENT_LED.has(y.id) ? 199 : 99)));
 
@@ -1280,3 +1281,6 @@ export function reserveBelowTitle(objects: FabricObject[], decorBottom: number):
   const need = decorBottom + title.fontSize * title.scaleY * 0.14;
   if (sub.top >= title.top && sub.top < need) { sub.set({ top: need }); sub.setCoords(); }
 }
+
+/** Building blocks shared with the layout sets kept in their own files (gaoding.ts). */
+export { rect, metrics, solid, pill, badge, sub, keep, meta, dot, lineW, FABRIC_LINE };

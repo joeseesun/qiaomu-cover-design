@@ -202,10 +202,19 @@ PATTERNS.push(
   sp('wx-serial', 'banner', '栏目头图', 'Column header', '系列文章、周刊、播客；左侧栏目条 + 期号，转发裁成方图时标题仍在中间', 'Recurring series with a column band and issue number', 'serial', { title: '本周值得看的 AI 工具', subtitle: '每周五更新', badge: '工具周刊 37' }, 'badge 写「栏目名 + 期号」；标题 ≤14 字。'),
   sp('wx-riso', 'banner', '孔版印刷', 'Risograph', '文化、展览、设计、潮流；粉蓝双色叠印，有手作感', 'Culture and design in pink and blue overprint', 'riso', { title: '小众杂志正在回来', subtitle: '独立出版的第二春', badge: 'ZINE' }, '标题 ≤10 字；badge 写英文短词。'),
 );
+PATTERNS.push(
+  sp('xhs-brush', 'xhs', '笔刷收藏', 'Brush highlight', '副业、避坑、干货；粗黑大字 + 绿色笔刷 + “建议收藏”标签 + ✓ 清单，最像爆款笔记', 'Tips and side hustles with a brush stroke, a save tag and a check row', 'brush', { title: '副业赚钱先看避坑指南', subtitle: '避坑、干货、少走弯路', badge: '建议收藏!' }, '标题 ≤12 字；points 或副标题写 3 个 ≤4 字的收益词；badge 写“建议收藏!”。'),
+  sp('xhs-regeng', 'xhs', '每日热梗', 'Daily drop', '每日资讯、热点、系列笔记；黑色话题条 + 三层描边卡片 + 期号', 'Daily news and series in stacked outlined cards with an issue number', 'regeng', { title: '每日热梗实时放送', subtitle: '今天互联网都在聊什么', badge: '每日新鲜事 12' }, 'badge 写话题名（可带期号数字）；标题 ≤10 字。'),
+  sp('xhs-interview', 'xhs', '黑黄箭头', 'Black & yellow', '面试、考试、清单；黑底黄字 + 手绘大箭头，强对比', 'Interviews and exams in yellow on black with a hand-drawn arrow', 'interview', { title: '背完这些再去面试', subtitle: 'HR 最爱问的 20 个问题', badge: 'INTERVIEW' }, '标题 ≤10 字，动词开头；badge 写一个英文词。'),
+  sp('xhs-kicker', 'xhs', '粗细引题', 'Kicker', '经验、问答、职场；细字引题 + 粗黑主句', 'Experience and Q&A with a thin kicker over a heavy line', 'kicker', { title: '第一份工作是什么', subtitle: '毕业后找到的', badge: '工作党请进' }, 'subtitle 是前半句（细字），title 是关键后半句（粗字），合起来一句话。'),
+  sp('xhs-calendar', 'xhs', '日历一句', 'Calendar page', '每日一句、打卡、待办；蓝底白色日历页', 'Daily lines and check-ins on a calendar page', 'calendar', { title: '和谐共处', subtitle: '和自己，也和这个世界', badge: '今日' }, '标题 ≤8 字，一个短语；badge 写日期感的词。'),
+  sp('xhs-corner', 'xhs', '斜角计划', 'Corner wedge', '计划、自律、学习清单；白底斜切色块 + 黑色胶囊', 'Plans and study lists with a mint wedge and a black pill', 'corner', { title: '暑假不摆烂', subtitle: '准大学生自律清单' }, '标题 ≤8 字；副标题写清单名。'),
+  sp('wx-frame', 'banner', '框线大字', 'Framed type', '招聘、通知、开学、活动头图；纯色内框 + 超大标题', 'Hiring and notices with an inset frame and huge type', 'frame', { title: '校招开启', subtitle: '2026 届秋招，现在投递', badge: '招聘' }, '标题 2~6 字，越短越好；副标题写时间和动作。'),
+);
 // Big type and flat colour first; mesh-gradient looks last (they read as generic in a feed).
-const ORDER = ['xhs-highlight', 'xhs-bigtype', 'xhs-pit', 'xhs-notes', 'xhs-chat', 'xhs-number', 'xhs-print', 'xhs-ticket', 'xhs-polaroid', 'xhs-memo', 'xhs-collage', 'xhs-mag', 'xhs-checklist', 'xhs-lifestyle', 'xhs-quote', 'xhs-compare', 'xhs-acid',
+const ORDER = ['xhs-brush', 'xhs-highlight', 'xhs-regeng', 'xhs-bigtype', 'xhs-kicker', 'xhs-pit', 'xhs-notes', 'xhs-interview', 'xhs-chat', 'xhs-calendar', 'xhs-corner', 'xhs-number', 'xhs-print', 'xhs-ticket', 'xhs-polaroid', 'xhs-memo', 'xhs-collage', 'xhs-mag', 'xhs-checklist', 'xhs-lifestyle', 'xhs-quote', 'xhs-compare', 'xhs-acid',
   'yt-keyword', 'yt-number', 'bili-explainer', 'bili-window', 'bili-tutorial', 'bili-vlog', 'yt-face', 'yt-ticker', 'yt-product', 'bili-knowledge', 'yt-versus', 'yt-neon', 'bili-game', 'yt-cinema',
-  'wx-editorial', 'wx-serial', 'wx-newspaper', 'wx-swiss', 'wx-print', 'wx-tech', 'wx-riso', 'wx-calm', 'x-banner', 'wx-bento', 'wx-quote', 'wx-cinema'];
+  'wx-editorial', 'wx-frame', 'wx-serial', 'wx-newspaper', 'wx-swiss', 'wx-print', 'wx-tech', 'wx-riso', 'wx-calm', 'x-banner', 'wx-bento', 'wx-quote', 'wx-cinema'];
 PATTERNS.sort((a, b) => (ORDER.indexOf(a.id) + 1 || 99) - (ORDER.indexOf(b.id) + 1 || 99));
 
 export const PATTERN_IDS = PATTERNS.map(p => p.id);

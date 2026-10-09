@@ -38,9 +38,9 @@ export function seriesPrompt(list: Series[]): string {
 
 /** Broad look of each layout. Variants come from different families, so an A/B set never shows three near-identical covers. */
 export const FAMILY: Record<string, 'type' | 'paper' | 'object' | 'number' | 'gradient'> = {
-  highlight: 'type', mega: 'type', bold: 'type', poster: 'type', stack: 'type', folio: 'type', minimal: 'type', swiss: 'type', keyword: 'type', pop: 'type',
+  highlight: 'type', brush: 'type', frame: 'type', kicker: 'type', interview: 'type', mega: 'type', bold: 'type', poster: 'type', stack: 'type', folio: 'type', minimal: 'type', swiss: 'type', keyword: 'type', pop: 'type',
   sage: 'paper', calm: 'paper', mag: 'paper', newspaper: 'paper', memo: 'paper', seal: 'paper', print: 'paper', collage: 'paper', riso: 'paper',
-  notes: 'object', chat: 'object', window: 'object', ticket: 'object', polaroid: 'object', bili: 'object', split: 'object', bento: 'object', serial: 'object', neo: 'object',
+  notes: 'object', chat: 'object', regeng: 'object', calendar: 'object', corner: 'object', window: 'object', ticket: 'object', polaroid: 'object', bili: 'object', split: 'object', bento: 'object', serial: 'object', neo: 'object',
   numeral: 'number', number: 'number',
   acid: 'gradient', glass: 'gradient', aurora: 'gradient', photo: 'gradient',
 };

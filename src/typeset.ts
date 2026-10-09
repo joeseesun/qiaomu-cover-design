@@ -30,6 +30,7 @@ const MOOD_OF: Record<string, Mood> = {
   neon: 'tech', calm: 'serif', seal: 'brush', quote: 'serif', cinema: 'serif',
   highlight: 'punch', notes: 'heavy', chat: 'heavy', keyword: 'punch', riso: 'trend', ticket: 'heavy', window: 'tech', newspaper: 'serif', polaroid: 'warm',
   stack: 'heavy', serial: 'heavy', aurora: 'tech', folio: 'heavy', sage: 'heavy', numeral: 'tech',
+  regeng: 'heavy', interview: 'punch', brush: 'punch', calendar: 'heavy', frame: 'heavy', kicker: 'heavy', corner: 'heavy',
 };
 export const moodOf = (templateId: string | undefined): Mood => MOOD_OF[templateId ?? ''] ?? 'heavy';
 
