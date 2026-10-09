@@ -60,7 +60,9 @@ export function contentHints(c: Copy): string[] {
  */
 export function pickVariants(candidates: string[], current: string | undefined, copy: Copy, n = 3): string[] {
   const curFam = FAMILY[current ?? ''];
-  const pool = candidates.filter(id => id !== current && (FAMILY[id] !== 'gradient' || curFam === 'gradient'));
+  // A big numeral with no number in the copy is a placeholder "01": only offer number layouts when the words have one.
+  const hasNumber = /\d/.test(copy.title);
+  const pool = candidates.filter(id => id !== current && (FAMILY[id] !== 'gradient' || curFam === 'gradient') && (FAMILY[id] !== 'number' || hasNumber));
   const hints = contentHints(copy).filter(id => pool.includes(id));
   const ordered = [...new Set([...hints, ...pool])];
   const out: string[] = []; const used = new Set<string>(curFam ? [curFam] : []);

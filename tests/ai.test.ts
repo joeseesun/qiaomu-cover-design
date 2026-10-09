@@ -202,6 +202,7 @@ test('A/B variants follow the words and come from different families', () => {
   const v = pickVariants(all, 'folio', { title: '30 天学会写作', subtitle: '从零开始' });
   assert.equal(v.length, 3); assert.equal(v[0], 'numeral'); assert.ok(!v.includes('folio') && !v.includes('acid'));
   assert.ok(!v.includes('highlight'), 'same family as the current layout is skipped while others exist');
+  assert.ok(!pickVariants(all, 'folio', { title: 'AI 时代的设计师' }).includes('numeral'), 'no numeral without a number');
 });
 
 test('the feed-size check flags tiny words and over-long headlines', () => {

@@ -135,7 +135,7 @@ const T = {
   relaidOut: ['已按「{platform}」重新排版（可撤销）', 'Re-laid out for {platform} (undo available)'],
   progressPlan: ['正在构思版面…', 'Planning the layout…'], progressSubject: ['版面已出 · 正在生成主体图层（约 30 秒，可继续微调其他内容）', 'Layout ready · generating the subject layer (~30 s, you can keep editing)'], progressImage: ['版面已出 · 正在生成背景图（约 30 秒）', 'Layout ready · generating the background (~30 s)'],
   variantsTitle: ['换个版式（图片与装饰会保留）', 'Try another layout (artwork is kept)'],
-  abTitle: ['同一文案的 3 个不同方向，点一张直接换上（图片与装饰会保留）', 'Three different directions for the same words; click one to switch (artwork is kept)'], abCommand: ['生成 3 个版式对比（A/B）', 'Show 3 alternative layouts (A/B)'],
+  abTitle: ['同一文案的 3 个不同方向，点一张直接换上', 'Three different directions for the same words; click one to switch'], abCommand: ['生成 3 个版式对比（A/B）', 'Show 3 alternative layouts (A/B)'],
   seriesTitle: ['我的系列', 'My series'], seriesHint: ['把满意的版式和配色存成系列，以后一键套用；AI 设计师也会默认沿用第一个系列，让主页看起来像同一个账号。', 'Save a layout and colours you like as a series to reuse in one click; the AI designer also follows your first series so your profile looks like one account.'],
   seriesSave: ['存为系列', 'Save as series'], seriesSaved: ['已存为系列「{name}」', 'Saved as series “{name}”'], seriesRemove: ['移除这个系列', 'Remove this series'], seriesApplied: ['已套用系列「{name}」', 'Applied series “{name}”'], seriesDefault: ['默认', 'Default'],
   thumbTitle: ['手机信息流预览', 'Phone feed preview'], thumbOk: ['在信息流尺寸下文字清楚可读', 'Readable at feed size'],
