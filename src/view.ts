@@ -12,6 +12,7 @@ import { assignIds, layoutIssues, placeBox, regionOf, resolveTarget, WHERE_ZH, t
 import { ADJUST_ZH, adjustPalette, colorMap, hexToHsl, fixPalette, mergePalette, MOOD_PALETTES, toneOf, type Tone } from './color';
 import { rankAssets } from './resolve';
 import { fontProblem } from './fontcheck';
+import { pairingById, type Pairing } from './pairings';
 import type { RunResult } from './capabilities';
 import { downloadPhoto, hasSource, searchPhotos, unsplashKey } from './unsplash';
 import { resolvePair, typeFor, usePairing, type Resolved } from './typeset';
@@ -902,7 +903,8 @@ export class CoverView extends FileView implements CoverApi {
   private relaying = false;
   /** Fonts the template would like to use but that are not installed yet; the drawer offers to fetch them. */
   missingFonts: string[] = [];
-  pairing(templateId: string | undefined): Resolved { return resolvePair(templateId, family => this.plugin.fonts.available(this.doc, family)); }
+  /** Library faces count as available even before their file lands: `ensure` fetches them on demand and the layout re-runs. */
+  pairing(templateId: string | undefined): Resolved { const f = this.plugin.fonts; return resolvePair(templateId, family => f.available(this.doc, family) || f.isLibraryFamily(family)); }
   /** After fonts are installed: swaps generic families on template text for the paired faces and re-measures. */
   repairFonts(): void {
     const c = this.canvas; if (!c) return;
@@ -926,10 +928,21 @@ export class CoverView extends FileView implements CoverApi {
 
   /* ---------- the designer ---------- */
   /** One-shot layout from a spec: sizes the canvas, picks a template that suits the picture, then generates the picture. */
+  /** Pure Latin and number text (issue numbers, "No. 01", English kickers) takes the pairing's Latin face. */
+  private async applyLatinFaces(p: Pairing): Promise<void> {
+    const texts = (this.canvas?.getObjects() ?? []).filter((o): o is Textbox & QObject => o instanceof Textbox && !hasCjk(o.text) && /[A-Za-z0-9]/.test(o.text));
+    if (!texts.length) return;
+    const face = (o: Textbox & QObject): string => o.qcRole === 'title' ? p.latin : p.tag ?? p.latin;
+    const ok = new Map<string, boolean>(); for (const f of new Set(texts.map(face))) ok.set(f, await this.plugin.fonts.ensure(this.doc, f));
+    for (const o of texts) { const f = face(o); if (!ok.get(f)) continue; o.set({ fontFamily: f, fontWeight: 'normal' }); o.initDimensions(); if (o.qcHug) this.rehug(o); o.setCoords(); }
+    this.canvas?.requestRenderAll(); this.changed();
+  }
   async applyDesign(input: DesignSpec): Promise<string[]> {
     const d = this.design; if (!d || !this.canvas) return [];
     const targetCanvas = this.canvas;
     const spec = expandPattern(input, family => this.plugin.fonts.available(this.doc, family));
+    // A pairing fills the faces the model did not name itself.
+    const pairing = pairingById(spec.typeset); if (pairing) { spec.titleFont ??= pairing.title; spec.bodyFont ??= pairing.body; }
     // A face that cannot set the words (or does not exist) is dropped, so the template's own pairing takes over.
     const fontNotes: string[] = []; const words = this.copyText();
     for (const [key, text] of [['titleFont', spec.title ?? words.title], ['bodyFont', spec.subtitle ?? words.subtitle]] as const) {
@@ -954,6 +967,7 @@ export class CoverView extends FileView implements CoverApi {
     this.finishLayout(spec, !!spec.subjectPrompt && imageOkEarly);
     // Vector decoration is free (the chat model drew it), so it never waits on or depends on an image model.
     if (spec.decor?.length) { notes.push(await this.addDecor(spec.decor.slice(0, spec.subjectPrompt && imageOkEarly ? 1 : 2))); this.calm(); }
+    if (pairing) await this.applyLatinFaces(pairing);
     notes.push(...this.qualityPass());
     const jobs: Promise<void>[] = []; const fail = (e: unknown): string => this.t('imageFailed', { message: e instanceof Error ? e.message : String(e) });
     const imageOk = this.plugin.ai.imageReady();
@@ -1178,7 +1192,7 @@ export class CoverView extends FileView implements CoverApi {
     const texts = (this.canvas?.getObjects() ?? []).filter((o): o is Textbox & QObject => o instanceof Textbox);
     const titleFont = texts.find(o => o.qcRole === 'title')?.fontFamily, bodyFont = texts.find(o => o.qcRole === 'subtitle')?.fontFamily;
     const template = this.design?.template ?? this.templateId;
-    const book = this.plugin.fonts.all();
+    const book = this.plugin.fonts.catalog();
     return {
       prompt, zh: this.zh, fonts: book.map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
       selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), scene: { nodes: this.sceneNodes(), meta: this.sceneMeta() }, history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
@@ -1269,9 +1283,10 @@ export class CoverView extends FileView implements CoverApi {
       // A text-first proposal must be complete without an empty photo/subject slot.
       if (t.photo || t.slot) { t = templateById('highlight')!; spec.template = t.id; }
       const platform = spec.platform ? platformById(spec.platform) : undefined;
-      const pair = this.pairing(t.id);
-      if (spec.titleFont && this.plugin.fonts.available(this.doc, spec.titleFont)) pair.title = spec.titleFont;
-      if (spec.bodyFont && this.plugin.fonts.available(this.doc, spec.bodyFont)) pair.body = spec.bodyFont;
+      const pair = this.pairing(t.id); const fonts = this.plugin.fonts; const usable = (f: string): boolean => fonts.available(this.doc, f) || fonts.isLibraryFamily(f);
+      const typeset = pairingById(spec.typeset); if (typeset) { spec.titleFont ??= typeset.title; spec.bodyFont ??= typeset.body; }
+      if (spec.titleFont && usable(spec.titleFont)) pair.title = spec.titleFont;
+      if (spec.bodyFont && usable(spec.bodyFont)) pair.body = spec.bodyFont;
       if (spec.titleFont) pair.titleBold = !isSingleWeight(spec.titleFont);
       if (pair.title) await this.plugin.fonts.ensure(this.doc, pair.title);
       if (pair.body) await this.plugin.fonts.ensure(this.doc, pair.body);
@@ -1622,7 +1637,7 @@ export class CoverView extends FileView implements CoverApi {
     return this.zh ? `已选中 ${objs.length} 个元素` : `Selected ${objs.length}`;
   }
   /** Why a font cannot set this text (unknown name, or Latin-only on Chinese), for the assistant's commands. */
-  fontIssue(family: string, text: string): string | undefined { return fontProblem(family, text, this.plugin.fonts.all(), this.zh); }
+  fontIssue(family: string, text: string): string | undefined { return fontProblem(family, text, this.plugin.fonts.catalog(), this.zh); }
   /** The palette the cover follows: the template's, the saved one, or one read off the canvas for hand-made covers. */
   currentPalette(): Palette {
     if (this.palette) return this.palette;

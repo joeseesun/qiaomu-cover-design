@@ -12,23 +12,25 @@
 export type Mood = 'heavy' | 'punch' | 'tech' | 'trend' | 'warm' | 'serif' | 'brush';
 export interface Pair { title: string[]; body: string[]; zh: string }
 
-const BODY = ['阿里巴巴普惠体', 'MiSans', '鸿蒙黑体', '思源黑体', '霞鹜新晰黑', 'PingFang SC'];
+// The default font library comes first everywhere, so a fresh install looks exactly like the design; system faces only catch
+// the moment before the library has landed.
+const BODY = ['思源黑体', 'PingFang SC', 'Microsoft YaHei'];
 export const MOODS: Record<Mood, Pair> = {
-  heavy: { zh: '稳重有力', title: ['阿里巴巴普惠体 Heavy', '优设标题黑', '鸿蒙黑体 Black', 'MiSans Heavy', '思源黑体 Bold', '思源黑体'], body: BODY },
-  punch: { zh: '冲击抓眼', title: ['优设标题黑', '钉钉进步体', '阿里巴巴普惠体 Heavy', '抖音美好体', '鸿蒙黑体 Black', '思源黑体 Bold'], body: BODY },
-  tech: { zh: '科技数据', title: ['阿里妈妈数黑体', '阿里巴巴普惠体 Heavy', '未来荧黑', '得意黑', '思源黑体 Bold'], body: ['MiSans', ...BODY] },
-  trend: { zh: '潮流年轻', title: ['抖音美好体', '站酷庆科黄油体', '优设标题黑', '阿里巴巴普惠体 Heavy'], body: BODY },
-  warm: { zh: '亲切活泼', title: ['站酷庆科黄油体', '江城圆体', '优设标题圆', '抖音美好体', '得意黑', '优设标题黑'], body: BODY },
-  serif: { zh: '文艺深度', title: ['朱雀仿宋', '京华老宋体', '思源宋体 Bold', '思源宋体', '霞鹜文楷', 'Songti SC'], body: ['霞鹜文楷', '仓耳渔阳体', '思源宋体', ...BODY] },
-  brush: { zh: '国风书法', title: ['马善政楷书', '志莽行书', '阿里妈妈刀隶体', '演示夏行楷'], body: ['霞鹜文楷', '思源宋体', ...BODY] },
+  heavy: { zh: '稳重有力', title: ['思源黑体 Heavy', '思源黑体 Bold', 'PingFang SC'], body: BODY },
+  punch: { zh: '冲击抓眼', title: ['抖音美好体', '思源黑体 Heavy', '思源黑体 Bold', 'PingFang SC'], body: BODY },
+  tech: { zh: '科技数据', title: ['未来荧黑', '得意黑', '思源黑体 Heavy'], body: BODY },
+  trend: { zh: '潮流年轻', title: ['得意黑', '抖音美好体', '站酷庆科黄油体'], body: BODY },
+  warm: { zh: '亲切活泼', title: ['江城圆体', '站酷庆科黄油体', '猫啃什锦黑', '抖音美好体'], body: BODY },
+  serif: { zh: '文艺深度', title: ['思源宋体 Heavy', '朱雀仿宋', '思源宋体 Bold', 'Songti SC'], body: ['霞鹜文楷', '思源宋体', ...BODY] },
+  brush: { zh: '国风书法', title: ['马善政楷书', '志莽行书', '朱雀仿宋'], body: ['朱雀仿宋', '霞鹜文楷', '思源宋体', ...BODY] },
 };
 
 const TEMPLATE_FACES: Record<string, string[]> = {
-  keyword: ['得意黑', '优设标题黑'], riso: ['站酷快乐体', '站酷庆科黄油体'],
-  newspaper: ['京华老宋体', '思源宋体 Bold'], mag: ['朱雀仿宋', '思源宋体 Bold'],
-  notes: ['霞鹜文楷', '思源黑体 Bold'], numeral: ['阿里妈妈数黑体', '未来荧黑'],
-  window: ['未来荧黑', '得意黑'], brush: ['优设标题黑', '钉钉进步体', '阿里巴巴普惠体 Heavy', '思源黑体 Bold'],
-  polaroid: ['霞鹜文楷', '站酷庆科黄油体'], stack: ['优设标题黑', '思源黑体 Bold'],
+  keyword: ['得意黑'], riso: ['站酷快乐体', '站酷庆科黄油体'],
+  newspaper: ['思源宋体 Heavy'], mag: ['朱雀仿宋', '思源宋体 Heavy'],
+  notes: ['霞鹜文楷'], numeral: ['未来荧黑'],
+  window: ['未来荧黑', '得意黑'], brush: ['抖音美好体', '思源黑体 Heavy', '思源黑体 Bold'],
+  polaroid: ['霞鹜文楷', '站酷庆科黄油体'], stack: ['抖音美好体', '思源黑体 Heavy', '思源黑体 Bold'],
 };
 
 const MOOD_OF: Record<string, Mood> = {
@@ -43,7 +45,8 @@ const MOOD_OF: Record<string, Mood> = {
 export const moodOf = (templateId: string | undefined): Mood => MOOD_OF[templateId ?? ''] ?? 'heavy';
 
 /** Faces that ship a real bold. Everything else in the lists is single-weight and must not be faux-bolded. */
-const HAS_BOLD = new Set(['思源黑体', '思源宋体', '朱雀仿宋', '霞鹜文楷', 'MiSans', '鸿蒙黑体', '阿里巴巴普惠体', 'PingFang SC', 'Songti SC']);
+// Library faces are one weight per family (思源黑体 / Bold / Heavy are separate families), so only system faces get a real bold.
+const HAS_BOLD = new Set(['PingFang SC', 'Songti SC', 'Microsoft YaHei', 'MiSans', '鸿蒙黑体', '阿里巴巴普惠体']);
 
 export interface Resolved { title?: string; body?: string; titleBold: boolean; /** Best title/body families that are not installed yet. */ missing: string[] }
 /** Picks the first installed family of each list. `missing` names the top choice per role when it is not installed. */

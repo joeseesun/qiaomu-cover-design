@@ -23,6 +23,8 @@ export interface DesignSpec {
   /** Family name of an installed font for the headline (must be one the assistant was told about). */
   titleFont?: string;
   bodyFont?: string;
+  /** Id of a type pairing (pairings.ts): headline, body and Latin faces chosen together. Explicit titleFont/bodyFont win. */
+  typeset?: string;
   /** Id of a cover pattern from the platform playbook; fills any gaps with its template, palette and decoration. */
   pattern?: string;
   /** Pieces from the built-in decoration library, drawn in the palette's colours. Needs no image model. */

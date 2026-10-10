@@ -3,6 +3,7 @@
  * data, so the same definition builds the thing you add to the cover and the preview in the menu.
  */
 import { Gradient, Shadow, Textbox } from 'fabric';
+import { BUNDLED_FONTS } from './fontmanifest';
 import { BadgeBox } from './badge';
 import { MOODS } from './typeset';
 
@@ -77,7 +78,9 @@ export function faceFor(kind: TextPreset['font'], have: (family: string) => bool
   return list.find(have);
 }
 /** Heavy single-weight faces must not be faux-bolded. */
-export const isSingleWeight = (family: string | undefined): boolean => !!family && /Heavy|Black|标题黑|数黑|美好体|黄油|庞门|刀隶|马善政|志莽|龙藏|得意黑/.test(family);
+/** Faces with one weight only: faux-bolding them smears the strokes. Every default-library family is one weight (Bold and Heavy are their own families). */
+const LIBRARY_FAMILIES = new Set(BUNDLED_FONTS.map(f => f.family));
+export const isSingleWeight = (family: string | undefined): boolean => !!family && (LIBRARY_FAMILIES.has(family) || /Heavy|Black|标题黑|数黑|美好体|黄油|庞门|刀隶|马善政|志莽|龙藏|得意黑/.test(family));
 
 /** Applies a style's look to a text box of font size `size` px. Pills are built by the caller (they are a different object). */
 export function styleText(box: Textbox, p: TextPreset, size: number): void {

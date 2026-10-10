@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planTurn, type Complete } from '../src/planner';
+import { BUNDLED_FONTS } from '../src/fontmanifest';
 import type { AssistantInput } from '../src/ops';
 import { CASES } from '../tests/intent/cases';
 import { META, NODES, PALETTE } from '../tests/fixtures/scene';
@@ -43,9 +44,8 @@ function transport(m: Model): Complete {
   return call;
 }
 
-/** What a fresh install offers: the fonts bundled in assets/fonts, exactly as FontService.all() describes them. */
-const bundled = JSON.parse(readFileSync(resolve(root, 'assets/fonts/index.json'), 'utf8')) as { family: string; mood: string; zh: string; hint: string; cjk: boolean }[];
-const fontBook = bundled.map(b => ({ family: b.family, source: 'bundled', ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
+/** What a fresh install offers: the default font library, exactly as FontService.catalog() describes it. */
+const fontBook = BUNDLED_FONTS.map(b => ({ family: b.family, source: 'bundled', ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
 function input(prompt: string, selection: string[]): AssistantInput {
   return {
     prompt, zh: true, fonts: fontBook.map(f => f.family), platform: 'xhs', size: { width: META.width, height: META.height },

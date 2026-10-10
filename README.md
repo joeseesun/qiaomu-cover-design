@@ -9,7 +9,7 @@
 ## 功能
 
 - **平台预设**：小红书 3:4 / 1:1、YouTube 缩略图、B 站、抖音 / 视频号、公众号头图、X 封面等；切换平台时内容按比例适配，并可显示平台安全区（时长标签、数据条等会遮挡的区域）。
-- **字体**：读取本机全部已安装字体（支持中文名搜索、收藏、最近使用）；也可导入 TTF / OTF / WOFF / WOFF2 到库内字体文件夹，随库同步；缺失字体会提示。
+- **默认字库**：随插件提供 34 个精选开源字体（思源黑体 / 宋体三字重、朱雀仿宋、霞鹜文楷、得意黑、抖音美好体、未来荧黑、江城圆体等中文字体，以及 Inter、Fraunces、Instrument Serif 等英文字体），覆盖《通用规范汉字表》8105 字，全部 SIL OFL 授权，装好即用，不需要装进电脑系统。模板与 AI 以 12 套「字体搭配」排版。也能使用本机字体、导入 TTF / OTF / WOFF / WOFF2，或在字体库一键下载更多。
 - **10 个模板**，套用时保留你的标题与副标题；文字预设（荧光笔、描边、投影、标签）、形状、本地 / 库内 / 粘贴 / 拖入图片（超大图自动压缩）。
 - 文字：字重、斜体、行高、字距、描边、阴影、底色；图片圆角、翻转、铺满；纯色与渐变背景；吸附参考线、对齐、图层拖拽排序、锁定、复制粘贴、右键菜单。
 - **导出**：PNG / JPEG / WebP，1–3 倍，超出平台限制（如 YouTube 2MB）自动压缩；位置可选库内文件夹、笔记所在文件夹或系统文件夹；文件名模板；导出后可插入笔记、写入 `cover` 属性、复制到剪贴板。
@@ -32,7 +32,7 @@
 
 无联网、账号、遥测、服务器或用户数据上传。默认不访问库外文件系统；仅当你选择「系统文件夹」导出时，才会写入你指定的库外目录（桌面端）。只接受 PNG/JPEG/WebP，单张不超过 10MB，图片内嵌于设计文件，可随库同步。设计中远程图片和 SVG 地址会被拒绝。
 
-使用本机已安装字体或库内导入的字体，不下载字库；库内字体随库同步，系统字体换设备时可能不同。首版仅支持桌面端，最低 Obsidian 1.8.7。语言设置在重新打开设计标签页后生效。剪贴板取决于系统权限，失败时可使用 PNG 导出。
+默认字库首次打开时在后台静默下载（约 31 MB，来自 [qiaomu-cover-fonts](https://github.com/joeseesun/qiaomu-cover-fonts) 经 jsDelivr 分发，GitHub 兜底），逐个校验 SHA-256 后存入插件目录，之后离线可用；下载失败的字体下次打开自动补，期间用系统字体兜底。完整安装包已自带字库，无需下载。导入的字体存在库内并随库同步，系统字体换设备时可能不同。首版仅支持桌面端，最低 Obsidian 1.8.7。语言设置在重新打开设计标签页后生效。剪贴板取决于系统权限，失败时可使用 PNG 导出。
 
 支持 AI 文案与版式候选、按需生成主体/背景图、Unsplash 搜索及内置字体；未移植网页的公开分享、手绘和路径编辑等全部能力。当前仍处于开发候选阶段，未提交或通过 Obsidian 官方目录审核。
 
@@ -65,7 +65,7 @@ MIT © 向阳乔木。
 
 ## Bundled fonts
 
-`assets/fonts/` (subset WOFF2 of open-licence fonts plus `index.json`) must be installed beside `main.js` as a `fonts/` folder. Rebuild it with `scripts/build-font-pack.py` (needs fonttools and brotli).
+The default font library is built by `scripts/build-font-library.py` (needs fonttools and brotli): it writes `assets/fonts/` (font files, `licenses/`, `index.json`) and the compiled manifest `src/fontmanifest.ts`, and `--publish <dir>` copies it into a checkout of [qiaomu-cover-fonts](https://github.com/joeseesun/qiaomu-cover-fonts). Store installs fetch the files on first run; `npm run package` ships them in the zip as a `fonts/` folder.
 
 ### AI 封面设计
 

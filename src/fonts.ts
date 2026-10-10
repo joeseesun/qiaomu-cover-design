@@ -1,12 +1,16 @@
 import { App, normalizePath, requestUrl, TFile } from 'obsidian';
 import { LibFont, looksLikeFont, unzipEntry } from './fontlib';
+import { BUNDLED_FONTS, FONT_LIBRARY_REPO, FONT_LIBRARY_VERSION } from './fontmanifest';
+import { fetchFont, fontMirrors, syncFonts, syncPlan, type SyncIO } from './fontsync';
 import { cache } from 'fabric';
 import { safeName } from './model';
 
 export type FontSource = 'system' | 'vault' | 'generic' | 'bundled';
 export interface FontEntry { family: string; source: FontSource; zh?: string; styles?: number; mood?: string; cjk?: boolean; hint?: string }
-/** A font that ships inside the plugin folder (assets/fonts): subset WOFF2, loaded the first time it is needed. */
-export interface BundledFont { id: string; family: string; en: string; mood: string; zh: string; hint: string; file: string; kb: number; cjk: boolean; license: string; home: string }
+/** A font of the default library (scripts/build-font-library.py): downloaded into the plugin folder on first run, loaded when first needed. */
+export interface BundledFont { id: string; family: string; en: string; mood: string; roles: string[]; zh: string; hint: string; file: string; bytes: number; sha256: string; cjk: boolean; priority: number; license: string; home: string; coverage?: number }
+/** Where the default library stands on this install: how many files are in, whether a download is running, which failed. */
+export interface LibraryState { total: number; ready: number; running: boolean; failed: string[] }
 export const FONT_EXTENSIONS = ['ttf', 'otf', 'woff', 'woff2'];
 const MIME: Record<string, string> = { ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2' };
 
@@ -44,24 +48,55 @@ export class FontService {
   private faces = new WeakMap<Document, Map<string, { face: FontFace; mtime: number }>>();
   private listeners = new Set<() => void>();
   private scan?: Promise<void>;
-  bundled: BundledFont[] = []; private bundledLoaded = new WeakMap<Document, Map<string, Promise<void>>>();
+  bundled: BundledFont[] = BUNDLED_FONTS; private bundledLoaded = new WeakMap<Document, Map<string, Promise<void>>>();
+  /** Ids of library files on disk with the expected size. */ private present = new Set<string>();
+  private fetching = new Map<string, Promise<boolean>>(); private failedIds = new Set<string>(); private syncing = false;
   constructor(private app: App, private folder: () => string, private dir: () => string = () => '') {}
-  /** Reads the list of bundled fonts. Missing folder just means none: the plugin still works with system and downloaded fonts. */
+  /** Finds which library files are already on disk (a zip install ships them, a store install fetches them). */
   async loadBundledIndex(): Promise<void> {
-    try { const raw = await this.app.vault.adapter.read(normalizePath(`${this.dir()}/fonts/index.json`)); const list = JSON.parse(raw) as BundledFont[]; this.bundled = Array.isArray(list) ? list.filter(f => f && typeof f.family === 'string' && typeof f.file === 'string') : []; } catch { this.bundled = []; }
+    const adapter = this.app.vault.adapter;
+    await Promise.all(this.bundled.map(async b => { try { const st = await adapter.stat(normalizePath(`${this.dir()}/fonts/${b.file}`)); if (st?.size === b.bytes) this.present.add(b.id); } catch { /* not there yet */ } }));
     this.emit();
   }
+  libraryState(): LibraryState { return { total: this.bundled.length, ready: this.bundled.filter(b => this.present.has(b.id)).length, running: this.syncing, failed: this.bundled.filter(b => this.failedIds.has(b.id)).map(b => b.family) }; }
+  private io(): SyncIO {
+    const adapter = this.app.vault.adapter; const dir = this.dir();
+    return {
+      fetch: async url => { const res = await Promise.race([requestUrl({ url, throw: false }), new Promise<never>((_, rej) => window.setTimeout(() => rej(new Error('timeout')), 60_000))]); if (res.status >= 400) throw new Error(`HTTP ${res.status}`); return res.arrayBuffer; },
+      sha256: async data => [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))].map(x => x.toString(16).padStart(2, '0')).join(''),
+      write: async (path, data) => { const full = normalizePath(`${dir}/${path}`); const folder = full.slice(0, full.lastIndexOf('/')); if (!(await adapter.exists(folder))) await adapter.mkdir(folder); await adapter.writeBinary(full, data); },
+    };
+  }
+  /** One library file, fetched at most once at a time (the background sync and an urgent `ensure` share the same download). */
+  private fetchBundled(b: BundledFont): Promise<boolean> {
+    if (this.present.has(b.id)) return Promise.resolve(true);
+    let p = this.fetching.get(b.id); if (p) return p;
+    p = fetchFont(b, fontMirrors(FONT_LIBRARY_REPO, FONT_LIBRARY_VERSION), this.io()).then(() => { this.present.add(b.id); this.failedIds.delete(b.id); this.emit(); return true; }, () => { this.failedIds.add(b.id); this.emit(); return false; }).finally(() => this.fetching.delete(b.id));
+    this.fetching.set(b.id, p); return p;
+  }
+  /**
+   * Silently fetches every missing library font, default-template faces first. `onFonts` runs once those are in and again at
+   * the end, so open covers re-pair their type as soon as it is possible. Failed files are retried on the next call.
+   */
+  async syncLibrary(onFonts?: () => void): Promise<void> {
+    if (this.syncing) return; const plan = syncPlan(this.bundled, this.present); if (!plan.length) return;
+    this.syncing = true; this.failedIds.clear(); this.emit();
+    try { await syncFonts({ plan, mirrors: [], io: this.io(), fetchOne: f => this.fetchBundled(f).then(ok => { if (!ok) throw new Error('failed'); }), onReady: () => undefined, onPriorityDone: onFonts }); }
+    finally { this.syncing = false; this.emit(); try { onFonts?.(); } catch (e) { console.error('[qiaomu-cover] re-pairing after font sync failed', e); } }
+  }
+  /** A library face that is not on disk yet but can be fetched: templates may plan with it, `ensure` fetches it on demand. */
+  isLibraryFamily(family: string): boolean { return this.bundled.some(b => b.family === family && !this.failedIds.has(b.id)); }
   /** Already usable without downloading: in the vault font folder or shipped with the plugin. */
   hasFont(family: string): boolean { return this.vault.some(v => v.family === family) || this.hasBundled(family); }
   /** A bundled font that is installed but not yet loaded into this document: measuring text with it now would use a fallback face. */
-  needsLoad(doc: Document, family: string): boolean { return this.hasBundled(family) && !this.bundledReady.get(doc)?.has(family); }
+  needsLoad(doc: Document, family: string): boolean { return this.isLibraryFamily(family) && !this.bundledReady.get(doc)?.has(family); }
   private bundledReady = new WeakMap<Document, Set<string>>();
-  hasBundled(family: string): boolean { return this.bundled.some(b => b.family === family); }
+  hasBundled(family: string): boolean { return this.bundled.some(b => b.family === family && this.present.has(b.id)); }
   private loadBundledFace(doc: Document, b: BundledFont): Promise<void> {
     let map = this.bundledLoaded.get(doc); if (!map) { map = new Map(); this.bundledLoaded.set(doc, map); }
     let p = map.get(b.family); if (p) return p;
     p = (async () => {
-      const data = await this.app.vault.adapter.readBinary(normalizePath(`${this.dir()}/fonts/${b.file}`)); const url = URL.createObjectURL(new Blob([data], { type: 'font/woff2' }));
+      const data = await this.app.vault.adapter.readBinary(normalizePath(`${this.dir()}/fonts/${b.file}`)); const url = URL.createObjectURL(new Blob([data], { type: MIME[b.file.split('.').pop() ?? 'woff2'] ?? 'font/woff2' }));
       try { const face = new FontFace(b.family, `url(${url})`, { display: 'block' }); await face.load(); (doc.fonts as MutableFonts).add(face); cache.clearFontCache(b.family); let set = this.bundledReady.get(doc); if (!set) { set = new Set(); this.bundledReady.set(doc, set); } set.add(b.family); } finally { URL.revokeObjectURL(url); }
     })();
     map.set(b.family, p); p.catch(() => map!.delete(b.family)); return p;
@@ -71,9 +106,15 @@ export class FontService {
 
   all(): FontEntry[] {
     const seen = new Set<string>(); const out: FontEntry[] = [];
-    const bundled: FontEntry[] = this.bundled.map(b => ({ family: b.family, source: 'bundled' as const, ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
+    const bundled: FontEntry[] = this.bundled.filter(b => this.present.has(b.id)).map(b => ({ family: b.family, source: 'bundled' as const, ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
     for (const entry of [...bundled, ...this.vault, ...GENERIC, ...this.system]) { const key = entry.family.toLowerCase(); if (!seen.has(key)) { seen.add(key); out.push(entry); } }
     return out;
+  }
+  /** Every face a design may use: what is loaded now plus library faces still downloading (fetched on first use). */
+  catalog(): FontEntry[] {
+    const now = this.all(); const have = new Set(now.map(e => e.family.toLowerCase()));
+    const pending = this.bundled.filter(b => !have.has(b.family.toLowerCase()) && this.isLibraryFamily(b.family)).map((b): FontEntry => ({ family: b.family, source: 'bundled', ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
+    return [...now.filter(e => e.source === 'bundled'), ...pending, ...now.filter(e => e.source !== 'bundled')];
   }
   find(family: string): FontEntry | undefined { const key = family.toLowerCase(); return this.all().find(e => e.family.toLowerCase() === key); }
 
@@ -206,7 +247,8 @@ export class FontService {
   /** Ensures a family is ready to draw. Resolves false when it cannot be found. */
   async ensure(doc: Document, family: string): Promise<boolean> {
     if (!family || GENERIC.some(g => g.family === family)) return true;
-    const b = this.bundled.find(x => x.family === family); if (b) { try { await this.loadBundledFace(doc, b); return true; } catch { /* fall through to the other checks */ } }
+    const b = this.bundled.find(x => x.family === family);
+    if (b && (this.present.has(b.id) || await this.fetchBundled(b))) { try { await this.loadBundledFace(doc, b); return true; } catch { /* fall through to the other checks */ } }
     try {
       const loaded = await doc.fonts.load(`16px "${family.replace(/"/g, '')}"`, '封面Aa');
       if (loaded.length) return true;
