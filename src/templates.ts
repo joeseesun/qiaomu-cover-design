@@ -696,18 +696,28 @@ const PREMIUM: Template[] = [
     },
   },
   {
-    id: 'folio', zh: '编辑大标题', en: 'Editorial headline', fit: [...XHS, ...BANNER, ...VIDEO], zhUse: '浅色纸面 + 贴左大标题 + 一条细线 + 小号期号；只有一个焦点，留白占一半以上', enUse: 'Light paper, a flush-left headline, one hairline and a small issue number; a single focal point and half the frame left empty',
+    id: 'folio', zh: '编辑大标题', en: 'Editorial headline', fit: [...XHS, ...BANNER, ...VIDEO], zhUse: '纸面编辑版式：顶部粗线 + 栏目名与期号、贴左黑体大标题、宋体导语、底部细线收边；只有一个焦点，留白占一半', enUse: 'An editorial page: a heavy top rule with section and issue, a flush-left heavy headline, a serif standfirst and a hairline foot; one focal point, half the page left empty',
     build(i) {
-      const p = palette(i, { bg: '#f4f1ea', bg2: '#f4f1ea', ink: '#1d1b17', sub: '#77716a', accent: '#c2410c', accentInk: '#ffffff' });
-      const { u, m, w, h, wide } = metrics(i); const x0 = m * 1.3; const tw = wide ? (w - x0 * 2) * 0.66 : w - x0 * 2;
-      const size = fitTitle(i.title, tw, h * (wide ? 0.56 : 0.42), 220 * u, 40, 1.08); const th = textHeight(i.title, tw, size, 1.08); const top = h * (wide ? 0.24 : 0.3);
+      const p = palette(i, { bg: '#f3efe6', bg2: '#f3efe6', ink: '#191714', sub: '#5c574f', accent: '#c2410c', accentInk: '#ffffff' });
+      const { u, m, w, h, wide } = metrics(i); const x0 = m * 1.3; const inner = w - x0 * 2; const tw = wide ? inner * 0.7 : inner;
+      const headY = m * 1.05; const footY = h - m * 1.05;
+      // Kicker, headline and standfirst must all fit between the two rules; the headline gives way if they do not.
+      const fitsAt = (sz: number): number => { const k = Math.max(26, Math.min(58 * u, sz * 0.24)); const d = Math.max(26, sz * 0.3); return k * 2.6 + textHeight(i.title, tw, sz, 1.08) + (i.subtitle.trim() ? textHeight(i.subtitle, tw * 0.92, d, 1.35) + 52 * u : 0) + m * 0.5; };
+      let size = fitTitle(i.title, tw, (footY - headY) * (wide ? 0.6 : 0.46), 230 * u, 40, 1.08); for (let k = 0; k < 14 && size > 40 && fitsAt(size) > footY - headY; k++) size = Math.max(40, size * 0.92);
+      const th = textHeight(i.title, tw, size, 1.08);
+      const ks = Math.max(26, Math.min(58 * u, size * 0.24)); const dek = Math.max(26, size * 0.3); const dekH = i.subtitle.trim() ? textHeight(i.subtitle, tw * 0.92, dek, 1.35) + 52 * u : 0;
+      // The block sits a little above the middle of the space between the rules: optical centre, not geometric.
+      const room = footY - headY - ks * 2.6; const top = headY + ks * 2.6 + Math.max(m * 0.4, (room - th - dekH) * 0.42);
+      const kicker = i.badge?.trim() || (i.zh ? '编辑部' : 'EDITORIAL');
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.06, 11),
-        rule(x0, m * 1.1, w - x0 * 2, p.ink, Math.max(2, 2.5 * u), false, 0.9),
-        meta(i.badge?.trim() ? i.badge.trim().toUpperCase() : 'NO. 01', x0, m * 1.35, w * 0.4, Math.max(16, 20 * u), p.accent, { qcRole: 'badge' }),
+        rule(x0, headY, inner, p.ink, Math.max(3, 4 * u), false, 1),
+        textbox(kicker, x0, headY + ks * 0.7, inner * 0.6, { qcRole: 'badge', fontSize: ks, fill: p.accent, fontWeight: 'bold', charSpacing: hasCjk(kicker) ? 80 : 200, lineHeight: 1 }),
+        textbox(`No. ${digits(i, false).padStart(2, '0')}`, x0 + inner * 0.5, headY + ks * 0.55, inner * 0.5, { fontSize: ks * 1.2, fill: p.ink, fontFamily: 'DM Serif Display', textAlign: 'right', lineHeight: 1 }),
         textbox(i.title, x0, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.08, charSpacing: -20 }),
-        rule(x0, top + th + 26 * u, Math.min(w * 0.12, 160 * u), p.accent, Math.max(4, 6 * u), false, 1),
-        ...sub(i, x0, top + th + 58 * u, tw * 0.9, Math.max(24, 34 * u), p.sub, {}),
+        rule(x0, top + th + 26 * u, Math.min(w * 0.12, 150 * u), p.accent, Math.max(5, 7 * u), false, 1),
+        ...sub(i, x0, top + th + 52 * u, tw * 0.92, dek, p.sub, { fontFamily: '思源宋体', lineHeight: 1.35 }),
+        rule(x0, footY, inner, p.ink, Math.max(1, 1.5 * u), false, 0.55),
       ) };
     },
   },
@@ -926,19 +936,21 @@ function biliTv(i: TemplateInput): { x: number; y: number; w: number; h: number;
 
 const STUDIO: Template[] = [
   {
-    id: 'highlight', zh: '荧光标题', en: 'Highlighter', fit: [...XHS, ...VIDEO, ...SHORT, 'wechat'], zhUse: '白纸黑字 + 每行标题下一道荧光笔，像在笔记上划重点；干货、观点、教程都稳', enUse: 'Black type on white with a highlighter stroke under every line; tips, opinions and tutorials',
+    id: 'highlight', zh: '荧光标题', en: 'Highlighter', fit: [...XHS, ...VIDEO, ...SHORT, 'wechat'], zhUse: '白纸黑字 + 每行标题下一道圆头荧光笔（每行微微不同的倾斜），像在笔记上划重点；干货、观点、教程都稳', enUse: 'Black type on white with a round-ended highlighter stroke under every line, each at its own slight tilt; tips, opinions and tutorials',
     build(i) {
       const p = palette(i, { bg: '#fffdf7', bg2: '#fffdf7', ink: '#111111', sub: '#4a4a4a', accent: '#ffe14d', accentInk: '#111111' });
       const { u, m, w, h, wide } = metrics(i); const x0 = m * 1.1; const tw = (w - x0 * 2) * (wide ? 0.8 : 1); const lh = 1.2;
-      const size = fitTitle(i.title, tw, h * (wide ? 0.56 : 0.42), 200 * u, 40, lh); const lines = wrapLines(i.title, tw, size, 'bold', -18); const step = size * lh * FABRIC_LINE; const th = lines.length * step;
-      const subSize = Math.max(26, size * 0.3); const subH = i.subtitle.trim() ? subSize * 1.4 + 40 * u : 0; const bs = Math.max(20, size * 0.22); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 26 * u : 0;
-      const top = (h - th - subH - badgeH) / 2 + badgeH;
-      const marks = lines.map((l, k) => rect(x0 - size * 0.06, top + k * step + size * 0.66, Math.min(w - x0, lineW(l, size) + size * 0.14), size * 0.4, p.accent, { angle: -0.5, qcKind: 'mark-title' }));
+      const size = fitTitle(i.title, tw, h * (wide ? 0.56 : 0.44), 210 * u, 40, lh); const lines = wrapLines(i.title, tw, size, 'bold', -18); const step = size * lh * FABRIC_LINE; const th = lines.length * step;
+      const subSize = Math.max(26, size * 0.3); const subH = i.subtitle.trim() ? textHeight(i.subtitle, tw, subSize, 1.3) + 40 * u : 0; const bs = Math.max(20, size * 0.22); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 26 * u : 0;
+      const top = (h - th - subH - badgeH) * 0.46 + badgeH;
+      // A real highlighter: round ends, a stroke that overshoots the words a little, and every line at its own slight tilt.
+      const tilt = [-0.9, 0.5, -0.4, 0.8]; const mh = size * 0.42;
+      const marks = lines.map((l, k) => rect(x0 - size * 0.08, top + k * step + size * 0.64, Math.min(w - x0 * 0.6, lineW(l, size) + size * 0.18), mh, p.accent, { angle: tilt[k % 4], rx: mh * 0.45, ry: mh * 0.45, qcKind: 'mark-title' }));
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.05, 19), ...marks,
         ...badge(i.badge, x0, top - badgeH, { ...p, accent: p.ink, accentInk: p.bg }, bs),
         textbox(i.title, x0, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: lh, charSpacing: -18 }),
-        ...sub(i, x0, top + th + 40 * u, tw, subSize, p.sub, { fontWeight: 'bold' }),
+        ...sub(i, x0, top + th + 40 * u, tw, subSize, p.sub, { fontWeight: 'bold', lineHeight: 1.3 }),
       ) };
     },
   },
@@ -987,17 +999,23 @@ const STUDIO: Template[] = [
     },
   },
   {
-    id: 'keyword', zh: '一词冲击', en: 'Keyword punch', fit: ['youtube', 'bilibili', 'bilibili-43', 'bilibili-hd', 'wide', ...SHORT, ...XHS], zhUse: '缩略图式三词标题：饱和蓝底 + 超粗白字 + 一块黄色关键词标签（副标题）+ 右侧主体位；不靠描边和爆炸星也抢眼', enUse: 'A three-word thumbnail: saturated blue, heavy white type, one yellow keyword tag (the subtitle) and room for a subject; loud without outlines or bursts',
+    id: 'keyword', zh: '一词冲击', en: 'Keyword punch', fit: ['youtube', 'bilibili', 'bilibili-43', 'bilibili-hd', 'wide', ...SHORT, ...XHS], zhUse: '缩略图式三词标题：饱和蓝底 + 超粗白字 + 一块黄色关键词标签（副标题）+ 主体位上一枚浅色圆盘（有图时主体站在上面）；不靠描边和爆炸星也抢眼', enUse: 'A three-word thumbnail: saturated blue, heavy white type, one yellow keyword tag (the subtitle) and a pale disc where the subject stands; loud without outlines or bursts',
     photo: true,
     slot: i => { const { w, h } = metrics(i); return w / h > 1.2 ? { x: w * 0.56, y: 0, w: w * 0.44, h, radius: 0 } : { x: 0, y: h * 0.5, w, h: h * 0.5, radius: 0 }; },
     build(i) {
       const p = palette(i, { bg: '#1740ff', bg2: '#1740ff', ink: '#ffffff', sub: '#111111', accent: '#ffd400', accentInk: '#111111' });
       const { u, m, w, h } = metrics(i); const side = w / h > 1.2; const x0 = m * 1.1; const tw = side ? w * 0.56 - x0 : w - x0 * 2; const shown = upper(i.title);
-      const size = fitTitle(shown, tw, h * (side ? 0.56 : 0.3), 260 * u, 44, 1.0); const th = textHeight(shown, tw, size, 1.0);
-      const tagS = Math.max(28, size * 0.34); const tagH = i.subtitle.trim() ? tagS * 1.8 + 26 * u : 0; const bs = Math.max(20, size * 0.18); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 20 * u + tw * Math.sin(2 * Math.PI / 180) : 0; // the tag is tilted 2°: its right end rises toward the badge
+      // Label, tag and headline are one stack: the headline is sized so the whole stack fits, or the layout pass would push it onto the tag.
+      const stackOf = (sz: number): number => { const ts = Math.max(28, sz * 0.32); const tg = i.subtitle.trim() ? ts * 1.8 + 30 * u + Math.min(tw, lineW(i.subtitle.trim(), ts, 'bold', 0) + ts * 1.2) * 0.035 : 0; const bd = i.badge?.trim() ? Math.max(20, sz * 0.18) * 2.2 + 34 * u + tw * 0.035 : 0; return textHeight(shown, tw, sz, 1.0) + tg + bd; };
+      let size = fitTitle(shown, tw, h * (side ? 0.56 : 0.36), 280 * u, 44, 1.0); for (let k = 0; k < 14 && size > 44 && stackOf(size) > h - m * 2.2; k++) size = Math.max(44, size * 0.92);
+      const th = textHeight(shown, tw, size, 1.0);
+      const tagS = Math.max(28, size * 0.32); const tagW = i.subtitle.trim() ? Math.min(tw, lineW(i.subtitle.trim(), tagS, 'bold', 0) + tagS * 1.2) : 0; const tagH = i.subtitle.trim() ? tagS * 1.8 + 30 * u + tagW * Math.sin(2 * Math.PI / 180) : 0; /* tilted 2°: its left end drops toward the headline */ const bs = Math.max(20, size * 0.18); const badgeH = i.badge?.trim() ? bs * 1.3 * 1.7 + 34 * u + tw * Math.sin(2 * Math.PI / 180) : 0; // the tag is tilted 2°: its right end rises toward the badge
       const top = side ? Math.max(m + badgeH + tagH, (h - th - tagH) / 2 + tagH) : m * 1.2 + badgeH + tagH;
+      // Where the subject goes: a pale disc and a ring. Empty, it balances the type; with a picture, the subject stands on it.
+      const dr = side ? h * 0.4 : w * 0.36; const dx = side ? w * 0.78 : w * 0.5; const dy = side ? h * 0.54 : h * 0.76;
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.06, 89),
+        dot(dx, dy, dr, '#ffffff', { opacity: 0.12, qcKind: 'mark' }), dot(dx, dy, dr * 1.18, 'rgba(0,0,0,0)', { stroke: '#ffffff', strokeWidth: Math.max(2, 3 * u), opacity: 0.22, qcKind: 'mark' }),
         ...badge(i.badge, x0, m, { ...p, accent: '#ffffff', accentInk: p.bg }, bs),
         ...(i.subtitle.trim() ? [pill(i.subtitle, x0, top - tagH, p.accent, p.accentInk, tagS, { qcRole: 'subtitle', radius: 0.14, angle: -2 })] : []),
         textbox(shown, x0, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.0, charSpacing: -18, shadow: new Shadow({ color: 'rgba(0,0,40,0.35)', blur: 26 * u, offsetX: 0, offsetY: 8 * u }) }),

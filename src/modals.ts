@@ -1,4 +1,3 @@
-import { FEED_WIDTH } from './quality';
 import { App, FuzzySuggestModal, Modal, Notice, setIcon, TFile, TFolder } from 'obsidian';
 import type CoverPlugin from './main';
 import type { CoverView } from './view';
@@ -101,6 +100,9 @@ export class SizeModal extends Modal {
 /* ---------- export ---------- */
 export class ExportModal extends Modal {
   private prefs: ExportPrefs; private timer?: number; private run = 0; private busy = false;
+  private shot!: HTMLImageElement; private mini!: HTMLImageElement;
+  private numDims!: HTMLElement; private numFmt!: HTMLElement; private numWeight!: HTMLElement;
+  private verdict!: HTMLElement; private summary!: HTMLElement; private systemInput?: HTMLInputElement;
   constructor(private view: CoverView) { super(view.app); this.prefs = view.exportPrefs(); }
   onOpen(): void {
     const view = this.view; const t = view.t.bind(view); const d = view.design!; const note = d.source ? view.app.vault.getAbstractFileByPath(d.source) : null; const hasNote = note instanceof TFile;
@@ -108,44 +110,76 @@ export class ExportModal extends Modal {
     this.titleEl.setText(t('export')); this.modalEl.addClass('qc-modal-wide'); this.contentEl.addClass('qc-modal');
     if (!hasNote && this.prefs.destination === 'note') this.prefs.destination = 'folder';
     const wrap = this.contentEl.createDiv('qc-export');
-    const preview = wrap.createDiv('qc-export-preview'); const img = preview.createEl('img', { attr: { alt: '' } }); const info = preview.createDiv({ cls: 'qc-export-info' });
-    // The cover as a card in a phone feed, at the real card width, with what is hard to read at that size.
-    const feed = preview.createDiv('qc-feed'); feed.createDiv({ text: t('thumbTitle'), cls: 'qc-export-label' });
-    const feedRow = feed.createDiv('qc-feed-row'); const mini = feedRow.createEl('img', { cls: 'qc-feed-img', attr: { alt: '' } }); mini.style.width = `${FEED_WIDTH[platform?.id ?? ''] ?? 150}px`;
-    const issues = view.thumbIssues(); const notes = feedRow.createDiv('qc-feed-notes');
-    if (issues.length) for (const x of issues) notes.createDiv({ text: x, cls: 'qc-feed-warn' }); else notes.createDiv({ text: t('thumbOk'), cls: 'qc-feed-ok' });
-    img.addEventListener('load', () => { mini.src = img.src; });
-    const form = wrap.createDiv('qc-export-form');
-    const update = (): void => this.schedule(img, info);
-    const section = (label: string): HTMLElement => { const s = form.createDiv('qc-export-section'); s.createDiv({ text: label, cls: 'qc-export-label' }); return s; };
+    const update = (): void => this.schedule();
 
-    const fmt = section(t('format'));
-    segmented<ExportFormat>(fmt, [{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG' }, { value: 'webp', label: 'WebP' }], this.prefs.format, v => { this.prefs.format = v; quality.toggleClass('qc-hidden', v === 'png'); update(); });
-    const quality = slider(fmt, t('quality'), Math.round(this.prefs.quality * 100), 40, 100, 1, v => { this.prefs.quality = v / 100; update(); }, v => `${v}%`);
-    quality.toggleClass('qc-hidden', this.prefs.format === 'png');
+    /* Stage 1 — the result. Numbers first, because "what am I getting" is the decision this dialog exists for. */
+    const result = wrap.createDiv('qc-export-result');
+    const shotBox = result.createDiv('qc-export-shot');
+    this.shot = shotBox.createEl('img', { attr: { alt: '' } });
+    const side = result.createDiv('qc-export-side');
+    const nums = side.createDiv('qc-export-nums');
+    const figure = (label: string): HTMLElement => {
+      const box = nums.createDiv('qc-export-num'); const value = box.createSpan({ cls: 'qc-export-num-v' });
+      box.createSpan({ text: label, cls: 'qc-export-num-k' }); return value;
+    };
+    this.numDims = figure(t('dimsLabel')); this.numFmt = figure(t('formatQuality')); this.numWeight = figure(t('estSize'));
+    const under = side.createDiv('qc-export-under');
+    this.mini = under.createEl('img', { cls: 'qc-feed-img', attr: { alt: '' } });
+    this.verdict = under.createDiv('qc-feed-notes');
+    const issues = view.thumbIssues();
+    if (issues.length) for (const x of issues) this.verdict.createDiv({ text: x, cls: 'qc-feed-warn' });
+    else this.verdict.createDiv({ text: t('thumbOk'), cls: 'qc-feed-ok' });
     if (platform?.maxBytes) {
-      const lim = fmt.createEl('label', { cls: 'qc-check' }); const cb = lim.createEl('input', { type: 'checkbox' }); cb.checked = this.prefs.fitLimit; cb.addEventListener('change', () => { this.prefs.fitLimit = cb.checked; update(); });
+      const lim = side.createEl('label', { cls: 'qc-check qc-export-limit' });
+      const cb = lim.createEl('input', { type: 'checkbox' }); cb.checked = this.prefs.fitLimit;
+      cb.addEventListener('change', () => { this.prefs.fitLimit = cb.checked; update(); });
       lim.createSpan({ text: t('fitLimit', { size: bytes(platform.maxBytes) }) });
     }
-    const size = section(t('exportSize'));
-    segmented<string>(size, [{ value: '1', label: '1×' }, { value: '2', label: '2×' }, { value: '3', label: '3×' }], String(this.prefs.scale), v => { this.prefs.scale = Number(v); update(); });
-    const dims = size.createDiv({ cls: 'qc-hint' });
-    const showDims = (): void => dims.setText(`${d.width * this.prefs.scale} × ${d.height * this.prefs.scale} px`);
-    showDims(); size.addEventListener('click', showDims);
+    this.shot.addEventListener('load', () => { this.mini.src = this.shot.src; });
 
-    const name = section(t('filename'));
-    const nameInput = name.createEl('input', { type: 'text', cls: 'qc-input', attr: { spellcheck: 'false' } }); nameInput.value = this.prefs.filename;
-    const resolved = name.createDiv({ cls: 'qc-hint qc-mono' });
+    /* Stage 2 — where it goes and what happens next. */
+    const form = wrap.createDiv('qc-export-form');
+    form.createDiv({ text: t('saveGroup'), cls: 'qc-divide' });
+    const cols = form.createDiv('qc-export-cols');
+
+    const fFormat = cols.createDiv('qc-export-field');
+    fFormat.createSpan({ text: t('format'), cls: 'qc-label' });
+    segmented<ExportFormat>(fFormat, [{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG' }, { value: 'webp', label: 'WebP' }], this.prefs.format, v => { this.prefs.format = v; syncQuality(); update(); });
+
+    const fScale = cols.createDiv('qc-export-field');
+    fScale.createSpan({ text: t('exportSize'), cls: 'qc-label' });
+    const showDims = (): void => { this.numDims.setText(`${d.width * this.prefs.scale} × ${d.height * this.prefs.scale}`); };
+    segmented<string>(fScale, [{ value: '1', label: '1×' }, { value: '2', label: '2×' }, { value: '3', label: '3×' }], String(this.prefs.scale), v => { this.prefs.scale = Number(v); showDims(); update(); });
+
+    // Quality keeps its slot for PNG: disabling it with a reason beats collapsing the field and moving everything below it.
+    const fQuality = cols.createDiv('qc-export-field');
+    slider(fQuality, t('quality'), Math.round(this.prefs.quality * 100), 40, 100, 1, v => { this.prefs.quality = v / 100; update(); }, v => `${v}%`);
+    const syncQuality = (): void => {
+      const on = this.prefs.format !== 'png'; const input = fQuality.querySelector('input'); const value = fQuality.querySelector('.qc-value');
+      if (input) input.disabled = !on; fQuality.classList.toggle('is-off', !on);
+      value?.setText(on ? `${Math.round(this.prefs.quality * 100)}%` : t('lossless'));
+    };
+
+    const fName = cols.createDiv('qc-export-field');
+    fName.createSpan({ text: t('filename'), cls: 'qc-label' });
+    const nameInput = fName.createEl('input', { type: 'text', cls: 'qc-input', attr: { spellcheck: 'false' } }); nameInput.value = this.prefs.filename;
+    const resolved = fName.createDiv({ cls: 'qc-hint qc-mono qc-export-resolved' });
     const showName = (): void => { const ext = this.prefs.format === 'jpeg' ? 'jpg' : this.prefs.format; resolved.setText(`${renderFilename(this.prefs.filename, { name: view.file?.basename ?? 'Cover', platform: platform?.id ?? 'custom', size: `${d.width}x${d.height}`, date: '20260101', time: '120000' })}.${ext}`); };
-    nameInput.addEventListener('input', () => { this.prefs.filename = nameInput.value; showName(); }); showName();
-    name.createDiv({ text: t('filenameHint'), cls: 'qc-hint' });
+    nameInput.addEventListener('input', () => { this.prefs.filename = nameInput.value; showName(); });
+    fName.createDiv({ text: t('filenameHint'), cls: 'qc-hint' });
     form.addEventListener('click', showName);
 
-    const where = section(t('destination'));
-    const opts: { value: Destination; label: string }[] = [{ value: 'folder', label: t('destFolder') }];
-    if (hasNote) opts.push({ value: 'note', label: t('destNote') });
-    opts.push({ value: 'system', label: t('destSystem') });
+    const row2 = form.createDiv('qc-export-row2');
+    const where = row2.createDiv('qc-export-field qc-export-where');
+    where.createSpan({ text: t('destination'), cls: 'qc-label' });
+    // Every destination is always listed; the one that cannot work is disabled in place instead of disappearing.
+    segmented<Destination>(where, [
+      { value: 'folder', label: t('destFolder') },
+      { value: 'note', label: t('destNote'), disabled: !hasNote },
+      { value: 'system', label: t('destSystem') },
+    ], this.prefs.destination, v => { this.prefs.destination = v; pathErr.addClass('qc-hidden'); drawDest(); });
     const detail = where.createDiv('qc-dest-detail');
+    const pathErr = where.createDiv({ cls: 'qc-export-error qc-hidden' });
     const drawDest = (): void => {
       detail.empty();
       if (this.prefs.destination === 'folder') {
@@ -157,51 +191,79 @@ export class ExportModal extends Modal {
         detail.createDiv({ text: t('destNoteHint', { folder: (note as TFile).parent?.path || '/' }), cls: 'qc-hint' });
       } else {
         const row = detail.createDiv('qc-row qc-row-tight'); const input = row.createEl('input', { type: 'text', cls: 'qc-input', attr: { spellcheck: 'false', placeholder: '~/Downloads' } }); input.value = this.prefs.systemDir;
-        input.addEventListener('input', () => { this.prefs.systemDir = input.value.trim(); });
-        textButton(row, t('choose'), () => void view.plugin.chooseSystemFolder(view.doc).then(p => { if (p) { this.prefs.systemDir = p; input.value = p; } }), 'qc-btn-sm', 'folder-open');
+        this.systemInput = input;
+        input.addEventListener('input', () => { this.prefs.systemDir = input.value.trim(); input.removeClass('qc-invalid'); pathErr.addClass('qc-hidden'); });
+        textButton(row, t('choose'), () => void view.plugin.chooseSystemFolder(view.doc).then(p => { if (p) { this.prefs.systemDir = p; input.value = p; input.removeClass('qc-invalid'); pathErr.addClass('qc-hidden'); } }), 'qc-btn-sm', 'folder-open');
         detail.createDiv({ text: t('destSystemHint'), cls: 'qc-hint' });
       }
     };
-    segmented<Destination>(where, opts, this.prefs.destination, v => { this.prefs.destination = v; drawDest(); });
-    where.appendChild(detail); drawDest();
+    drawDest();
 
-    const after = section(t('afterExport'));
+    const after = row2.createDiv('qc-export-field qc-export-after');
+    after.createSpan({ text: t('afterExport'), cls: 'qc-label' });
+    const checks = after.createDiv('qc-export-checks');
     const check = (label: string, key: 'insert' | 'cover' | 'copy', disabled = false): void => {
-      const l = after.createEl('label', { cls: 'qc-check' }); const cb = l.createEl('input', { type: 'checkbox' }); cb.checked = this.prefs[key] && !disabled; cb.disabled = disabled;
+      const l = checks.createEl('label', { cls: 'qc-check' }); const cb = l.createEl('input', { type: 'checkbox' }); cb.checked = this.prefs[key] && !disabled; cb.disabled = disabled;
       cb.addEventListener('change', () => { this.prefs[key] = cb.checked; }); l.createSpan({ text: label });
     };
     check(t('afterInsert'), 'insert', !hasNote); check(t('afterCover'), 'cover', !hasNote); check(t('afterCopy'), 'copy');
     if (!hasNote) after.createDiv({ text: t('noSourceHint'), cls: 'qc-hint' });
 
     const footer = this.contentEl.createDiv('qc-modal-footer');
+    this.summary = footer.createDiv({ cls: 'qc-export-summary' });
     textButton(footer, t('cancel'), () => this.close());
     const go = textButton(footer, t('export'), () => {
-      if (this.busy) return; this.busy = true; go.disabled = true;
-      void view.exportWith({ ...this.prefs, insert: this.prefs.insert && hasNote, cover: this.prefs.cover && hasNote }).then(() => this.close()).catch(e => { view.plugin.report(e); this.busy = false; go.disabled = false; });
+      if (this.busy) return;
+      if (this.prefs.destination === 'system' && !this.prefs.systemDir.trim()) { this.failPath(t('destSystemMissing'), pathErr); return; }
+      this.busy = true; go.disabled = true;
+      void view.exportWith({ ...this.prefs, insert: this.prefs.insert && hasNote, cover: this.prefs.cover && hasNote }).then(() => this.close()).catch(e => {
+        const message = e instanceof Error ? e.message : String(e);
+        if (this.prefs.destination === 'system' && (message === t('destSystemMissing') || message === t('destSystemDesktop'))) this.failPath(message, pathErr);
+        else view.plugin.report(e);
+        this.busy = false; go.disabled = false;
+      });
     }, 'qc-primary', 'download');
     this.scope.register(['Mod'], 'Enter', () => { go.click(); return false; });
-    update();
+    syncQuality(); showDims(); update();
   }
-  private schedule(img: HTMLImageElement, info: HTMLElement): void {
+  /** Report a bad path on the field itself, where the fix is, instead of only in a notice. */
+  private failPath(message: string, box: HTMLElement): void {
+    box.setText(message); box.removeClass('qc-hidden');
+    this.systemInput?.addClass('qc-invalid'); this.systemInput?.focus();
+  }
+  private destLabel(): string {
+    const view = this.view; const d = view.design;
+    if (this.prefs.destination === 'system') return this.prefs.systemDir || '—';
+    if (this.prefs.destination === 'note') { const note = d?.source ? view.app.vault.getAbstractFileByPath(d.source) : null; return note instanceof TFile ? (note.parent?.path || '/') : '/'; }
+    return this.prefs.folder || view.plugin.settings.exportFolder || '/';
+  }
+  private schedule(): void {
     const w = this.view.win; if (this.timer !== undefined) w.clearTimeout(this.timer);
-    this.timer = w.setTimeout(() => void this.refresh(img, info), 280);
+    this.timer = w.setTimeout(() => void this.refresh(), 280);
   }
-  private async refresh(img: HTMLImageElement, info: HTMLElement): Promise<void> {
+  private async refresh(): Promise<void> {
     const token = ++this.run; const view = this.view; const t = view.t.bind(view);
     try {
       const platform = view.platform(); const out = await view.encode(this.prefs, platform?.maxBytes);
       if (token !== this.run || !this.contentEl.isConnected) return;
-      const url = URL.createObjectURL(out.blob); const old = img.src; img.onload = () => { if (old.startsWith('blob:')) URL.revokeObjectURL(old); }; img.src = url;
-      const over = platform?.maxBytes && out.blob.size > platform.maxBytes;
-      info.empty(); info.createSpan({ text: `${out.width} × ${out.height}` }); info.createSpan({ text: out.format.toUpperCase() });
-      info.createSpan({ text: bytes(out.blob.size), cls: over ? 'is-warn' : '' });
-      if (over) info.createDiv({ text: t('overLimit', { size: bytes(platform!.maxBytes!) }), cls: 'is-warn' });
-      if (out.format !== this.prefs.format) info.createDiv({ text: t('exportConverted', { format: out.format.toUpperCase() }), cls: 'qc-hint' });
-    } catch (e) { info.setText(e instanceof Error ? e.message : String(e)); }
+      const url = URL.createObjectURL(out.blob); const old = this.shot.src;
+      this.shot.onload = () => { if (old.startsWith('blob:')) URL.revokeObjectURL(old); };
+      this.shot.src = url;
+      const over = Boolean(platform?.maxBytes && out.blob.size > platform.maxBytes);
+      const size = bytes(out.blob.size);
+      this.numDims.setText(`${out.width} × ${out.height}`);
+      this.numFmt.setText(`${out.format.toUpperCase()} · ${out.format === 'png' ? t('lossless') : `${Math.round(out.quality * 100)}%`}`);
+      this.numWeight.setText(size); this.numWeight.classList.toggle('is-warn', over);
+      this.summary.empty();
+      this.summary.createDiv({ text: t('summaryWill', { what: `${out.format.toUpperCase()} · ${out.width} × ${out.height} · ${size}`, where: this.destLabel() }), cls: 'qc-export-summary-line' });
+      if (over) this.summary.createDiv({ text: t('overLimit', { size: bytes(platform!.maxBytes!) }), cls: 'is-warn' });
+      if (out.format !== this.prefs.format) this.summary.createDiv({ text: t('exportConverted', { format: out.format.toUpperCase() }), cls: 'qc-hint' });
+    } catch (e) { this.summary.setText(e instanceof Error ? e.message : String(e)); }
   }
   onClose(): void {
     if (this.timer !== undefined) this.view.win.clearTimeout(this.timer); ++this.run;
-    const src = this.contentEl.querySelector('img')?.src; if (src?.startsWith('blob:')) URL.revokeObjectURL(src);
+    const src = this.shot?.src; if (src?.startsWith('blob:')) URL.revokeObjectURL(src);
+    this.shot = undefined as unknown as HTMLImageElement; this.systemInput = undefined;
     this.contentEl.empty();
   }
 }

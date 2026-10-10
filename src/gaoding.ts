@@ -37,7 +37,7 @@ export const GAODING: Template[] = [
     id: 'regeng', zh: '热梗卡', en: 'Daily drop', fit: [...XHS, 'wechat'], zhUse: '黑色话题条（#标签#）+ 三层错位描边卡片里的粗黑大字 + 左下“No.期号”；每日热梗、资讯速递、系列笔记，小红书辨识度很高', enUse: 'A black hashtag bar, a heavy headline in a stack of three offset outlined cards and an issue number; daily drops, news and series notes',
     build(i) {
       const p = palette(i, { bg: '#f2f2ef', bg2: '#f2f2ef', ink: '#111111', sub: '#4b4b4b', accent: '#e8432b', accentInk: '#ffffff' });
-      const { u, m, w, h } = metrics(i); const side = w / h > 1.25; const bar = Math.max(44, 70 * u); const sw = Math.max(4, 6 * u); const off = Math.max(8, 14 * u);
+      const { u, m, w, h } = metrics(i); const side = w / h > 1.25; const bar = Math.max(56, 88 * u); const sw = Math.max(4, 6 * u); const off = Math.max(8, 14 * u);
       const tag = (i.badge?.trim() || (i.zh ? '每日新鲜事' : 'daily')).replace(/^#|#$/g, '');
       const bx = m, by = bar + m * 0.9; const bw = side ? w * 0.6 - m : w - m * 2 - off * 2; const bh = side ? h - by - m - off * 2 : h * 0.5;
       const pad = Math.max(m * 0.6, 34 * u); const tw = bw - pad * 2;
@@ -49,14 +49,14 @@ export const GAODING: Template[] = [
         grain(w, h, 0.05, 151),
         rect(0, 0, w, bar, p.ink),
         textbox(`#${tag}#`, m, (bar - bar * 0.42 * 1.13) / 2, w * 0.6, { qcRole: 'badge', fontSize: bar * 0.42, fill: '#ffffff', fontWeight: 'bold', lineHeight: 1 }),
-        textbox(i.zh ? '（建议收藏）' : '(save it)', w * 0.5, (bar - bar * 0.36 * 1.13) / 2, w * 0.5 - m, { fontSize: bar * 0.36, fill: '#ffffff', textAlign: 'right', lineHeight: 1 }),
+        // The record switch lives in the bar: a white track with the red "live" light on.
+        rect(w - m - bar * 0.95, bar * 0.3, bar * 0.95, bar * 0.4, 'rgba(0,0,0,0)', { rx: bar * 0.2, ry: bar * 0.2, stroke: '#ffffff', strokeWidth: Math.max(2, 3 * u) }),
+        dot(w - m - bar * 0.25, bar * 0.5, bar * 0.13, p.accent),
         card(2), card(1), card(0),
         textbox(i.title, bx + pad, by + (bh - th) / 2, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.08 }),
-        textbox(no, nx, ny, nw, { fontSize: ns, fill: p.ink, fontWeight: 'bold', lineHeight: 1, charSpacing: -20 }),
-        // A little record switch: the red light says "live".
-        rect(side ? w - m - ns * 1.6 : w - m - ns * 1.6, ny + ns * 0.12, ns * 1.6, ns * 0.8, '#ffffff', { rx: ns * 0.4, ry: ns * 0.4, stroke: p.ink, strokeWidth: Math.max(2, sw * 0.7) }),
-        dot(w - m - ns * 0.4, ny + ns * 0.52, ns * 0.26, p.accent),
-        ...sub(i, nx, ny + ns * 1.25 + 14 * u, side ? nw : nw - ns * 2, Math.max(24, size * 0.3), p.sub, { fontWeight: 'bold' }),
+        textbox(no, nx, ny, nw, { fontSize: ns, fill: p.ink, fontFamily: 'Anton', lineHeight: 1, charSpacing: 20 }),
+        rect(nx, ny + ns * 1.22, Math.max(40, ns * 0.9), Math.max(4, 6 * u), p.accent),
+        ...sub(i, nx, ny + ns * 1.22 + 24 * u, nw, Math.max(24, size * 0.3), p.sub, { fontWeight: 'bold' }),
       ) };
     },
   },
@@ -89,13 +89,16 @@ export const GAODING: Template[] = [
       const p = palette(i, { bg: '#ffffff', bg2: '#ffffff', ink: '#111111', sub: '#4b4b4b', accent: '#3ddc84', accentInk: '#111111' });
       const { u, m, w, h, wide } = metrics(i); const x0 = m * 1.1; const tw = (w - x0 * 2) * (wide ? 0.82 : 1); const lh = 1.12;
       const size = fitTitle(i.title, tw, h * (wide ? 0.5 : 0.48), 240 * u, 40, lh); const lines = wrapLines(i.title, tw, size, 'bold', -18); const step = size * lh * FABRIC_LINE; const th = lines.length * step;
-      const checks = items(i.points, i.subtitle, 3); const cs = Math.max(22, size * 0.24); const rowH = checks.length ? cs * 2.4 : 0;
+      const checks = items(i.points, i.subtitle, 3); const cs = Math.max(24, size * 0.28);
+      // The check row wraps instead of running off the page; its height is known before the block is centred.
+      const cw = (t: string): number => cs * 2.2 + lineW(t, cs, 'bold', 0); const flow: { t: string; x: number; y: number }[] = []; { let fx = 0, fy = 0; for (const t of checks) { if (fx && fx + cw(t) > tw) { fx = 0; fy += cs * 1.7; } flow.push({ t, x: fx, y: fy }); fx += cw(t); } }
+      const rowH = checks.length ? (flow[flow.length - 1]!.y + cs * 1.4) : 0;
       const subS = Math.max(24, size * 0.28); const subH = !checks.length && i.subtitle.trim() ? textHeight(i.subtitle, tw, subS, 1.25) + 30 * u : 0;
       const tagS = Math.max(22, size * 0.24); const tagH = tagS * 1.3 * 1.7 + 40 * u;
       const ty = (h - tagH - th - subH - rowH - (rowH ? 40 * u : 0)) / 2 + tagH; const last = lines[lines.length - 1] ?? '';
       const ray = (k: number): Line => { const a = (-150 - k * 28) * Math.PI / 180; const cx = x0 + tagS * 0.2, cy = ty - tagH * 0.55; const r0 = tagS * 0.9, r1 = tagS * 1.6; return mark(new Line([cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1], { stroke: p.ink, strokeWidth: Math.max(3, 5 * u), strokeLineCap: 'round' }), 'mark-title'); };
-      const rowY = ty + th + 40 * u; let cx = x0;
-      const row = checks.flatMap(t => { const box = [dot(cx + cs * 0.5, rowY + cs * 0.62, cs * 0.5, p.accent), textbox('✓', cx + cs * 0.1, rowY + cs * 0.06, cs * 0.8, { fontSize: cs * 0.9, fill: p.ink, fontWeight: 'bold', textAlign: 'center', lineHeight: 1 }), textbox(t, cx + cs * 1.3, rowY, lineW(t, cs, 'bold', 0) + cs, { fontSize: cs, fill: p.ink, fontWeight: 'bold', lineHeight: 1.1 })]; cx += cs * 2.2 + lineW(t, cs, 'bold', 0); return box; });
+      const rowY = ty + th + 40 * u;
+      const row = flow.flatMap(({ t, x, y }) => { const cx = x0 + x, cy = rowY + y; return [dot(cx + cs * 0.5, cy + cs * 0.62, cs * 0.5, p.accent), textbox('✓', cx + cs * 0.1, cy + cs * 0.06, cs * 0.8, { fontSize: cs * 0.9, fill: p.ink, fontWeight: 'bold', textAlign: 'center', lineHeight: 1 }), textbox(t, cx + cs * 1.3, cy, lineW(t, cs, 'bold', 0) + cs, { fontSize: cs, fill: p.ink, fontWeight: 'bold', lineHeight: 1.1 })]; });
       return { background: solid(p.bg), objects: keep<FabricObject>(
         grain(w, h, 0.04, 163),
         brushBlock(x0 - size * 0.1, ty + (lines.length - 1) * step + size * 0.22, Math.min(w - x0, lineW(last, size) + size * 0.25), size * 0.95, p.accent, lines.length),
@@ -133,14 +136,16 @@ export const GAODING: Template[] = [
       const p = palette(i, { bg: '#22b573', bg2: '#22b573', ink: '#0f2a1d', sub: '#0f2a1d', accent: '#f4e04d', accentInk: '#0f2a1d' });
       const { u, m, w, h, wide } = metrics(i); const f = m * 0.55; const pad = m * 0.9; const tw = w - (f + pad) * 2;
       // The subtitle rides right under the headline: the foot of the frame is left to the sun and to platform UI (9:16 captions).
-      const subS = Math.max(24, 32 * u); const sw = tw * 0.8; const subH = i.subtitle.trim() ? textHeight(i.subtitle, sw, subS, 1.25) + 30 * u : 0; const bH = i.badge?.trim() ? Math.max(18, 24 * u) * 2.4 : 0;
-      const room = h - (f + pad) * 2 - bH; const size = fitTitle(i.title, tw, (room - subH) * (wide ? 0.86 : 0.58), 420 * u, 44, 1.02); const th = textHeight(i.title, tw, size, 1.02);
-      const ty = f + pad + bH + (wide ? (room - subH - th) / 2 : room * 0.04); const R = Math.min(w, h) * 0.34;
+      const subS = Math.max(24, 32 * u); const sw = tw * 0.8; const subH = i.subtitle.trim() ? textHeight(i.subtitle, sw, subS, 1.25) + 30 * u : 0; const bs = Math.max(22, 34 * u); const bH = i.badge?.trim() ? bs * 1.3 * 1.8 + 16 * u : 0;
+      // On a banner (wider than 2.2:1) the copy hangs from the top: the lower left is where X puts the avatar.
+      const banner = w / h > 2.2; const room = h - (f + pad) * 2 - bH; const size = fitTitle(i.title, tw, (room - subH) * (banner ? 0.62 : wide ? 0.86 : 0.58), 420 * u, 44, 1.02); const th = textHeight(i.title, tw, size, 1.02);
+      const ty = f + pad + bH + (banner ? 0 : wide ? (room - subH - th) / 2 : room * 0.04); const R = Math.min(w, h) * 0.34;
       return { background: solid(p.bg), objects: keep<FabricObject>(
         new Circle({ left: w - R * 1.45, top: h - R * 1.25, radius: R, fill: p.accent, opacity: 0.85, originX: 'left', originY: 'top' }),
         grain(w, h, 0.08, 173),
-        rect(f, f, w - f * 2, h - f * 2, 'rgba(0,0,0,0)', { stroke: p.ink, strokeWidth: Math.max(2, 3 * u) }),
-        ...badge(i.badge, f + pad, f + pad * 0.7, { ...p, accent: p.ink, accentInk: p.bg }, Math.max(18, 24 * u)),
+        // qcRole marks the border as the page's structure, so platform avoidance moves the words inside it and leaves it whole.
+        rect(f, f, w - f * 2, h - f * 2, 'rgba(0,0,0,0)', { stroke: p.ink, strokeWidth: Math.max(2, 3 * u), qcRole: 'frame' }),
+        ...badge(i.badge, f + pad, f + pad * 0.7, { ...p, accent: p.ink, accentInk: p.bg }, bs),
         textbox(i.title, f + pad, ty, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.02 }),
         ...sub(i, f + pad, ty + th + 30 * u, sw, subS, p.sub, { fontWeight: 'bold' }),
       ) };

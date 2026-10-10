@@ -4,3 +4,6 @@ main.js
 artifacts/
 .DS_Store
 scripts/template-gallery/bundle.js
+scripts/template-gallery/review.js
+.claude/
+design-previews/

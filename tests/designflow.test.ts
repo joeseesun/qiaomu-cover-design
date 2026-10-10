@@ -26,7 +26,9 @@ test('bundled fonts give individual templates distinct typography and fall back 
   const fonts = new Set(['得意黑', '未来荧黑', '霞鹜文楷', '思源黑体 Bold', '思源黑体', '马善政楷书']);
   assert.equal(resolvePair('keyword', f => fonts.has(f)).title, '得意黑');
   assert.equal(resolvePair('window', f => fonts.has(f)).title, '未来荧黑');
-  assert.equal(resolvePair('brush', f => fonts.has(f)).title, '马善政楷书');
+  // The brush (highlighter) layout takes heavy display sans faces; without them it falls back down its own list.
+  assert.equal(resolvePair('brush', f => fonts.has(f)).title, '思源黑体 Bold');
+  assert.equal(resolvePair('brush', f => fonts.has(f) || f === '优设标题黑').title, '优设标题黑');
   assert.equal(resolvePair('notes', f => fonts.has(f)).title, '霞鹜文楷');
   assert.equal(resolvePair('keyword', f => f === '思源黑体').title, '思源黑体');
 });

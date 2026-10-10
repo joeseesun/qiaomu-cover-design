@@ -27,7 +27,7 @@ const TEMPLATE_FACES: Record<string, string[]> = {
   keyword: ['得意黑', '优设标题黑'], riso: ['站酷快乐体', '站酷庆科黄油体'],
   newspaper: ['京华老宋体', '思源宋体 Bold'], mag: ['朱雀仿宋', '思源宋体 Bold'],
   notes: ['霞鹜文楷', '思源黑体 Bold'], numeral: ['阿里妈妈数黑体', '未来荧黑'],
-  window: ['未来荧黑', '得意黑'], brush: ['马善政楷书', '阿里妈妈刀隶体'],
+  window: ['未来荧黑', '得意黑'], brush: ['优设标题黑', '钉钉进步体', '阿里巴巴普惠体 Heavy', '思源黑体 Bold'],
   polaroid: ['霞鹜文楷', '站酷庆科黄油体'], stack: ['优设标题黑', '思源黑体 Bold'],
 };
 
