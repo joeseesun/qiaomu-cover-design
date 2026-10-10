@@ -1,4 +1,5 @@
 import { COVER_ICON } from './cover-icon';
+import { conversationContext, conversationTitle, newConversation, savedMessages, type ConversationBook, type DesignerConversation } from './conversations';
 import { bindDrawing, type DrawingInput } from './drawing';
 import { snapAxis, type SnapHit } from './snapping';
 import { bindMarquee } from './marquee';
@@ -76,6 +77,8 @@ export class CoverView extends FileView implements CoverApi {
   /** Conversation with the designer. It lives on the view so it survives drawer redraws. */
   pictureRequested = false;
   chatDraft = '';
+  private conversationBook: ConversationBook = { active: '', sessions: [] };
+  private richChats = new Map<string, ChatMessage[]>();
   private drawButton?: HTMLButtonElement; private drawBar?: HTMLElement; private drawing?: DrawingInput; private drawColor = '#111111'; private drawWidth = 8;
   imageDraft = ''; imageModelId = ''; directImageBusy = false;
   private imageDialog?: ImageGenerateDialog;
@@ -99,7 +102,7 @@ export class CoverView extends FileView implements CoverApi {
     try {
       const raw = await this.app.vault.read(file); const design = parseDesign(raw);
       if (generation !== this.generation) return;
-      this.expected = raw; this.design = design; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History();
+      this.expected = raw; this.design = design; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History(); this.busy = false; this.inTurn = false;
       await this.plugin.fonts.register(this.doc);
       this.build();
       if (generation !== this.generation || !this.canvas) return;
@@ -108,7 +111,13 @@ export class CoverView extends FileView implements CoverApi {
       if (generation !== this.generation || !this.canvas) return;
       this.history.reset(this.snapshot()); this.restoring = false; this.baseRevision = this.revision;
       // The conversation picks up where this cover left off; rich payloads (variants, snapshots) start empty.
-      this.chat = (this.plugin.settings.chats[file.path] ?? []).map(m => ({ ...m }));
+      this.richChats.clear();
+      this.conversationBook = structuredClone(this.plugin.settings.conversations[file.path] ?? (() => {
+        const session = newConversation(savedMessages(this.plugin.settings.chats[file.path])); return { active: session.id, sessions: [session] };
+      })());
+      const session = this.conversationBook.sessions.find(s => s.id === this.conversationBook.active)!;
+      this.chat = session.messages.map(m => ({ ...m })); this.chatDraft = session.draft; this.richChats.set(session.id, this.chat);
+      this.resetConversationContext();
       this.applyZoom(); this.refreshAll(); this.setStatus('saved');
       const brief = this.plugin.takeBrief(file.path); if (brief) void this.autoDesign(brief);
       this.unsubscribeFonts = this.plugin.fonts.onChange(() => { void this.reflowFonts(); this.refreshInspector(true); });
@@ -118,9 +127,11 @@ export class CoverView extends FileView implements CoverApi {
   }
   async onUnloadFile(): Promise<void> {
     this.drawing?.dispose(); this.drawing = undefined;
+    this.closingView = true; ++this.generation;
     this.imageDialog?.close();
+    if (this.design && !this.restoring) await this.saveChatNow();
     this.closingView = true; this.clearTimers(); this.unsubscribeFonts?.(); this.unsubscribeFonts = undefined;
-    const untouched = !!this.file && this.plugin.scratch.has(this.file.path) && this.revision === this.baseRevision;
+    const untouched = !!this.file && this.plugin.scratch.has(this.file.path) && this.revision === this.baseRevision && !this.conversations.some(s => s.messages.length || s.draft.trim());
     this.commitHistory(); await this.flush();
     if (untouched && this.file) { this.plugin.scratch.delete(this.file.path); try { await this.app.fileManager.trashFile(this.file); } catch { /* leave the file if it cannot be removed */ } this.dirty = false; }
     if (this.dirty && this.canvas && this.file && this.design && !this.restoring) {
@@ -130,7 +141,6 @@ export class CoverView extends FileView implements CoverApi {
       new Notice(this.t('recovered', { path: recovery.path }));
       this.dirty = false;
     }
-    ++this.generation;
     this.observer?.disconnect(); this.observer = undefined;
     if (this.canvas) await this.canvas.dispose();
     this.canvas = undefined; this.design = undefined; this.contentEl.empty();
@@ -146,17 +156,67 @@ export class CoverView extends FileView implements CoverApi {
     this.chatTimer = undefined;
   }
   private chatTimer?: number;
-  /** Saves the words of the conversation against this design file (throttled); rich payloads are recomputable on reopen. */
+  get conversations(): readonly DesignerConversation[] { return this.conversationBook.sessions; }
+  get activeConversation(): DesignerConversation | undefined { return this.conversationBook.sessions.find(s => s.id === this.conversationBook.active); }
+  private resetConversationContext(): void { this.lastPrompt = ''; this.currentPattern = undefined; this.lastSpec = undefined; this.pictureRequested = false; }
+  private stashConversation(): void {
+    const session = this.activeConversation, path = this.file?.path; if (!session || !path) return;
+    session.messages = savedMessages(this.chat); session.draft = this.chatDraft; session.updatedAt = Date.now();
+    if (!session.title) session.title = conversationTitle(session.messages);
+    this.richChats.set(session.id, this.chat);
+    this.plugin.settings.conversations[path] = structuredClone(this.conversationBook);
+  }
+  async saveChatNow(): Promise<void> {
+    if (this.chatTimer !== undefined) this.win.clearTimeout(this.chatTimer); this.chatTimer = undefined;
+    this.stashConversation(); await this.plugin.saveSettings();
+  }
+  /** Save before switching, so a pending debounce cannot write one thread into another. */
+  async newChat(): Promise<void> {
+    if (this.busy || this.restoring || this.closingView) return;
+    if (!this.chat.length && !this.chatDraft.trim()) { this.resetConversationContext(); this.focusChat(); return; }
+    if (this.conversations.length >= 30) { new Notice(this.t('chatLimit')); return; }
+    await this.saveChatNow(); const session = newConversation(); this.conversationBook.sessions.unshift(session); this.conversationBook.active = session.id;
+    this.chat = []; this.chatDraft = ''; this.resetConversationContext(); await this.saveChatNow(); this.refreshDrawer(); this.focusChat();
+  }
+  async switchConversation(id: string): Promise<void> {
+    if (this.busy || this.restoring || this.closingView || id === this.conversationBook.active) return;
+    const session = this.conversationBook.sessions.find(s => s.id === id); if (!session) return;
+    await this.saveChatNow(); this.conversationBook.active = id; this.chat = this.richChats.get(id) ?? session.messages.map(m => ({ ...m })); this.chatDraft = session.draft;
+    this.resetConversationContext(); this.lastPrompt = [...this.chat].reverse().find(m => m.role === 'user')?.text ?? ''; await this.saveChatNow(); this.refreshDrawer(); this.focusChat();
+  }
+  async renameConversation(title: string): Promise<void> { if (this.busy || !this.activeConversation || !title.trim()) return; this.activeConversation.title = title.trim().slice(0, 80); await this.saveChatNow(); this.onChat?.(); }
+  async deleteConversation(): Promise<void> {
+    if (this.busy || !this.activeConversation) return; const id = this.activeConversation.id;
+    this.conversationBook.sessions = this.conversationBook.sessions.filter(s => s.id !== id); this.richChats.delete(id);
+    if (!this.conversations.length) this.conversationBook.sessions.push(newConversation());
+    const session = this.conversationBook.sessions[0]!; this.conversationBook.active = session.id;
+    this.chat = this.richChats.get(session.id) ?? session.messages.map(m => ({ ...m })); this.chatDraft = session.draft; this.resetConversationContext();
+    await this.saveChatNow(); this.refreshDrawer(); this.focusChat();
+  }
+  /** A direction gets its own canvas. Historical snapshots never overwrite the original artwork. */
+  async branchConversation(index?: number): Promise<void> {
+    if (this.busy || this.restoring || !this.file || !this.design) return;
+    const message = index === undefined ? undefined : this.chat[index];
+    const design = message?.snapshot ? this.codec.decode(message.snapshot) : this.currentDesign();
+    const messages = index === undefined ? [] : savedMessages(this.chat.slice(0, index + 1));
+    const sourceName = this.file.basename; await this.saveChatNow();
+    const file = await this.plugin.duplicateDesign(`${sourceName} ${this.t('chatDirection')}`, design);
+    const target = this.app.workspace.getLeavesOfType(VIEW).map(l => l.view).find((v): v is CoverView => v instanceof CoverView && v.file?.path === file.path);
+    if (target) { const session = newConversation(messages); target.conversationBook = { active: session.id, sessions: [session] }; target.chat = session.messages.map(m => ({ ...m })); target.chatDraft = ''; target.resetConversationContext(); await target.saveChatNow(); target.refreshDrawer(); target.focusChat(); }
+  }
+  async blankConversation(): Promise<void> {
+    if (this.busy || this.restoring || !this.design) return; await this.saveChatNow();
+    const { width, height, platform } = this.design;
+    await this.plugin.duplicateDesign(this.t('untitled'), { format: 'qiaomu-cover-design', schema: 1, width, height, platform, bg: { kind: 'solid', color: '#ffffff' }, canvas: { version: '7.4.0', background: '#ffffff', objects: [] } });
+  }
+  private focusChat(): void { this.contentEl.querySelector<HTMLTextAreaElement>('.qc-chat-input')?.focus({ preventScroll: true }); }
+  /** Save only the active book; archived sessions never enter the model's input. */
   persistChat(): void {
     const w = this.win; if (this.chatTimer !== undefined) w.clearTimeout(this.chatTimer);
+    this.stashConversation();
     this.chatTimer = w.setTimeout(() => {
       this.chatTimer = undefined;
-      const path = this.file?.path; if (!path) return;
-      const keep = this.chat.filter(m => m.text).slice(-30).map(m => ({ role: m.role, text: m.text, ...(m.applied?.length ? { applied: m.applied } : {}) }));
-      const chats = { ...this.plugin.settings.chats };
-      if (keep.length) chats[path] = keep; else delete chats[path];
-      const keys = Object.keys(chats); if (keys.length > 20) delete chats[keys[0]!];
-      this.plugin.settings.chats = chats; void this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     }, 800);
   }
   private setStatus(key: Key): void {
@@ -1316,7 +1376,7 @@ export class CoverView extends FileView implements CoverApi {
     const sel = this.selection()[0];
     // Failed turns (prose-only replies the model narrated without acting) stay OUT of history:
     // the model imitates its own past replies, so one bad example breeds more.
-    const history = this.chat.slice(0, -1).filter(m => m.text && !m.warn).map(m => ({ role: m.role, text: m.text.slice(0, 400) }));
+    const history = conversationContext(this.chat.slice(0, -1));
     const texts = (this.canvas?.getObjects() ?? []).filter((o): o is Textbox & QObject => o instanceof Textbox);
     const titleFont = texts.find(o => o.qcRole === 'title')?.fontFamily, bodyFont = texts.find(o => o.qcRole === 'subtitle')?.fontFamily;
     const template = this.design?.template ?? this.templateId;
@@ -1333,10 +1393,12 @@ export class CoverView extends FileView implements CoverApi {
   async ask(prompt: string, display = prompt): Promise<void> {
     if (this.busy || this.restoring || !this.canvas) return;
     const list = this.plugin.assistantList(); const extras = list.some(p => p.id !== 'ai' && p.id !== 'offline'); const provider = (extras ? list.find(p => p.id === this.plugin.settings.assistant) : list.find(p => p.id === 'ai')) ?? list[0]!;
-    this.busy = true; this.lastPrompt = prompt; this.chat.push({ role: 'user', text: display }); this.setProgress(this.t('progressPlan'));
+    const generation = this.generation;
+    this.busy = true; this.lastPrompt = prompt; this.chat.push({ role: 'user', text: display });
+    if (this.activeConversation && !this.activeConversation.title) this.activeConversation.title = conversationTitle(this.chat);
+    this.setProgress(this.t('progressPlan'));
     this.beginTurn();
     try {
-      const generation = this.generation;
       const request = this.assistantInput(prompt);
       let result = picturePolicy(await provider.run(request), !request.noPicture);
       if (generation !== this.generation) return;
@@ -1388,8 +1450,9 @@ export class CoverView extends FileView implements CoverApi {
       this.chat.push(message);
       if (designed) void this.variantThumbs().then(v => { message.variants = v; this.onChat?.(); }).catch(() => undefined);
     } catch (e) {
+      if (generation !== this.generation) return;
       this.chat.push({ role: 'assistant', text: this.t('error', { message: e instanceof Error ? e.message : String(e) }), failed: true });
-    } finally { this.endTurn(); this.busy = false; this.pictureRequested = false; this.setProgress(); this.persistChat(); }
+    } finally { if (generation === this.generation) { this.endTurn(); this.busy = false; this.pictureRequested = false; this.persistChat(); this.setProgress(); } }
   }
   /**
    * Other layouts for the same words, rendered offline in a blink, so a first pass is a choice and not a gamble. They come from

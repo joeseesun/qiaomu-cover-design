@@ -27,6 +27,7 @@ export default class CoverPlugin extends Plugin {
   /** Text a new cover should be designed from once its view has loaded, keyed by file path. */
   private briefs = new Map<string, string>();
   private writer = new SerialWriter(); private assistants = new Map<string, AssistantProvider>(); private settingsTab?: CoverSettings; private fontTimer?: number;
+  private settingsWriter = new SerialWriter();
 
   t(key: Key, params?: Record<string, string | number>): string { return translate(this.lang(), key, params); }
   lang(): string { return this.settings.language === 'auto' ? getLanguage() : this.settings.language; }
@@ -135,6 +136,11 @@ export default class CoverPlugin extends Plugin {
     }));
     this.registerEvent(this.app.vault.on('rename', (file, old) => {
       if (!(file instanceof TFile)) return;
+      if (file.extension === 'qcover') {
+        if (this.settings.conversations[old]) { this.settings.conversations[file.path] = this.settings.conversations[old]!; delete this.settings.conversations[old]; }
+        if (this.settings.chats[old]) { this.settings.chats[file.path] = this.settings.chats[old]!; delete this.settings.chats[old]; }
+        void this.saveSettings();
+      }
       for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) {
         const view = leaf.view as CoverView;
         if (view.design?.source === old) { view.design.source = file.path; view.changed(); }
@@ -207,7 +213,7 @@ export default class CoverPlugin extends Plugin {
     const palette = builtPalette();
     return { format: 'qiaomu-cover-design', schema: 1, width: p.width, height: p.height, source, platform: p.id, bg, ...(palette ? { palette } : {}), canvas: { version: '7.4.0', background: bg.kind === 'solid' ? bg.color : bg.from, objects: result.objects.map(o => o.toObject(PROPS)) } };
   }
-  saveSettings(): Promise<void> { syncProfiles(this.settings.ai); return this.saveData(this.settings); }
+  saveSettings(): Promise<void> { syncProfiles(this.settings.ai); const snapshot = structuredClone(this.settings); return this.settingsWriter.run(() => this.saveData(snapshot)); }
   rememberFont(family: string): void { this.settings.recentFonts = [family, ...this.settings.recentFonts.filter(f => f !== family)].slice(0, 12); void this.saveSettings(); }
   rememberColor(color: string): void {
     if (!/^#[\da-f]{6}$/i.test(color)) return;

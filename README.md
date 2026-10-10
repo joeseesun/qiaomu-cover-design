@@ -16,9 +16,15 @@ Create editable covers and posters from your notes, ideas and images—inside Ob
 
 **桌面端 Obsidian 1.11.4+ · MIT 开源 · 基础编辑无需账号 · AI 服务按需配置**
 
-原名 Qiaomu Cover Design，现名 Qiaomu Design。插件 ID 仍为 `qiaomu-cover-design`，设计格式仍为 `.qcover`；改名不会要求你迁移已有设计、模型配置或图片历史。本文按 **0.2.1** 已提交实现整理。
+原名 Qiaomu Cover Design，现名 Qiaomu Design。插件 ID 仍为 `qiaomu-cover-design`，设计格式仍为 `.qcover`；改名不会要求你迁移已有设计、模型配置或图片历史。本文按 **0.2.2** 实现整理。
 
 [安装](#quick-start) · [AI 排版](#ai-layout) · [平台模板](#platforms) · [画布图层](#canvas) · [字体素材](#fonts) · [图库](#gallery) · [AI 生图](#image-ai) · [模型配置](#models) · [导出](#export) · [快捷键](#shortcuts) · [备份隐私](#storage)
+
+## Installation and usage
+
+Qiaomu Design creates editable covers and posters inside Obsidian, with optional AI layout, image generation, an image gallery and freehand drawing. See the [complete English guide](README.en.md).
+
+Install the complete ZIP from [GitHub Releases](https://github.com/joeseesun/qiaomu-cover-design/releases/latest) into your vault configuration folder under `plugins/qiaomu-cover-design/`, then enable Qiaomu Design in Community plugins. Desktop Obsidian 1.11.4+ is required. Preserve plugin settings, Gallery, image jobs, fonts and caches when upgrading. Open the designer from the command palette, choose a platform, add/edit elements and export PNG/JPEG/WebP. AI is optional and uses your own configured provider.
 
 ## 为什么在笔记里做设计
 
@@ -103,9 +109,10 @@ AI 设计面板接收主题、文章片段或修改要求，结合平台、模�
 
 - **从笔记开始**：命令「用 AI 把当前笔记 / 选中文字做成封面」读取选文；没有选文时使用当前笔记内容。当前实现最多取前 6,000 个字符，长文建议先选出重点。
 - **继续对话修改**：要求调整配色、标题、字体或布局，随后检查画布结果。自然语言请求受当前指令协议与模型输出约束，复杂要求可拆成几步。
-- **文字和布局先行**：默认不生成图片。可以在支持的配图入口明确选择本次生成，或之后使用独立「AI 生图」。
+- **文字和布局先行**：默认不生成图片。需要图片时，可用独立「AI 生图」生成并预览后插入。
 - **仍然可以手改**：通过排版指令建立的文字和形状保留各自的编辑能力。
-- **对话有连续性**：近期对话按设计保存于插件设置，重开后可继续；它不是无限历史或云端聊天备份。
+- **对话互不干扰**：「新对话」保留画布并隔离旧聊天上下文；点击对话标题切换历史、重命名或删除，草稿随对话保存。当前编辑中，已应用消息的菜单可从该次方案创建独立画布；「从空白画布开始」也会创建单独文件。
+- **清晰的作用范围**：输入区显示当前画布或选中元素。仅携带当前对话最近的成功轮次，不把失败回复作为后续指令；重开后恢复文字、状态及草稿，预览和历史画布快照限当前编辑会话。每个画布最多 30 段对话，每段保留最近 100 条消息。
 - **不接模型的选择**：离线助手可解释部分中英文指令，覆盖范围小于接入模型后的自然语言设计。
 
 可以尝试：

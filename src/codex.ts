@@ -84,7 +84,7 @@ function session(bin: string): NonNullable<typeof shared> {
   const os = nodeRequire()('os') as typeof import('os');
   const rpc = new Rpc(bin, os.tmpdir());
   const ready = (async () => {
-    await rpc.request('initialize', { clientInfo: { name: 'qiaomu_cover_design', title: 'Qiaomu Design', version: '0.2.1' } }, 20000);
+    await rpc.request('initialize', { clientInfo: { name: 'qiaomu_cover_design', title: 'Qiaomu Design', version: '0.2.2' } }, 20000);
     rpc.notify('initialized');
   })();
   const entry = { bin, rpc, ready, busy: 0 } as NonNullable<typeof shared>;
