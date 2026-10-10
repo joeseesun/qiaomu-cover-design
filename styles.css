@@ -240,15 +240,34 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-popover-head { position: absolute; top: 6px; right: 6px; display: none; }
 
 /* chat */
-.qc-root .qc-conversation-bar { display: flex; align-items: center; gap: 12px; flex: none; min-width: 0; padding: 0 8px; }
-.qc-root button.qc-conversation-title { display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px; min-width: 0; flex: 1; height: 30px; padding: 4px 0; color: var(--qc-muted); background: transparent; box-shadow: none; text-align: left; }
-.qc-conversation-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
-.qc-conversation-chevron { display: flex; flex: none; } .qc-conversation-chevron svg { width: 12px; height: 12px; }
-.qc-root button.qc-conversation-new { flex: none; height: 28px; min-height: 28px; padding: 4px 8px; gap: 4px; font-size: 12px; background: var(--qc-surface); color: var(--qc-ink); box-shadow: none; }
-.qc-root .qc-conversation-new svg { width: 14px; height: 14px; }
-.qc-root .qc-conversation-title:hover, .qc-root .qc-conversation-new:hover { background: var(--qc-hover); color: var(--qc-ink); }
-.qc-root .qc-msg-controls { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.qc-root .qc-msg-controls .qc-msg-restore, .qc-root .qc-msg-controls .qc-msg-more { margin: 0; width: 24px; height: 24px; min-height: 24px; padding: 0; color: var(--qc-muted); }
+.qc-root .qc-conversation-bar { display: flex; align-items: center; gap: 2px; flex: none; min-width: 0; min-height: 32px; padding: 0 6px 0 10px; }
+.qc-conversation-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--qc-muted); }
+.qc-root .qc-conversation-bar .qc-icon-btn { flex: none; width: 28px; height: 28px; min-height: 28px; box-shadow: none; background: transparent; }
+.qc-root .qc-conversation-bar .qc-icon-btn:hover:not(:disabled) { background: var(--qc-hover); color: var(--qc-ink); }
+/* Message actions: icon-only, quiet; older messages reveal them on hover or focus, the newest and touch screens always show them. */
+.qc-root .qc-msg-controls { display: flex; align-items: center; gap: 2px; margin: 6px 0 0 -4px; opacity: 0; transition: opacity .12s ease; }
+.qc-root .qc-msg-user .qc-msg-controls { justify-content: flex-end; height: 0; margin: 2px -4px 0 0; overflow: visible; }
+.qc-root .qc-msg-user .qc-msg-controls .qc-icon-btn { width: 22px; height: 22px; min-height: 22px; }
+.qc-root .qc-msg:hover .qc-msg-controls, .qc-root .qc-msg:focus-within .qc-msg-controls, .qc-root .qc-msg-assistant .qc-msg-controls.is-latest { opacity: 1; }
+@media (pointer: coarse) { .qc-root .qc-msg-controls { opacity: 1; } }
+.qc-root .qc-msg-controls .qc-icon-btn { width: 26px; height: 26px; min-height: 26px; padding: 0; box-shadow: none; background: transparent; color: var(--qc-muted); }
+.qc-root .qc-msg-controls .qc-icon-btn:hover:not(:disabled) { background: var(--qc-hover); color: var(--qc-ink); }
+.qc-root .qc-msg-controls .qc-icon-btn svg { width: 14px; height: 14px; }
+.qc-root .qc-msg-controls .qc-msg-delete:hover:not(:disabled) { color: var(--text-error); }
+/* The user's bubble carries its actions beneath it, outside the grey fill. */
+.qc-root .qc-msg-user { background: transparent; padding: 0; display: flex; flex-direction: column; align-items: flex-end; }
+.qc-root .qc-msg-user .qc-msg-text { background: var(--qc-surface); padding: 9px 12px; border-radius: 14px 14px 4px 14px; }
+/* Follow-up suggestions: one scrollable row right above the composer. */
+.qc-root .qc-followups { display: flex; gap: 6px; flex: none; overflow-x: auto; scrollbar-width: none; padding: 2px 10px 8px; mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 24px), transparent); }
+.qc-root .qc-followups::-webkit-scrollbar { display: none; }
+.qc-root button.qc-followup { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; min-height: 28px; padding: 0 11px 0 9px; border-radius: 999px; font-size: 12px; color: var(--qc-ink); background: var(--qc-paper); box-shadow: 0 0 0 1px var(--qc-line); }
+.qc-root button.qc-followup:hover { background: var(--qc-hover); box-shadow: 0 0 0 1px var(--qc-strong, var(--qc-line)); }
+.qc-followup-icon { display: flex; color: var(--qc-muted); } .qc-followup-icon svg { width: 13px; height: 13px; }
+/* Fixes for a warning: inline, accent-tinted, read as "do this" rather than another set of options. */
+.qc-root .qc-fixes { margin-top: 8px; }
+.qc-root button.qc-fix { display: inline-flex; align-items: center; gap: 5px; color: var(--interactive-accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 35%, transparent) !important; background: color-mix(in srgb, var(--interactive-accent) 6%, transparent); }
+.qc-root button.qc-fix:hover { background: var(--interactive-accent) !important; color: var(--text-on-accent) !important; }
+.qc-tweak-icon { display: flex; } .qc-tweak-icon svg { width: 12px; height: 12px; }
 .qc-root .qc-chat-scope { margin: 2px 2px 8px; padding: 0; gap: 6px; min-height: 24px; background: transparent; box-shadow: none; border-radius: 0; color: var(--qc-muted); }
 .qc-root .qc-chat-scope svg { color: var(--qc-muted); }
 .qc-chat-scope-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -766,7 +785,6 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-msg-user { max-width: 88%; padding: 9px 12px; border-radius: 12px 12px 4px 12px; }
 .qc-msg-assistant { max-width: 100%; width: 100%; padding: 0 2px; }
 .qc-msg-text { white-space: pre-wrap; }
-.qc-msg-author { margin-bottom: 6px; color: var(--qc-muted); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
 .qc-msg-details { margin-top: 8px; }
 .qc-msg-details > summary { width: fit-content; cursor: pointer; font-size: 11.5px; color: var(--qc-muted); padding: 3px 0; }
 .qc-msg-details[open] > summary { margin-bottom: 4px; }
