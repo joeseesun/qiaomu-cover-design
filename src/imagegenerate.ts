@@ -1,26 +1,31 @@
-import { Modal, Notice } from 'obsidian';
+import { Modal, Notice, setIcon } from 'obsidian';
 import type { FabricImage } from 'fabric';
 import { directImageConfig, imageLabel, imageReady, type AiConfig } from './aiparse';
 import { seedreamCaps, seedreamFamily, type SeedreamFamily, type ImageReference, type SeedreamOptions } from './seedream';
 import { AiService } from './ai';
 import { jimengProtocol } from './jimeng';
-import { imageHash } from './imagejobs';
+import { ImageResultsDialog } from './imagejobdialog';
+import { imageHash, type ImageJob, type ImageSelection } from './imagejobs';
 import type { QObject } from './view';
 import { promptLibrary } from './imageprompts';
 import { ModelDialog } from './modeldialog';
 import { textButton } from './ui';
 import type { CoverView } from './view';
 
+export interface ImageGenerationContext { reference?: ImageReference; selection?: ImageSelection; previousPrompt?: string; target?: ImageJob['target'] }
+
 /** A generation job is tied to its source canvas; edit results are reviewed before replacing the raster. */
 export class ImageGenerateDialog extends Modal {
   private closed = false;
   private running = false;
+  private unsubscribe?: () => void; private timer?: number;
   private valid: () => boolean;
-  constructor(private view: CoverView, private done: () => void, private target?: FabricImage) { super(view.app); this.valid = view.imageGuard(target); }
+  constructor(private view: CoverView, private done: () => void, private target?: FabricImage, private context?: ImageGenerationContext) { super(view.app); this.valid = view.imageGuard(target); }
   onOpen(): void {
     this.closed = false;
     const v = this.view, t = v.t.bind(v);
-    this.titleEl.setText(t(this.target ? 'aiEditImage' : 'aiGenerateImage'));
+    const editing=!!(this.target || this.context?.reference);
+    this.titleEl.setText(t(editing ? 'imageCreateSelection' : 'aiGenerateImage'));
     this.modalEl.addClass('qc-image-generate-modal');
     const el = this.contentEl; el.addClass('qc-modal', 'qc-image-generate'); el.empty();
     const heading = el.createDiv('qc-image-heading'); heading.createDiv({ text: t('imageBackgroundHint'), cls: 'qc-hint' }); textButton(heading, t('imageTasks'), () => { this.close(); v.plugin.openImageTasks(); }, 'qc-image-tasks-link', 'images');
@@ -29,23 +34,25 @@ export class ImageGenerateDialog extends Modal {
     const field = (parent: HTMLElement, name: string, suffix: string): HTMLElement => { const row = parent.createDiv('qc-image-field'); row.createEl('label', { text: name, attr: { for: `${uid}-${suffix}` } }); return row; };
     const select = (parent: HTMLElement, name: string, suffix: string) => field(parent, name, suffix).createEl('select', { cls: 'qc-select', attr: { id: `${uid}-${suffix}` } });
     const refs: ImageReference[] = [];
-    if (this.target) {
+    if (this.context?.reference) refs.push(this.context.reference);
+    else if (this.target) {
       const img = this.target.getElement(), canvas = v.doc.createElement('canvas');
       canvas.width = (img as HTMLImageElement).naturalWidth || img.width; canvas.height = (img as HTMLImageElement).naturalHeight || img.height;
       canvas.getContext('2d')!.drawImage(img, 0, 0);
       refs.push({ url: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height });
     }
-    const prompt = field(el, t('imagePrompt'), 'prompt').createEl('textarea', { cls: 'qc-image-prompt', attr: { id: `${uid}-prompt`, rows: '5', placeholder: t(this.target ? 'imageEditHint' : 'imagePromptHint') } });
-    prompt.value = this.target ? '' : v.imageDraft;
-    prompt.addEventListener('input', () => { if (!this.target) v.imageDraft = prompt.value; sync(); });
-    promptLibrary(el, v.plugin, this.target ? 'edit' : 'create', prompt, () => { if (!this.target) v.imageDraft = prompt.value; sync(); });
+    const prompt = field(el, t('imagePrompt'), 'prompt').createEl('textarea', { cls: 'qc-image-prompt', attr: { id: `${uid}-prompt`, rows: '5', placeholder: t(editing ? 'imageEditHint' : 'imagePromptHint') } });
+    prompt.value = editing ? '' : v.imageDraft;
+    if(this.context?.previousPrompt)prompt.parentElement!.createDiv({text:`${t('imagePreviousRound')}：${this.context.previousPrompt}`,cls:'qc-image-previous'});
+    prompt.addEventListener('input', () => { if (!editing) v.imageDraft = prompt.value; sync(); });
+    promptLibrary(el, v.plugin, editing ? 'edit' : 'create', prompt, () => { if (!editing) v.imageDraft = prompt.value; sync(); });
     const modelRow = field(controls, t('imageModel'), 'model');
     const model = modelRow.createEl('select', { cls: 'qc-select qc-image-model', attr: { id: `${uid}-model` } });
     const populate = (): void => {
       model.empty(); const cfg = v.plugin.settings.ai;
       const ids = new Set(cfg.images.map(p => p.id)); if (cfg.imageId) ids.add(cfg.imageId);
       for (const id of ids) {
-        const c = directImageConfig(cfg, id); if (!c || !imageReady({ ...c, enabled: true }) || (this.target && (!['ark', 'codex'].includes(c.imageEngine) || (c.imageEngine === 'ark' && (c.imageFamily ?? seedreamFamily(c.imageModel)) === '3.0')))) continue;
+        const c = directImageConfig(cfg, id); if (!c || !imageReady({ ...c, enabled: true }) || (editing && (!(['ark', 'codex'].includes(c.imageEngine) || jimengProtocol(c)) || (c.imageEngine === 'ark' && (c.imageFamily ?? seedreamFamily(c.imageModel)) === '3.0')))) continue;
         model.createEl('option', { value: id, text: imageLabel(c) });
       }
       const wanted = v.imageModelId || cfg.imageId;
@@ -55,8 +62,8 @@ export class ImageGenerateDialog extends Modal {
     const add = textButton(modelRow, t('imageAddModel'), () => new ModelDialog(v.plugin, 'image', () => { if (!this.closed) { v.imageModelId = v.plugin.settings.ai.imageId; populate(); } }).open(), 'qc-btn-sm qc-image-add-model', 'plus');
     add.title = t('imageAddModel');
     const ratio = select(controls, t('directImageRatio'), 'ratio'); ratio.addClass('qc-image-ratio');
-    for (const id of ['canvas', '1:1', '3:4', '4:3', '16:9', '9:16', '3:2', '2:3', '21:9']) ratio.createEl('option', { value: id, text: id === 'canvas' ? t(this.target ? 'imageOriginalRatio' : 'imageCanvasRatio') : id });
-    const referenceRow = field(el, t(this.target ? 'imageReferences' : 'imageReferenceOptional'), 'refs');
+    for (const id of ['canvas', '1:1', '3:4', '4:3', '16:9', '9:16', '3:2', '2:3', '21:9']) ratio.createEl('option', { value: id, text: id === 'canvas' ? t(editing ? 'imageOriginalRatio' : 'imageCanvasRatio') : id });
+    const referenceRow = field(el, t(editing ? 'imageReferences' : 'imageReferenceOptional'), 'refs');
     referenceRow.addClass('qc-image-reference-section');
     const referenceList = referenceRow.createDiv('qc-image-references');
     const upload = referenceRow.createEl('input', { cls: 'qc-hidden', attr: { id: `${uid}-refs`, type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: '' } });
@@ -64,13 +71,13 @@ export class ImageGenerateDialog extends Modal {
     const renderRefs = (): void => {
       referenceList.empty(); refs.forEach((ref, index) => {
         const card = referenceList.createDiv('qc-image-reference'); card.createEl('img', { attr: { src: ref.url, alt: `${t('imageReferences')} ${index + 1}` } });
-        if (!(this.target && index === 0)) textButton(card, t('remove'), () => { if (this.running) return; refs.splice(index, 1); renderRefs(); layers.checked = false; refreshSizes(); sync(); }, 'qc-btn-sm', 'x');
+        if (!(editing && index === 0)) textButton(card, t('remove'), () => { if (this.running) return; refs.splice(index, 1); renderRefs(); layers.checked = false; refreshSizes(); sync(); }, 'qc-btn-sm', 'x');
       });
     };
     upload.addEventListener('change', () => void (async () => {
       if (this.running) return;
       try {
-        const c = config(), limit = c?.imageEngine === 'ark' ? seedreamCaps(family.value as SeedreamFamily).refs : 1;
+        const c = config(), limit = c && jimengProtocol(c) ? 10 : c?.imageEngine === 'ark' ? seedreamCaps(family.value as SeedreamFamily).refs : 1;
         const files = Array.from(upload.files ?? []); if (refs.length + files.length > limit) throw new Error(t('imageReferenceLimit', { count: limit }));
         const added: ImageReference[] = [];
         for (const file of files) { const url = await v.prepareImage(file); const image = new v.win.Image(); image.src = url; await image.decode(); added.push({ url, width: image.naturalWidth, height: image.naturalHeight }); }
@@ -102,7 +109,7 @@ export class ImageGenerateDialog extends Modal {
     const generate = textButton(footer, t('imageGenerateInsert'), () => void run(), 'qc-primary qc-image-submit', 'sparkles');
     const config = (): AiConfig | undefined => { const c = directImageConfig(v.plugin.settings.ai, model.value); return c && imageReady(c) ? c : undefined; };
     const modelChanged = (): void => {
-      const c = config(); if (c && !['ark', 'codex'].includes(c.imageEngine) && refs.length) { refs.splice(0); renderRefs(); }
+      const c = config(); if (c && !['ark', 'codex'].includes(c.imageEngine) && !jimengProtocol(c) && refs.length) { refs.splice(0); renderRefs(); }
       family.value = seedreamFamily(c?.imageModel ?? '') ?? c?.imageFamily ?? '5.0-pro';
       refreshSizes(); sync();
     };
@@ -123,7 +130,7 @@ export class ImageGenerateDialog extends Modal {
       size.parentElement!.toggleClass('qc-hidden', !ark && !jimeng);
       if (jimeng) { family.parentElement!.addClass('qc-hidden'); seed.parentElement!.addClass('qc-hidden'); guidance.parentElement!.addClass('qc-hidden'); } family.disabled = this.running || !!seedreamFamily(c?.imageModel ?? '');
       seed.parentElement!.toggleClass('qc-hidden', family.value !== '3.0'); guidance.parentElement!.toggleClass('qc-hidden', family.value !== '3.0');
-      optimize.parentElement!.toggleClass('qc-hidden', family.value === '3.0'); referenceRow.toggleClass('qc-hidden', (!ark && c?.imageEngine !== 'codex') || (ark && !caps.refs));
+      optimize.parentElement!.toggleClass('qc-hidden', family.value === '3.0'); referenceRow.toggleClass('qc-hidden', (!ark && !jimeng && c?.imageEngine !== 'codex') || (ark && !caps.refs));
       custom.parentElement!.toggleClass('qc-hidden', size.value !== 'custom');
       count.disabled = this.running || !caps.groups; if (!caps.groups) count.value = '1';
       if (Number(count.value) > 15 - refs.length) count.value = String(Math.max(1, 15 - refs.length));
@@ -144,26 +151,43 @@ export class ImageGenerateDialog extends Modal {
     const run = async (): Promise<void> => {
       if (this.running || !this.valid()) return;
       const c = config(), d = v.design; if (!c || !d) return;
-      const [rw, rh] = ratio.value === 'canvas' ? this.target ? [refs[0]!.width, refs[0]!.height] : [d.width, d.height] : ratio.value.split(':').map(Number);
+      const [rw, rh] = ratio.value === 'canvas' ? editing ? [refs[0]!.width, refs[0]!.height] : [d.width, d.height] : ratio.value.split(':').map(Number);
       const width = Math.round(1536 * rw! / Math.max(rw!, rh!)), height = Math.round(1536 * rh! / Math.max(rw!, rh!));
       c.imageSize = 'auto'; v.imageModelId = model.value;
       this.running = true; status.setText(t('imageGenerating')); sync();
       try {
         const caps = seedreamCaps(family.value as SeedreamFamily);
-        const options: SeedreamOptions = c.imageEngine === 'ark' ? { family: family.value as SeedreamFamily, seed: family.value === '3.0' ? Number(seed.value) : undefined, guidance: family.value === '3.0' ? Number(guidance.value) : undefined, references: refs.slice(), size: size.value === 'custom' ? custom.value.trim() : size.value, maxImages: Number(count.value), outputFormat: caps.format ? format.value as 'png' | 'jpeg' : undefined, responseFormat: response.value as 'url' | 'b64_json', watermark: watermark.checked, optimize: optimize.value as 'standard' | 'fast', webSearch: search.checked, transparent: transparent.checked, layers: layers.checked } : jimengProtocol(c) ? { resolution: size.value as '1k' | '2k' | '4k' } : { references: refs.slice() };
-        let target: {id:string;hash:string}|undefined;
+        const options: SeedreamOptions = c.imageEngine === 'ark' ? { family: family.value as SeedreamFamily, seed: family.value === '3.0' ? Number(seed.value) : undefined, guidance: family.value === '3.0' ? Number(guidance.value) : undefined, references: refs.slice(), size: size.value === 'custom' ? custom.value.trim() : size.value, maxImages: Number(count.value), outputFormat: caps.format ? format.value as 'png' | 'jpeg' : undefined, responseFormat: response.value as 'url' | 'b64_json', watermark: watermark.checked, optimize: optimize.value as 'standard' | 'fast', webSearch: search.checked, transparent: transparent.checked, layers: layers.checked } : jimengProtocol(c) ? { resolution: size.value as '1k' | '2k' | '4k', references: refs.slice() } : { references: refs.slice() };
+        let target: {id:string;hash:string}|undefined=this.context?.target;
         if (this.target) { const object = this.target as QObject; object.qcImageId ??= crypto.randomUUID(); target = { id: object.qcImageId, hash: await imageHash(this.target.getSrc()) }; v.changed(); await v.flush(); }
-        if (!this.valid() || !v.file) throw new Error(t('imageNotInserted'));
+        if (!this.valid() || !v.file || (this.context?.selection && !await v.selectionMatches(this.context.selection))) throw new Error(t('imageNotInserted'));
         v.plugin.scratch.delete(v.file.path);
         const snapshot = structuredClone(c), text = prompt.value.trim();
-        await v.plugin.imageJobs.submit({ prompt: text, model: imageLabel(c), path: v.file.path, layers: !!options.layers, target }, () => new AiService(() => snapshot).images(text, width, height, options));
-        new Notice(t('imageBackgroundStarted')); this.close();
+        const job=await v.plugin.imageJobs.submit({ prompt: text, model: imageLabel(c), path: v.file.path, layers: !!options.layers, target, selection:this.context?.selection }, () => new AiService(() => snapshot).images(text, width, height, options));
+        if (!this.closed) waitFor(job);
       } catch (e) { if (!this.closed) status.setText(t('error', { message: e instanceof Error && e.message.includes('ModelNotOpen') ? t('seedreamNotOpen', { model: c.imageModel }) : e instanceof Error ? e.message : String(e) })); }
-      finally { this.running = false; if (!this.closed) sync(); }
+      finally { if (!this.unsubscribe) this.running = false; if (!this.closed) sync(); }
     };
     prompt.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); void run(); } });
     el.insertBefore(controls, prompt.parentElement!);
+    const form=el.createDiv('qc-image-form');while(el.firstChild!==form)form.appendChild(el.firstChild!);
+    const waiting=el.createDiv('qc-image-waiting');waiting.addClass('qc-hidden');
+    const stopWaiting=():void=>{this.unsubscribe?.();this.unsubscribe=undefined;if(this.timer!==undefined)v.win.clearInterval(this.timer);this.timer=undefined;};
+    const waitFor=(job:ImageJob):void=>{
+      form.addClass('qc-hidden');waiting.empty();waiting.removeClass('qc-hidden');
+      const art=waiting.createDiv({cls:'qc-image-wait-art',attr:{'aria-hidden':'true'}});setIcon(art,'image');art.createSpan({cls:'qc-image-wait-spark'});
+      waiting.createDiv({text:t('imageGenerating'),cls:'qc-image-wait-title'});
+      waiting.createDiv({text:job.model,cls:'qc-hint'});waiting.createDiv({text:job.prompt||t('imageDecompose'),cls:'qc-image-wait-prompt'});
+      const elapsed=waiting.createDiv({cls:'qc-image-wait-time',attr:{role:'status','aria-live':'off'}}),tick=()=>elapsed.setText(t(job.state==='queued'?'imageTaskQueued':'imageWaitElapsed',{seconds:Math.floor((Date.now()-job.created)/1000)}));tick();this.timer=v.win.setInterval(tick,1000);
+      waiting.createDiv({text:t('imageWaitHint'),cls:'qc-hint'});textButton(waiting,t('imageMoveBackground'),()=>{new Notice(t('imageBackgroundStarted'));this.close();},'qc-btn-sm qc-image-background','panel-bottom-close');
+      const update=():void=>{
+        if(this.closed)return;
+        if(job.state==='ready'){stopWaiting();this.close();new ImageResultsDialog(v.plugin,job).open();}
+        else if(job.state==='failed'||job.state==='interrupted'){stopWaiting();this.running=false;waiting.addClass('qc-hidden');form.removeClass('qc-hidden');status.setText(job.error||t('imageTaskInterrupted'));sync();}
+      };this.unsubscribe=v.plugin.imageJobs.subscribe(update);update();
+    };
+    if(this.context?.selection)referenceRow.createDiv({text:t('imageSelectionHint',{count:this.context.selection.objects.length}),cls:'qc-hint'});
     renderRefs(); populate(); v.win.requestAnimationFrame(() => { if (prompt.isConnected) prompt.focus({ preventScroll: true }); });
   }
-  onClose(): void { this.closed = true; this.contentEl.empty(); this.done(); }
+  onClose(): void { this.closed = true; this.unsubscribe?.(); this.unsubscribe=undefined; if(this.timer!==undefined)this.view.win.clearInterval(this.timer); this.contentEl.empty(); this.done(); }
 }

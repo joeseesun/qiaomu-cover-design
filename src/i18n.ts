@@ -1,5 +1,10 @@
 /** One table keeps zh and en in lockstep; the test suite checks placeholders match. */
 const T = {
+  imageCreateSelection: ['AI 创作', 'AI create'], imageReplaceSelection: ['替换所选元素', 'Replace selected elements'], imageContinueCreate: ['继续创作', 'Continue creating'],
+  imagePreviousRound: ['上一轮要求', 'Previous request'],
+  imageMoveBackground: ['放到后台', 'Move to background'], imageWaitElapsed: ['已等待 {seconds} 秒', 'Waiting for {seconds} seconds'], imageWaitHint: ['结果会在这里出现。也可以放到后台，继续编辑画布；关闭弹窗不会取消任务。', 'Results will appear here. Move to the background to keep editing; closing this dialog does not cancel the task.'],
+  imageSelectionHint: ['已将 {count} 个元素合成参考图。替换后变为一张图片，撤销可恢复原图层。', '{count} elements captured as a reference. Replacing turns them into one image; undo restores the original layers.'],
+
   // commands and general
   open: ['打开封面设计器', 'Open cover designer'], fromNote: ['从当前笔记创建封面', 'Create cover from current note'], create: ['新建封面', 'New cover'], newCover: ['新建封面…', 'New cover…'],
   name: ['名称', 'Name'], coverTitle: ['封面标题', 'Cover title'], createAction: ['创建', 'Create'], cancel: ['取消', 'Cancel'], untitled: ['未命名封面', 'Untitled cover'], close: ['关闭', 'Close'],
@@ -19,7 +24,7 @@ const T = {
   layerExpand: ['展开／收起分组', 'Expand / collapse group'],
   imageUploadReference: ['添加参考图', 'Add references'],
   imageReferenceOptional: ['参考图（可选）', 'References (optional)'],
-  imageBackgroundHint: ['生成时可以继续编辑，完成后通知你查看。', 'Keep editing while generating. A notice appears when ready.'],
+  imageBackgroundHint: ['先生成预览，再决定插入。等待时也可放到后台。', 'Preview first, then choose what to insert. You can also move generation to the background.'],
   imageCreateAction: ['生成图片', 'Generate images'],
   imageTasks: ['生图任务', 'Image tasks'],
   imageTasksEmpty: ['还没有生图任务。', 'No image tasks yet.'],

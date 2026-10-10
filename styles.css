@@ -819,14 +819,14 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-modal button.qc-image-add-model { padding: 7px; min-height: 34px; box-shadow: none !important; }
 .qc-image-add-model > span:not(.qc-btn-icon) { position: absolute; clip: rect(0,0,0,0); width: 1px; height: 1px; overflow: hidden; }
 .qc-image-generate .qc-image-prompt { min-height: 148px; }
-.qc-image-generate .qc-image-advanced { border-top: 1px solid var(--qc-line); padding-top: 4px; }
+.qc-image-generate .qc-image-advanced { border: 0; padding: 0; }
 .qc-image-generate .qc-image-presets { padding: 6px 2px; gap: 6px; }
 .qc-image-preset .qc-icon-btn { width: 24px; height: 24px; min-height: 24px; opacity: 0; pointer-events: none; }
 .qc-image-preset:hover .qc-icon-btn, .qc-image-preset:focus-within .qc-icon-btn { opacity: 1; pointer-events: auto; }
 .qc-image-reference-section { gap: 8px; }
 .qc-modal button.qc-image-upload { align-self: flex-start; border: 1px dashed var(--qc-strong); padding: 10px 14px; box-shadow: none !important; border-radius: 8px; color: var(--qc-muted); }
 .qc-image-reference-section .qc-image-references:empty { display: none; }
-.qc-image-generate .qc-modal-footer { position: sticky; bottom: -6px; background: var(--qc-paper); padding: 14px 2px 4px; }
+.qc-image-generate .qc-modal-footer { border: 0; position: sticky; bottom: -6px; background: var(--qc-paper); padding: 14px 2px 4px; }
 .qc-header-mid > .qc-ai-image-btn { margin-right: 10px; }
 .qc-header-mid > .qc-insert-btn { margin-right: 6px; }
 .qc-modal .qc-md-model-picker { width: 100%; min-width: 0; }
@@ -859,3 +859,25 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qcs-font-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
 .qc-settings .qcs-model-actions .qc-icon-btn { width: 28px; height: 28px; }
 @media (max-width: 560px) { .qcs-model-row { align-items: flex-start; flex-wrap: wrap; gap: 8px; } .qcs-model-info { flex-basis: 65%; } .qcs-model-actions { margin-left: auto; } }
+
+/* A compact prompt tool row and an honest, user-controlled wait state. */
+.qc-image-form { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.qc-image-prompt-tools { display: flex; align-items: center; gap: 4px; min-width: 0; margin-top: -8px; }
+.qc-modal .qc-image-prompt-picker { width: auto; max-width: min(240px, 65%); min-width: 0; font-size: 12px; height: 30px; border: 0; background: var(--qc-hover); }
+.qc-image-prompt-tools .qc-icon-btn { width: 28px; height: 28px; min-height: 28px; }
+.qc-image-previous { font-size: 11px; line-height: 1.5; color: var(--qc-muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.qc-image-reference-section .qc-image-references { display: flex; flex-wrap: wrap; gap: 8px; }
+.qc-image-reference-section .qc-image-reference { width: 80px; }
+.qc-image-reference-section .qc-image-reference img { height: 72px; }
+.qc-selection-create { padding: 8px 0 14px; }
+.qc-image-waiting { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 32px 16px; min-height: 320px; }
+.qc-image-wait-art { position: relative; width: 92px; height: 112px; display: flex; align-items: center; justify-content: center; color: var(--qc-muted); border: 1px solid var(--qc-line); border-radius: 14px; background: var(--qc-hover); overflow: hidden; }
+.qc-image-wait-art > svg { width: 38px; height: 38px; animation: qc-image-breathe 3s ease-in-out infinite; }
+.qc-image-wait-spark { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 25%, color-mix(in srgb, var(--qc-paper) 60%, transparent), transparent 75%); transform: translateX(-110%); animation: qc-image-sweep 3s ease-in-out infinite; }
+.qc-image-wait-title { margin-top: 8px; font-size: 16px; font-weight: 600; }
+.qc-image-wait-prompt { color: var(--qc-muted); font-size: 12px; max-width: 420px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.qc-image-wait-time { font-size: 12px; color: var(--qc-muted); font-variant-numeric: tabular-nums; }
+.qc-image-waiting > .qc-hint { max-width: 380px; line-height: 1.6; }
+@keyframes qc-image-breathe { 50% { opacity: .4; transform: scale(.92); } }
+@keyframes qc-image-sweep { 75%,100% { transform: translateX(110%); } }
+@media (prefers-reduced-motion: reduce) { .qc-image-wait-art > svg, .qc-image-wait-spark { animation: none; } }

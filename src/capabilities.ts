@@ -280,6 +280,7 @@ export const UI_ONLY: Record<string, string> = {
   renameLayers: 'User-managed layer names support organization and search without changing assistant ids.',
   imageGuard: 'Internal canvas identity guard used by asynchronous dialogs.',
   openImageGenerator: 'Explicit image generation/edit modal; references are sent only after user submission.',
+  openSelectionImageGenerator: 'Explicit selected-element image editing; rasterizes only the selected elements after the user opens the dialog.',
   action: 'wrapper', ask: 'the assistant itself', changed: 'housekeeping', persistChat: 'housekeeping', flush: 'housekeeping', refreshDrawer: 'view', refreshInspector: 'view', renderGuides: 'view',
   applyZoom: 'view zoom', setZoom: 'view zoom', zoomBy: 'view zoom', toggleDrawer: 'panel layout', t: 'i18n',
   selection: 'read-only', selectionLabel: 'read-only', texts: 'read-only', copyText: 'read-only', fontsInUse: 'read-only', hasMesh: 'read-only', pairing: 'read-only', platform: 'read-only', thumbIssues: 'read-only', exportPrefs: 'read-only', encode: 'export internals',

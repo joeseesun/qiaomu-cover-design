@@ -413,8 +413,7 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
   iconButton(actions, first.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', t('locked'), () => view.toggleLock(), first.lockMovementX ? 'is-active' : '');
   iconButton(actions, 'copy-plus', t('duplicate'), () => void view.action(() => view.cloneSelection()));
   iconButton(actions, 'trash-2', t('remove'), () => view.removeSelection());
-  const raster = first as FabricImage;
-  if (single && raster instanceof FabricImage) iconButton(actions, 'image-pen', t('aiEditImage'), () => view.openImageGenerator(raster));
+  const create = el.createDiv('qc-selection-create'); textButton(create, t('imageCreateSelection'), () => void view.action(() => view.openSelectionImageGenerator()), 'qc-btn-sm', 'image-pen');
 
   if (single && ((first.qcRole === 'subject' || first.qcRole === 'image') && first.qcPrompt !== undefined || first.qcRole === 'subject')) {
     const g = group(el, t('aiRedraw')); g.createDiv({ text: t('aiRedrawHint'), cls: 'qc-hint' });

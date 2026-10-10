@@ -23,9 +23,15 @@ class PromptEditor extends Modal{
   onClose():void{this.contentEl.empty();}
 }
 export function promptLibrary(parent:HTMLElement,p:CoverPlugin,mode:ImagePrompt['mode'],input:HTMLTextAreaElement,changed:()=>void):void{
-  const t=p.t.bind(p),details=parent.createEl('details',{cls:'qc-image-advanced'});details.createEl('summary',{text:t('imageQuickPrompts')});details.open=true;const body=details.createDiv('qc-image-presets');
+  const t=p.t.bind(p),bar=parent.createDiv('qc-image-prompt-tools'),id=crypto.randomUUID();bar.createEl('label',{cls:'qc-sr-only',text:t('imageQuickPrompts'),attr:{for:id}});
+  const picker=bar.createEl('select',{cls:'qc-image-prompt-picker',attr:{id}});
   const all=()=>p.settings.imagePrompts??imagePromptPresets(p.isZh());
   const persist=(items:ImagePrompt[])=>{p.settings.imagePrompts=items;void p.saveSettings();render();};
   const edit=(item:ImagePrompt)=>new PromptEditor(p,item,replacement=>{const list=all().slice(),at=list.findIndex(x=>x.id===item.id);if(at>=0)list[at]=replacement;else list.push(replacement);persist(list);}).open();
-  const render=()=>{body.empty();for(const item of all().filter(x=>x.mode===mode)){const row=body.createDiv('qc-image-preset');textButton(row,item.name,()=>{input.value=item.text;changed();input.focus();},'qc-btn-sm');iconButton(row,'pencil',t('imageEditPreset'),()=>edit(item));iconButton(row,'x',t('remove'),()=>persist(all().filter(x=>x.id!==item.id)));}textButton(body,t('imageSavePrompt'),()=>{if(input.value.trim())edit({id:crypto.randomUUID(),mode,name:t('imageQuickPrompts'),text:input.value.trim()});},'qc-btn-sm','plus');};render();
+  const editButton=iconButton(bar,'pencil',t('imageEditPreset'),()=>{const item=all().find(x=>x.id===picker.value);if(item)edit(item);});
+  const remove=iconButton(bar,'trash-2',t('remove'),()=>persist(all().filter(x=>x.id!==picker.value)));
+  iconButton(bar,'bookmark-plus',t('imageSavePrompt'),()=>{if(input.value.trim())edit({id:crypto.randomUUID(),mode,name:t('imageQuickPrompts'),text:input.value.trim()});});
+  const sync=()=>{editButton.disabled=remove.disabled=!picker.value;};
+  picker.addEventListener('change',()=>{const item=all().find(x=>x.id===picker.value);if(item){input.value=item.text;changed();input.focus();}sync();});
+  const render=()=>{const selected=picker.value;picker.empty();picker.createEl('option',{value:'',text:t('imageQuickPrompts')});for(const item of all().filter(x=>x.mode===mode))picker.createEl('option',{value:item.id,text:item.name});picker.value=all().some(x=>x.id===selected)?selected:'';sync();};render();
 }

@@ -1,8 +1,9 @@
 import type { GeneratedPicture, ImageResult } from './seedream';
 export type ImageJobState = 'queued' | 'running' | 'ready' | 'failed' | 'interrupted';
+export interface ImageSelection { objects: {id:string;hash:string}[]; box: {left:number;top:number;width:number;height:number} }
 export interface ImageJob {
   id: string; created: number; prompt: string; model: string; path: string; layers: boolean;
-  target?: { id: string; hash: string }; state: ImageJobState; error?: string;
+  target?: { id: string; hash: string }; selection?: ImageSelection; state: ImageJobState; error?: string;
   pictures?: Omit<GeneratedPicture, 'data'>[]; warnings?: string[]; usage?: ImageResult['usage'];
 }
 export interface ImageJobStore {

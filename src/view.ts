@@ -1,5 +1,6 @@
 import { bindMarquee } from './marquee';
-import type { GeneratedPicture } from './seedream';
+import { imageHash, type ImageSelection } from './imagejobs';
+import type { GeneratedPicture, ImageReference } from './seedream';
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
@@ -8,7 +9,7 @@ import { templateThumb } from './panels';
 import { calmLayout, clearCopyOfZones, decorOnText, layoutPass } from './calm';
 import { faceFor, isSingleWeight, pillFor, styleText, textPresetById, type TextPreset } from './textstyles';
 import { openInsertPopover } from './insertpop';
-import { ImageGenerateDialog } from './imagegenerate';
+import { ImageGenerateDialog, type ImageGenerationContext } from './imagegenerate';
 import { BASIC_SHAPES, PATH_SHAPES, type BasicShape } from './shapes';
 import { AssetCat, assetSvg, loadAssets } from './assets';
 import { assignIds, layoutIssues, placeBox, regionOf, resolveTarget, WHERE_ZH, type Box as SceneBox, type NodeKind, type SceneMeta, type SceneNode, type Target } from './scene';
@@ -334,7 +335,7 @@ export class CoverView extends FileView implements CoverApi {
     const has = c.getActiveObjects().length > 0; const m = new Menu();
     if (has) {
       const selected = c.getActiveObject();
-      if (selected instanceof FabricImage) m.addItem(i => i.setTitle(this.t('aiEditImage')).setIcon('image-pen').onClick(() => this.openImageGenerator(selected)));
+      m.addItem(i => i.setTitle(this.t('imageCreateSelection')).setIcon('image-pen').onClick(() => void this.action(() => this.openSelectionImageGenerator())));
       m.addItem(i => i.setTitle(this.t('renameLayers')).setIcon('pencil').onClick(() => renameLayersDialog(this, c.getActiveObjects())));
       if (c.getActiveObjects().length > 1) m.addItem(i => i.setTitle(this.t('groupLayers')).setIcon('group').onClick(() => this.groupLayers()));
       if ((selected as QObject | undefined)?.qcLayerGroup) m.addItem(i => i.setTitle(this.t('ungroupLayers')).setIcon('ungroup').onClick(() => this.ungroupLayers()));
@@ -1785,10 +1786,55 @@ export class CoverView extends FileView implements CoverApi {
       return await readDataUrl(this.win, out);
     } finally { bitmap.close(); }
   }
-  openImageGenerator(target?: FabricImage): void {
+  openImageGenerator(target?: FabricImage, context?: ImageGenerationContext): void {
     if (this.imageDialog) return;
-    const dialog = new ImageGenerateDialog(this, () => { if (this.imageDialog === dialog) this.imageDialog = undefined; }, target);
+    const dialog = new ImageGenerateDialog(this, () => { if (this.imageDialog === dialog) this.imageDialog = undefined; }, target, context);
     this.imageDialog = dialog; dialog.open();
+  }
+  async openSelectionImageGenerator(): Promise<void> {
+    if (this.imageDialog || !this.canvas) return;
+    const objects = this.canvas.getActiveObjects() as QObject[];
+    if (objects.length === 1 && objects[0] instanceof FabricImage) { this.openImageGenerator(objects[0]); return; }
+    const selected = objects.filter(o => !objects.some(other => { let p=o.parent; while(p){if(p===other)return true;p=p.parent;}return false; }));
+    if (!selected.length) return;
+    const guard=this.imageGuard();
+    for(const o of selected)o.qcImageId ??= crypto.randomUUID();
+    const boxes=selected.map(o=>o.getBoundingRect()),left=Math.min(...boxes.map(b=>b.left)),top=Math.min(...boxes.map(b=>b.top));
+    const box={left,top,width:Math.max(...boxes.map(b=>b.left+b.width))-left,height:Math.max(...boxes.map(b=>b.top+b.height))-top};
+    if(!Number.isFinite(box.width+box.height)||box.width<=0||box.height<=0)throw Error(this.t('imageNotInserted'));
+    const hashes=await Promise.all(selected.map(async o=>({id:o.qcImageId!,hash:await this.selectionObjectHash(o)})));
+    const clones=await Promise.all(selected.map(async o=>{const clone=await o.clone(PROPS);util.applyTransformToObject(clone,util.multiplyTransformMatrices([1,0,0,1,-left,-top],o.calcTransformMatrix()));let opacity=o.opacity;for(let p=o.parent;p;p=p.parent)opacity*=p.opacity;clone.set({opacity});return clone;}));
+    const scale=Math.min(1,4096/Math.max(box.width,box.height)),element=this.doc.createElement('canvas');
+    const off=new StaticCanvas(element,{width:Math.max(1,Math.ceil(box.width*scale)),height:Math.max(1,Math.ceil(box.height*scale)),enableRetinaScaling:false,renderOnAddRemove:false});
+    let reference:ImageReference;
+    try{off.setViewportTransform([scale,0,0,scale,0,0]);off.add(...clones);off.renderAll();reference={url:off.toDataURL({format:'png',multiplier:1}),width:off.width,height:off.height};}finally{void off.dispose();}
+    if(!guard()||!await this.selectionMatches({objects:hashes,box}))throw Error(this.t('imageOriginalChanged'));
+    this.changed();await this.flush();this.openImageGenerator(undefined,{reference,selection:{objects:hashes,box}});
+  }
+  private async selectionObjectHash(object:QObject):Promise<string>{
+    const walk=(items:Record<string,unknown>[]):Record<string,unknown>|undefined=>{for(const item of items){if(item.qcImageId===object.qcImageId)return item;const found=Array.isArray(item.objects)?walk(item.objects as Record<string,unknown>[]):undefined;if(found)return found;}return undefined;};
+    const serialized=walk((this.currentDesign().canvas.objects??[]) as Record<string,unknown>[]);
+    return imageHash(JSON.stringify({object:serialized,world:object.calcTransformMatrix().map(n=>Math.round(n*1000)/1000)}));
+  }
+  selectionObjects(selection:ImageSelection):QObject[]{
+    const flatten=(items:FabricObject[]):QObject[]=>items.flatMap(o=>o instanceof Group?[o as QObject,...flatten(o.getObjects())]:[o as QObject]);
+    const all=flatten(this.canvas?.getObjects()??[]);return selection.objects.map(item=>all.find(o=>o.qcImageId===item.id)).filter((o):o is QObject=>!!o);
+  }
+  async selectionMatches(selection:ImageSelection):Promise<boolean>{
+    const objects=this.selectionObjects(selection);return objects.length===selection.objects.length && (await Promise.all(objects.map(o=>this.selectionObjectHash(o)))).every((hash,i)=>hash===selection.objects[i]!.hash);
+  }
+  async replaceImageSelection(picture:GeneratedPicture,selection:ImageSelection,keep:()=>boolean):Promise<boolean>{
+    if(!keep()||!await this.selectionMatches(selection))throw Error(this.t('imageOriginalChanged'));
+    if(picture.data.byteLength>MAX_IMAGE_BYTES||!['image/png','image/jpeg','image/webp'].includes(picture.type))throw Error(this.t('imageLimit'));
+    const image=await FabricImage.fromURL(await readDataUrl(this.win,new Blob([picture.data],{type:picture.type})));
+    if(!keep()||!await this.selectionMatches(selection))throw Error(this.t('imageOriginalChanged'));
+    const c=this.canvas!,objects=this.selectionObjects(selection),parent=objects[0]!.parent,owner=objects.every(o=>o.parent===parent)?parent??c:c;
+    const root=(o:FabricObject):FabricObject=>o.parent?root(o.parent):o;
+    const at=Math.max(...objects.map(o=>owner.getObjects().indexOf(owner===c?root(o):o)));
+    const box=selection.box;image.set({left:box.left,top:box.top,scaleX:box.width/image.width,scaleY:box.height/image.height});
+    (image as QObject).qcName=picture.name??this.t('imageResult');
+    this.beginTurn();try{c.discardActiveObject();const before=owner.getObjects().slice(0,at).filter(o=>!objects.includes(o as QObject)).length;for(const object of objects)(object.parent??c).remove(object);owner.insertAt(before,image);image.setCoords();c.setActiveObject(image);this.changed();}finally{this.endTurn();}
+    c.requestRenderAll();this.refreshInspector(true);return true;
   }
   /** A delayed result belongs to its original file and raster, even if another tab is now active. */
   imageGuard(target?: FabricImage): () => boolean {
