@@ -14,6 +14,8 @@ export interface Design {
   platform?: string; bg?: Background; export?: Partial<ExportPrefs>;
   /** Id of the template this cover was laid out from. Lets a platform switch re-lay it out instead of just scaling it. */
   template?: string;
+  /** The palette the cover's layers follow (bg, bg2, ink, sub, accent, accentInk), so a later colour change knows what to replace. */
+  palette?: { bg: string; bg2: string; ink: string; sub: string; accent: string; accentInk: string };
   canvas: Record<string, unknown>;
 }
 export const MAX_SIDE = 4096;
@@ -56,6 +58,7 @@ export function parseDesign(raw: string): Design {
   const d = JSON.parse(raw) as Design;
   if (!d || d.format !== 'qiaomu-cover-design' || d.schema !== 1 || !validSize(d.width,d.height) || !d.canvas || !Array.isArray(d.canvas.objects) || d.canvas.objects.length > 500 || (d.source !== undefined && typeof d.source !== 'string') || (d.platform !== undefined && typeof d.platform !== 'string') || (d.template !== undefined && typeof d.template !== 'string') || (d.bg !== undefined && !validBackground(d.bg)) || (d.export !== undefined && (typeof d.export !== 'object' || d.export === null))) throw new Error('invalid-design');
   checkCanvas(d.canvas);
+  if (d.palette !== undefined && (typeof d.palette !== 'object' || d.palette === null || !['bg', 'bg2', 'ink', 'sub', 'accent', 'accentInk'].every(k => /^#[\da-f]{6}$/i.test(String((d.palette as Record<string, unknown>)[k]))))) delete d.palette;
   return d;
 }
 /**

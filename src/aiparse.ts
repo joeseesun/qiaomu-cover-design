@@ -2,9 +2,8 @@
  * Pure helpers for the model-backed designer: provider presets, JSON extraction and validation of whatever a model
  * returns. Nothing here touches Obsidian or fabric, so it can be unit tested in plain Node.
  */
-import { DECOR_IDS, TONES } from './decor';
-import { PATTERN_IDS } from './playbook';
-import type { DecorSpec, DesignSpec, Op } from './ops';
+export { sanitizeOps } from './capabilities';
+export type { Catalog } from './valid';
 
 export interface AiConfig {
   /** Master switch: off keeps the plugin fully offline whatever else is filled in. */
@@ -117,19 +116,6 @@ export function imageReady(c: AiConfig): boolean {
   const key = c.imageKey.trim() || (c.imageBaseUrl.trim() ? '' : c.apiKey.trim());
   return !!base && (!!key || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(base));
 }
-function sanitizeDecor(raw: unknown): DecorSpec[] | undefined {
-  if (!Array.isArray(raw)) return undefined; const out: DecorSpec[] = [];
-  for (const item of raw.slice(0, 6)) {
-    if (!item || typeof item !== 'object') continue; const o = item as Record<string, unknown>;
-    const kind = str(o.kind, 24); const at = o.at === 'subject' || o.at === 'title' || o.at === 'canvas' ? o.at : undefined;
-    const x = num(o.x, -2, 2) ?? (at && at !== 'canvas' ? 0 : undefined), y = num(o.y, -2, 2) ?? (at && at !== 'canvas' ? 0 : undefined), w = num(o.w, 0.03, at === 'subject' ? 3 : 1.6);
-    if (!kind || !DECOR_IDS.includes(kind) || x === undefined || y === undefined || w === undefined) continue;
-    const rotate = num(o.rotate, -180, 180); const opacity = num(o.opacity, 0.05, 1);
-    const tone = TONES.find(t => t === o.tone);
-    out.push({ kind, x, y, w, ...(at ? { at } : {}), ...(rotate !== undefined ? { rotate } : {}), ...(tone ? { tone } : {}), ...(opacity !== undefined ? { opacity } : {}) });
-  }
-  return out.length ? out : undefined;
-}
 export function trimBase(url: string): string { return url.trim().replace(/\/+$/, ''); }
 
 /** Nearest size the common image endpoints accept for a canvas aspect ratio. */
@@ -161,65 +147,3 @@ export function extractJson(text: string): unknown {
   throw new Error('no-json');
 }
 
-export interface Catalog { platforms: string[]; templates: string[] }
-const HEX = /^#(?:[\da-f]{3}|[\da-f]{6})$/i;
-const str = (v: unknown, max: number): string | undefined => typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
-const num = (v: unknown, lo: number, hi: number): number | undefined => typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : undefined;
-const hex = (v: unknown): string | undefined => typeof v === 'string' && HEX.test(v.trim()) ? v.trim().toLowerCase() : undefined;
-const align = (v: unknown): 'left' | 'center' | 'right' | undefined => v === 'left' || v === 'center' || v === 'right' ? v : undefined;
-const bool = (v: unknown): boolean | undefined => typeof v === 'boolean' ? v : undefined;
-
-function sanitizeDesign(o: Record<string, unknown>, c: Catalog): DesignSpec {
-  const spec: DesignSpec = {};
-  const platform = str(o.platform, 32); if (platform && c.platforms.includes(platform)) spec.platform = platform;
-  const template = str(o.template, 32); if (template && c.templates.includes(template)) spec.template = template;
-  const title = str(o.title, 80); if (title) spec.title = title;
-  const subtitle = str(o.subtitle, 120); if (subtitle) spec.subtitle = subtitle;
-  const badge = str(o.badge, 12); if (badge) spec.badge = badge;
-  if (Array.isArray(o.points)) { const points = o.points.map(p => str(p, 24)).filter((p): p is string => !!p).slice(0, 4); if (points.length) spec.points = points; }
-  if (o.palette && typeof o.palette === 'object') {
-    const p = o.palette as Record<string, unknown>; const palette: NonNullable<DesignSpec['palette']> = {};
-    for (const k of ['bg', 'bg2', 'ink', 'sub', 'accent', 'accentInk'] as const) { const v = hex(p[k]); if (v) palette[k] = v; }
-    if (Object.keys(palette).length) spec.palette = palette;
-  }
-  const imagePrompt = str(o.imagePrompt, 900); if (imagePrompt) spec.imagePrompt = imagePrompt;
-  if (o.imageRole === 'background' || o.imageRole === 'side') spec.imageRole = o.imageRole;
-  const subjectPrompt = str(o.subjectPrompt, 700); if (subjectPrompt) spec.subjectPrompt = subjectPrompt;
-  if (o.subjectAt === 'left' || o.subjectAt === 'right' || o.subjectAt === 'center') spec.subjectAt = o.subjectAt;
-  const pattern = str(o.pattern, 32); if (pattern && PATTERN_IDS.includes(pattern)) spec.pattern = pattern;
-  const titleFont = str(o.titleFont, 60); if (titleFont) spec.titleFont = titleFont;
-  const bodyFont = str(o.bodyFont, 60); if (bodyFont) spec.bodyFont = bodyFont;
-  const decor = sanitizeDecor(o.decor); if (decor) spec.decor = decor;
-  return spec;
-}
-
-/** Keeps only commands the canvas understands, with every value clamped. A model can never reach anything else. */
-export function sanitizeOps(raw: unknown, c: Catalog): { reply: string; ops: Op[]; designs?: DesignSpec[] } {
-  const root = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const list = Array.isArray(root.ops) ? root.ops : root.op ? [root] : [];
-  const ops: Op[] = [];
-  for (const item of list.slice(0, 16)) {
-    if (!item || typeof item !== 'object') continue; const o = item as Record<string, unknown>;
-    switch (o.op) {
-      case 'design': { const spec = sanitizeDesign(o, c); if (Object.keys(spec).length) ops.push({ op: 'design', ...spec }); break; }
-      case 'platform': { const id = str(o.id, 32); if (id && c.platforms.includes(id)) ops.push({ op: 'platform', id }); break; }
-      case 'template': { const id = str(o.id, 32); if (id && c.templates.includes(id)) ops.push({ op: 'template', id }); break; }
-      case 'background': {
-        const color = hex(o.color), from = hex(o.from), to = hex(o.to); const angle = num(o.angle, 0, 360);
-        if (color) ops.push({ op: 'background', color }); else if (from && to) ops.push({ op: 'background', from, to, ...(angle !== undefined ? { angle } : {}) }); break;
-      }
-      case 'addText': { const text = str(o.text, 200); if (text) ops.push({ op: 'addText', text, size: num(o.size, 8, 600), color: hex(o.color), font: str(o.font, 60), bold: bool(o.bold), align: align(o.align) }); break; }
-      case 'style': {
-        const target = o.target === 'title' || o.target === 'subtitle' || o.target === 'selection' ? o.target : undefined;
-        ops.push({ op: 'style', ...(target ? { target } : {}), text: str(o.text, 200), size: num(o.size, 8, 600), scale: num(o.scale, 0.3, 3), color: hex(o.color), font: str(o.font, 60), bold: bool(o.bold), italic: bool(o.italic), align: align(o.align) }); break;
-      }
-      case 'align': { const to = o.to; if (to === 'left' || to === 'center' || to === 'right' || to === 'top' || to === 'middle' || to === 'bottom') ops.push({ op: 'align', to }); break; }
-      case 'image': { const prompt = str(o.prompt, 900); if (prompt) ops.push({ op: 'image', prompt, ...(o.role === 'side' ? { role: 'side' as const } : {}) }); break; }
-      case 'export': break; // exporting writes files; a model reply never triggers it
-      case 'undo': ops.push({ op: 'undo' }); break;
-      case 'redo': ops.push({ op: 'redo' }); break;
-    }
-  }
-  const designs = Array.isArray(root.designs) ? root.designs.slice(0, 3).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map(x => sanitizeDesign(x, c)).filter(x => !!x.title && !!x.template) : [];
-  return { reply: str(root.reply, 200) ?? '', ops, ...(designs.length ? { designs } : {}) };
-}

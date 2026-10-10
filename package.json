@@ -11,7 +11,9 @@
     "test": "tsx --test tests/*.test.ts",
     "lint": "eslint src",
     "check": "npm run lint && npm test && npm run build",
+    "deploy": "npm run build && cp main.js styles.css manifest.json \"/Users/joe/Documents/ChatGPT/qiaomu-home-dashboard-qa/.obsidian/plugins/qiaomu-cover-design/\" && echo deployed to vault",
     "audit": "tsx scripts/audit-templates.ts",
+    "eval": "tsx scripts/eval-intent.ts",
     "gallery": "node scripts/template-gallery/build.mjs && python3 scripts/template-gallery/server.py",
     "package": "npm run build && node scripts/package.mjs"
   },

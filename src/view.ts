@@ -1,15 +1,23 @@
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
-import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
+import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
 import { picturePolicy, requestsPicture, usefulFeedback, withoutPictures } from './designflow';
 import { templateThumb } from './panels';
 import { calmLayout, clearCopyOfZones, decorOnText, layoutPass } from './calm';
-import { faceFor, isSingleWeight, pillFor, styleText, type TextPreset } from './textstyles';
+import { faceFor, isSingleWeight, pillFor, styleText, textPresetById, type TextPreset } from './textstyles';
 import { openInsertPopover } from './insertpop';
+import { BASIC_SHAPES, PATH_SHAPES, type BasicShape } from './shapes';
+import { AssetCat, assetSvg, loadAssets } from './assets';
+import { assignIds, layoutIssues, placeBox, regionOf, resolveTarget, WHERE_ZH, type Box as SceneBox, type NodeKind, type SceneMeta, type SceneNode, type Target } from './scene';
+import { ADJUST_ZH, adjustPalette, colorMap, hexToHsl, fixPalette, mergePalette, MOOD_PALETTES, toneOf, type Tone } from './color';
+import { rankAssets } from './resolve';
+import type { RunResult } from './capabilities';
+import { downloadPhoto, hasSource, searchPhotos, unsplashKey } from './unsplash';
 import { resolvePair, typeFor, usePairing, type Resolved } from './typeset';
 import { Background, Design, ExportFormat, ExportPrefs, EXPORT_DEFAULTS, folderPath, History, parseDesign, renderFilename, safeName, SerialWriter, SnapshotCodec, validSize } from './model';
 import { Platform, PLATFORMS, platformById, platformFor } from './platforms';
 import { BadgeBox } from './badge';
+import type { Palette } from './templates';
 import { arrangeForSubject, builtPalette, canReflow, reserveBelowTitle, rewrap, sourceOf, unwrap, templateById, templatesFor, gradient, hasCjk, textbox, textWidth, tightenCopy } from './templates';
 import { decorInFront, drawDecor } from './decor';
 import { expandPattern, patternById } from './playbook';
@@ -17,10 +25,11 @@ import { renderPattern } from './preview';
 import { MESH_PRESETS, MeshPreset } from './mesh';
 import { glow as kitGlow, grain } from './kit';
 import { Anchor, decorPlacement, defaultSubjectBox, SubjectBox, TitleBox } from './compose';
-import { ensureReadable, thumbCheck } from './quality';
+import { ensureReadable, FEED_WIDTH, readableOn, THUMB_MIN, thumbCheck } from './quality';
 import { addSeries, pickVariants, Series } from './series';
 import { imageStyleById } from './prompts';
-import { Align, AssistantInput, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op, runOps } from './ops';
+import { Align, AssistantInput, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op, OpOf, OpProblem, Placement, TextChange } from './ops';
+import { runOps } from './capabilities';
 import { Key } from './i18n';
 import type CoverPlugin from './main';
 import { renderDrawer, renderInspector, renderLayers } from './panels';
@@ -29,9 +38,12 @@ import { ExportModal, RenameModal, SizeModal, ShortcutsModal, PickFile } from '.
 
 export const VIEW = 'qiaomu-cover-design';
 export interface Variant { id: string; label: string; url: string; spec?: DesignSpec; selected?: boolean }
-export interface ChatMessage { role: 'user' | 'assistant'; text: string; applied?: string[]; retry?: boolean; variants?: Variant[]; variantScroll?: number; tweaks?: boolean }
-export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean };
-export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit'];
+/** One-tap fix offered after an AI turn, e.g. a headline that reads too small in a phone feed. */
+export interface Suggestion { id: string; label: string }
+export interface AssetPick { target: string; chosen: string; items: { cat: AssetCat; id: string }[] }
+export interface ChatMessage { role: 'user' | 'assistant'; text: string; applied?: string[]; /** Notes that need attention (e.g. the model narrated without acting), shown with a warning icon. */ warn?: string[]; retry?: boolean; variants?: Variant[]; variantScroll?: number; tweaks?: boolean; options?: string[]; suggestions?: Suggestion[]; /** Runner-up library items for icons this turn added; tapping one swaps it in. */ picks?: AssetPick[]; /** Canvas state right after this turn, so the chat doubles as a visual version history. */ snapshot?: string }
+export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean; /** Stable short id the assistant refers to (t1, i3…). */ qcId?: string; /** Palette token the colour follows. */ qcTone?: string; /** Library item, e.g. line:guitar or sticker:rocket. */ qcAsset?: string };
+export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit', 'qcId', 'qcTone', 'qcAsset'];
 type Layout = Pick<DesignSpec, 'title' | 'subtitle' | 'badge' | 'points' | 'palette' | 'titleFont' | 'bodyFont'>;
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_SIDE = 2600;
@@ -54,7 +66,7 @@ export class CoverView extends FileView implements CoverApi {
   private unsubscribeFonts?: () => void;
   /** Conversation with the designer. It lives on the view so it survives drawer redraws. */
   pictureRequested = false;
-  chat: ChatMessage[] = []; busy = false; progress = ''; private centerEl?: HTMLElement; private progressEl?: HTMLElement; onChat?: () => void; private lastPrompt = ''; currentPattern?: string; private lastSpec?: DesignSpec; palette?: import('./templates').Palette; private templateId?: string;
+  chat: ChatMessage[] = []; busy = false; progress = ''; private centerEl?: HTMLElement; private progressEl?: HTMLElement; onChat?: () => void; /** Redraws the composer chip when the canvas pick changes. */ onSelection?: () => void; private lastPrompt = ''; currentPattern?: string; private lastSpec?: DesignSpec; palette?: import('./templates').Palette; private templateId?: string;
 
   constructor(leaf: WorkspaceLeaf, public plugin: CoverPlugin) { super(leaf); }
   getViewType(): string { return VIEW; }
@@ -72,7 +84,7 @@ export class CoverView extends FileView implements CoverApi {
     try {
       const raw = await this.app.vault.read(file); const design = parseDesign(raw);
       if (generation !== this.generation) return;
-      this.expected = raw; this.design = design; this.templateId = design.template; this.codec = new SnapshotCodec(); this.history = new History();
+      this.expected = raw; this.design = design; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History();
       await this.plugin.fonts.register(this.doc);
       this.build();
       if (generation !== this.generation || !this.canvas) return;
@@ -80,6 +92,8 @@ export class CoverView extends FileView implements CoverApi {
       await this.afterLoad();
       if (generation !== this.generation || !this.canvas) return;
       this.history.reset(this.snapshot()); this.restoring = false; this.baseRevision = this.revision;
+      // The conversation picks up where this cover left off; rich payloads (variants, snapshots) start empty.
+      this.chat = (this.plugin.settings.chats[file.path] ?? []).map(m => ({ ...m }));
       this.applyZoom(); this.refreshAll(); this.setStatus('saved'); this.updateEmptyHint();
       const brief = this.plugin.takeBrief(file.path); if (brief) void this.autoDesign(brief);
       this.unsubscribeFonts = this.plugin.fonts.onChange(() => { void this.reflowFonts(); this.refreshInspector(true); });
@@ -110,6 +124,22 @@ export class CoverView extends FileView implements CoverApi {
     if (this.saveTimer !== undefined) w?.clearTimeout(this.saveTimer); this.saveTimer = undefined;
     if (this.historyTimer !== undefined) w?.clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
+    if (this.chatTimer !== undefined) w?.clearTimeout(this.chatTimer);
+    this.chatTimer = undefined;
+  }
+  private chatTimer?: number;
+  /** Saves the words of the conversation against this design file (throttled); rich payloads are recomputable on reopen. */
+  persistChat(): void {
+    const w = this.win; if (this.chatTimer !== undefined) w.clearTimeout(this.chatTimer);
+    this.chatTimer = w.setTimeout(() => {
+      this.chatTimer = undefined;
+      const path = this.file?.path; if (!path) return;
+      const keep = this.chat.filter(m => m.text).slice(-30).map(m => ({ role: m.role, text: m.text, ...(m.applied?.length ? { applied: m.applied } : {}) }));
+      const chats = { ...this.plugin.settings.chats };
+      if (keep.length) chats[path] = keep; else delete chats[path];
+      const keys = Object.keys(chats); if (keys.length > 20) delete chats[keys[0]!];
+      this.plugin.settings.chats = chats; void this.plugin.saveSettings();
+    }, 800);
   }
   private setStatus(key: Key): void {
     // Saving is automatic, so it stays silent; only a failure is worth a word.
@@ -257,7 +287,7 @@ export class CoverView extends FileView implements CoverApi {
     const c = this.canvas!;
     c.on('object:modified', () => this.changed()); c.on('object:added', () => this.changed()); c.on('object:removed', () => this.changed());
     c.on('text:changed', e => { const t = e.target as (Textbox & QObject) | undefined; if (t) { t.splitByGrapheme = hasCjk(t.text); this.rehug(t); } this.changed(); });
-    for (const ev of ['selection:created', 'selection:updated', 'selection:cleared'] as const) c.on(ev, () => this.refreshInspector(true));
+    for (const ev of ['selection:created', 'selection:updated', 'selection:cleared'] as const) c.on(ev, () => { this.refreshInspector(true); this.onSelection?.(); });
     c.on('object:moving', e => { if (this.plugin.settings.guides.snap && e.target) this.snapMove(e.target); });
     c.on('mouse:up', () => this.clearSnap()); c.on('mouse:down', () => { this.snapCache = undefined; });
     c.on('text:editing:exited', () => this.refreshInspector(true));
@@ -397,7 +427,7 @@ export class CoverView extends FileView implements CoverApi {
   }
   private commitHistory(): void {
     if (this.historyTimer !== undefined) { this.win.clearTimeout(this.historyTimer); this.historyTimer = undefined; }
-    if (this.restoring || !this.canvas || !this.design || !this.dirty) return;
+    if (this.restoring || !this.canvas || !this.design || !this.dirty || this.inTurn) return;
     this.history.push(this.snapshot()); this.updateHistoryButtons();
   }
   private updateHistoryButtons(): void {
@@ -451,6 +481,15 @@ export class CoverView extends FileView implements CoverApi {
 
   /* ---------- object helpers ---------- */
   selection(): QObject[] { return (this.canvas?.getActiveObjects() ?? []) as QObject[]; }
+  /** What the composer chip shows about the current pick, so "make it bigger" has a visible referent. */
+  selectionLabel(): string | undefined {
+    const o = this.selection()[0];
+    if (!(o instanceof Textbox)) return undefined;
+    const role = (o as QObject).qcRole;
+    const name = role === 'title' ? this.t('roleTitle') : role === 'subtitle' ? this.t('roleSubtitle') : '';
+    const text = o.text.trim().replace(/\s+/g, ' ').slice(0, 16);
+    return name ? `${name}「${text}」` : `「${text}」`;
+  }
   texts(): Textbox[] { return this.selection().filter((o): o is Textbox & QObject => o instanceof Textbox); }
   update(props: Record<string, unknown>, only?: (o: FabricObject) => boolean): void {
     const targets = this.selection().filter(o => !only || only(o));
@@ -534,8 +573,8 @@ export class CoverView extends FileView implements CoverApi {
     this.rehug(box as Textbox & QObject); styleText(box, p, size); (box as QObject).qcShadow = p.shadow && p.shadow.blur === 0 ? 'hard' : undefined;
     box.setCoords(); this.canvas!.requestRenderAll(); this.changed(); this.refreshInspector(true); return box;
   }
-  addShape(type: 'rect' | 'rounded' | 'circle' | 'triangle' | 'line' | 'star'): void {
-    if (!this.canvas || !this.design) return;
+  addShape(type: 'rect' | 'rounded' | 'circle' | 'triangle' | 'line' | 'star'): FabricObject | undefined {
+    if (!this.canvas || !this.design) return undefined;
     const d = this.design; const size = Math.round(Math.min(d.width, d.height) * 0.3); const left = Math.round((d.width - size) / 2), top = Math.round((d.height - size) / 2);
     const common = { left, top, fill: '#2563eb' };
     let o: FabricObject;
@@ -552,7 +591,92 @@ export class CoverView extends FileView implements CoverApi {
       }
     }
     if (type !== 'line') o.set({ left: Math.round((d.width - o.getScaledWidth()) / 2), top: Math.round((d.height - o.getScaledHeight()) / 2) });
-    this.place(o);
+    this.place(o); return o;
+  }
+  /** A shape by its semantic id (basic six or a named path shape), optionally recoloured — what the assistant calls. */
+  addSemanticShape(kind: string, color?: string, place: Placement & { size?: number; tone?: Tone } = {}): boolean {
+    let o: FabricObject | undefined;
+    if ((BASIC_SHAPES as readonly string[]).includes(kind)) o = this.addShape(kind as BasicShape);
+    else {
+      const hit = PATH_SHAPES.find(([id]) => id === kind); if (!hit) return false;
+      this.addPathShape(hit[2]); o = this.canvas?.getActiveObject() ?? undefined;
+    }
+    if (!o) return false; (o as QObject).qcKind = kind;
+    const fill = color ?? (place.tone ? this.currentPalette()[place.tone] : undefined);
+    if (fill) { if (kind === 'line') o.set({ stroke: fill }); else o.set({ fill }); }
+    if (place.tone) (o as QObject).qcTone = place.tone;
+    if (place.size) { const d = this.design!; const k = place.size * Math.min(d.width, d.height) / Math.max(o.getScaledWidth(), o.getScaledHeight(), 1); o.set({ scaleX: o.scaleX * k, scaleY: o.scaleY * k }); }
+    o.setCoords();
+    if (place.to || place.near || place.x !== undefined || place.y !== undefined) this.placeObjects([o as QObject], place, true);
+    this.canvas?.requestRenderAll(); this.changed();
+    return true;
+  }
+  /** A preset text look (caption, display type, pill, highlighter) carrying the assistant's own words. */
+  addTextPreset(id: string, text?: string): boolean {
+    const p = textPresetById(id); if (!p || !this.canvas) return false;
+    const box = this.addTextStyle(p);
+    if (text && text !== box.text) {
+      box.set({ text }); box.splitByGrapheme = hasCjk(text); box.initDimensions(); box.setCoords();
+      this.canvas.requestRenderAll(); this.changed();
+    }
+    return true;
+  }
+  /** The best-matching sticker (or line icon) from the offline library, in the current ink colour. */
+  async addSticker(query: string): Promise<string> {
+    return this.addIcon({ op: 'icon', want: { zh: query.trim(), ...(/[a-z]/i.test(query) ? { en: [query.trim()] } : {}) }, style: 'auto' });
+  }
+  /**
+   * The best library match for a semantic ask (both libraries, every phrasing), sized and placed where it does not cover the
+   * words, in the palette colour it should follow. The runners-up are kept for the chat so the user can swap with one tap.
+   */
+  async addIcon(op: OpOf<'icon'>): Promise<string> {
+    const data = await loadAssets(this.app, this.plugin.manifest.dir ?? '');
+    const ranked = rankAssets(data, op.want, op.style ?? 'auto', 9); const label = op.want.zh ?? op.want.en?.[0] ?? '';
+    const hit = ranked[0];
+    if (!hit) throw new OpProblem(this.zh ? `素材库里没有匹配「${label}」的图标；换一个更常见的说法或英文同义词再试` : `No library match for "${label}"; try a more common word or English synonyms`);
+    const old = op.replace ? this.targets(op.replace)[0] : undefined;
+    const pal = this.currentPalette(); const tone: Tone | undefined = hit.cat === 'line' && !op.color ? op.tone ?? (old?.qcTone as Tone | undefined) ?? 'accent' : undefined;
+    const color = op.color ?? (tone ? pal[tone] : pal.ink);
+    const g = await this.addAssetSvg(assetSvg(hit, color), { asset: `${hit.cat}:${hit.id}`, tone });
+    if (!g) throw new OpProblem('svg');
+    const d = this.design!;
+    if (old) {
+      const b = old.getBoundingRect(); const k = Math.max(b.width, b.height) / Math.max(g.getScaledWidth(), g.getScaledHeight(), 1);
+      g.set({ scaleX: g.scaleX * k, scaleY: g.scaleY * k, left: b.left + b.width / 2, top: b.top + b.height / 2 }); g.setCoords();
+      this.canvas!.remove(old);
+    } else {
+      const side = (op.size ?? 0.17) * Math.min(d.width, d.height); const k = side / Math.max(g.getScaledWidth(), g.getScaledHeight(), 1);
+      g.set({ scaleX: g.scaleX * k, scaleY: g.scaleY * k }); g.setCoords();
+      const place: Placement = op.to || op.near || op.x !== undefined || op.y !== undefined ? op : { ...op, to: 'top-right' };
+      this.placeObjects([g], place, true);
+    }
+    this.canvas!.setActiveObject(g); this.canvas!.requestRenderAll(); this.changed();
+    const id = this.idOf(g); this.touched.add(id);
+    if (ranked.length > 1) this.turnPicks.push({ target: id, chosen: `${hit.cat}:${hit.id}`, items: ranked.slice(1, 9).map(a => ({ cat: a.cat, id: a.id })) });
+    const name = this.zh && hit.cat === 'sticker' ? hit.zh : hit.id; const b = g.getBoundingRect(); const where = regionOf({ x: b.left, y: b.top, w: b.width, h: b.height }, d.width, d.height);
+    return this.zh ? `已${old ? '替换为' : '添加'}${hit.cat === 'line' ? '线性图标' : '贴纸'}：${name}（${WHERE_ZH[where]}）` : `${old ? 'Swapped in' : 'Added'} ${hit.cat === 'line' ? 'line icon' : 'sticker'}: ${hit.id} (${where})`;
+  }
+  /** Swaps an icon for another library item in the same place and size (the chat's runner-up strip). */
+  async swapAsset(targetId: string, cat: AssetCat, id: string): Promise<void> {
+    const old = (this.canvas?.getObjects() as QObject[] | undefined)?.find(o => o.qcId === targetId); if (!old) return;
+    const data = await loadAssets(this.app, this.plugin.manifest.dir ?? '');
+    const item = (cat === 'line' ? data.lines : data.stickers).find(a => a.id === id); if (!item) return;
+    const tone = cat === 'line' ? (old.qcTone as Tone | undefined) ?? 'accent' : undefined; const color = tone ? this.currentPalette()[tone] : this.currentPalette().ink;
+    const b = old.getBoundingRect(); const angle = old.angle; const z = this.canvas!.getObjects().indexOf(old);
+    const g = await this.addAssetSvg(assetSvg(item, color), { asset: `${cat}:${id}`, tone }); if (!g) return;
+    const k = Math.max(b.width, b.height) / Math.max(g.getScaledWidth(), g.getScaledHeight(), 1);
+    g.set({ scaleX: g.scaleX * k, scaleY: g.scaleY * k, left: b.left + b.width / 2, top: b.top + b.height / 2, angle }); g.qcId = targetId;
+    this.canvas!.remove(old); this.canvas!.moveObjectTo(g, Math.max(0, z)); g.setCoords(); this.canvas!.setActiveObject(g); this.canvas!.requestRenderAll(); this.changed(); this.refreshInspector(true);
+  }
+  /** The top Unsplash photo for the query as a full-bleed background. */
+  async addPhotoBackground(query: string): Promise<string> {
+    const src = { key: unsplashKey(this.app, this.plugin.settings.unsplashSecret), proxy: this.plugin.settings.unsplashProxy };
+    if (!hasSource(src)) throw new Error(this.t('photoNoKey'));
+    const photo = (await searchPhotos(src, query.trim()))[0];
+    if (!photo) throw new Error(this.t('photoNone', { query: query.trim() }));
+    const blob = await downloadPhoto(src, photo);
+    await this.addBackgroundPhoto(blob, `Unsplash · ${photo.author}`);
+    return this.t('photoAdded', { author: photo.author });
   }
   removeSelection(): void {
     const c = this.canvas; if (!c) return;
@@ -597,12 +721,17 @@ export class CoverView extends FileView implements CoverApi {
     for (const o of targets) o.set({ lockMovementX: locked, lockMovementY: locked, lockScalingX: locked, lockScalingY: locked, lockRotation: locked, hasControls: !locked, ...(o instanceof Textbox ? { editable: !locked } : {}) });
     this.canvas?.requestRenderAll(); this.changed(); this.refreshInspector(true);
   }
-  align(to: Align): boolean {
-    const c = this.canvas, d = this.design; const target = c?.getActiveObject(); if (!c || !d || !target) return false;
-    const b = target.getBoundingRect();
-    const dx = to === 'left' ? -b.left : to === 'right' ? d.width - (b.left + b.width) : to === 'center' ? d.width / 2 - (b.left + b.width / 2) : 0;
-    const dy = to === 'top' ? -b.top : to === 'bottom' ? d.height - (b.top + b.height) : to === 'middle' ? d.height / 2 - (b.top + b.height / 2) : 0;
-    target.set({ left: target.left + dx, top: target.top + dy }); target.setCoords();
+  /** Snaps the selection (or the assistant's target, which keeps the cover's margin) to an edge or the centre. */
+  align(to: Align, target?: Target): boolean {
+    const c = this.canvas, d = this.design; if (!c || !d) return false;
+    const objs: FabricObject[] = target !== undefined ? this.targets(target) : c.getActiveObject() ? [c.getActiveObject()!] : []; if (!objs.length) return false;
+    const m = target !== undefined ? Math.round(Math.min(d.width, d.height) * 0.06) : 0;
+    for (const o of objs) {
+      const b = o.getBoundingRect();
+      const dx = to === 'left' ? m - b.left : to === 'right' ? d.width - m - (b.left + b.width) : to === 'center' ? d.width / 2 - (b.left + b.width / 2) : 0;
+      const dy = to === 'top' ? m - b.top : to === 'bottom' ? d.height - m - (b.top + b.height) : to === 'middle' ? d.height / 2 - (b.top + b.height / 2) : 0;
+      o.set({ left: o.left + dx, top: o.top + dy }); o.setCoords(); if (target !== undefined) this.touched.add(this.idOf(o as QObject));
+    }
     c.requestRenderAll(); this.changed(); this.refreshInspector(true); return true;
   }
   move(dx: number, dy: number): void {
@@ -642,7 +771,8 @@ export class CoverView extends FileView implements CoverApi {
     d.bg = bg; c.backgroundColor = bg.kind === 'solid' ? bg.color : gradient(d.width, d.height, bg.from, bg.to, bg.angle);
     c.requestRenderAll(); if (record) this.changed();
   }
-  setBackground(spec: { color?: string; from?: string; to?: string; angle?: number }): boolean {
+  setBackground(spec: { color?: string; from?: string; to?: string; angle?: number; mesh?: string }): boolean {
+    if (spec.mesh) { const m = MESH_PRESETS.find(x => x.id === spec.mesh); if (!m) return false; this.applyMesh(m); this.refreshInspector(true); return true; }
     if (spec.color) this.applyBackground({ kind: 'solid', color: spec.color });
     else if (spec.from && spec.to) this.applyBackground({ kind: 'linear', from: spec.from, to: spec.to, angle: spec.angle ?? 135 });
     else return false;
@@ -758,7 +888,7 @@ export class CoverView extends FileView implements CoverApi {
       for (const o of kept.filter(k => !((k as QObject).qcRole === 'image' && !k.clipPath))) c.insertAt(this.belowText(), o);
       for (const o of mine) c.add(o);
     } finally { this.restoring = false; }
-    this.templateId = t.id; d.template = t.id; this.palette = builtPalette(); for (const o of result.objects) (o as QObject).qcTpl = true;
+    this.templateId = t.id; d.template = t.id; this.palette = builtPalette(); d.palette = this.palette; for (const o of result.objects) (o as QObject).qcTpl = true;
     this.applyBackground(result.background, false);
     // A bundled font that is not loaded yet was measured with a fallback face: load it, then lay the template out again with real metrics.
     const faces = [pair.title, pair.body].filter((f): f is string => !!f && this.plugin.fonts.needsLoad(this.doc, f));
@@ -806,12 +936,15 @@ export class CoverView extends FileView implements CoverApi {
     if (spec.platform && spec.platform !== this.platform()?.id && this.setPlatform(spec.platform, false)) notes.push(zh ? `已切换平台：${spec.platform}` : `Platform: ${spec.platform}`);
     const imageOkEarly = this.plugin.ai.imageReady(); const picture = !!spec.imagePrompt && imageOkEarly;
     let role: 'background' | 'side' | undefined = picture ? spec.imageRole ?? 'background' : undefined;
-    let tpl = (spec.template ? templateById(spec.template) : undefined) ?? templatesFor(this.platform()?.id)[0]!;
+    // An omitted template keeps the current one, like every other omitted field; only a blank canvas falls back to the platform default.
+    let tpl = (spec.template ? templateById(spec.template) : undefined) ?? templateById(d.template ?? this.templateId ?? '') ?? templatesFor(this.platform()?.id)[0]!;
     if (role === 'side' && !tpl.slot?.({ width: d.width, height: d.height, title: '', subtitle: '', zh })) role = 'background';
     if (role === 'background' && !tpl.photo) tpl = templateById('photo')!;
     // Re-theming or re-wording must not throw away a picture the user already likes: keep artwork unless this design brings new.
     const newArt = !!spec.imagePrompt || !!spec.subjectPrompt; const keep = newArt ? [] : spec.decor ? ['image', 'subject'] : ['image', 'subject', 'decor'];
-    this.applyTemplate(tpl.id, spec, keep); notes.push(zh ? `已套用模板：${tpl.zh}` : `Template: ${tpl.en}`);
+    // An omitted palette keeps the current colours, so a font-only or copy-only tweak does not reset the theme.
+    const themed = !spec.palette && this.palette ? { ...spec, palette: { ...this.palette } } : spec;
+    this.applyTemplate(tpl.id, themed, keep); notes.push(zh ? `已套用模板：${tpl.zh}` : `Template: ${tpl.en}`);
     this.finishLayout(spec, !!spec.subjectPrompt && imageOkEarly);
     // Vector decoration is free (the chat model drew it), so it never waits on or depends on an image model.
     if (spec.decor?.length) { notes.push(await this.addDecor(spec.decor.slice(0, spec.subjectPrompt && imageOkEarly ? 1 : 2))); this.calm(); }
@@ -894,13 +1027,15 @@ export class CoverView extends FileView implements CoverApi {
     o.set({ scaleX: k * ratio, scaleY: k, left: d.width / 2, top: d.height / 2 }); o.setCoords(); c.add(o); c.setActiveObject(o); c.requestRenderAll(); this.changed(); this.refreshInspector(true);
   }
   /** Drops a sticker or icon on the canvas as an editable vector group, centred and sized to about a fifth of the cover. */
-  async addAssetSvg(svg: string): Promise<void> {
-    const c = this.canvas, d = this.design; if (!c || !d) return;
+  async addAssetSvg(svg: string, meta: { asset?: string; tone?: string } = {}): Promise<QObject | undefined> {
+    const c = this.canvas, d = this.design; if (!c || !d) return undefined;
     const parsed = await loadSVGFromString(svg); const objects = parsed.objects.filter((o): o is FabricObject => !!o); if (!objects.length) throw new Error('empty svg');
-    const group = util.groupSVGElements(objects, parsed.options) as FabricObject;
+    const group = util.groupSVGElements(objects, parsed.options) as QObject;
+    if (meta.asset) group.qcAsset = meta.asset; if (meta.tone) group.qcTone = meta.tone;
     const target = Math.min(d.width, d.height) * 0.22; const scale = target / Math.max(group.width, group.height, 1);
     group.set({ scaleX: scale, scaleY: scale, left: d.width / 2, top: d.height / 2, originX: 'center', originY: 'center' });
     c.add(group); c.setActiveObject(group); group.setCoords(); c.requestRenderAll(); this.changed(); this.refreshInspector(true);
+    return group;
   }
   /** A photo as the full-bleed background: replaces any earlier background picture, sits under everything else. */
   async addBackgroundPhoto(blob: Blob, credit: string): Promise<void> {
@@ -1031,10 +1166,19 @@ export class CoverView extends FileView implements CoverApi {
   }
   assistantInput(prompt: string): AssistantInput {
     const sel = this.selection()[0];
-    const history = this.chat.slice(0, -1).filter(m => m.text).map(m => ({ role: m.role, text: m.text.slice(0, 400) }));
+    // Failed turns (prose-only replies the model narrated without acting) stay OUT of history:
+    // the model imitates its own past replies, so one bad example breeds more.
+    const history = this.chat.slice(0, -1).filter(m => m.text && !m.warn).map(m => ({ role: m.role, text: m.text.slice(0, 400) }));
+    const texts = (this.canvas?.getObjects() ?? []).filter((o): o is Textbox & QObject => o instanceof Textbox);
+    const titleFont = texts.find(o => o.qcRole === 'title')?.fontFamily, bodyFont = texts.find(o => o.qcRole === 'subtitle')?.fontFamily;
+    const template = this.design?.template ?? this.templateId;
+    const book = this.plugin.fonts.all();
     return {
-      prompt, zh: this.zh, fonts: this.plugin.fonts.all().map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
-      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
+      prompt, zh: this.zh, fonts: book.map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
+      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), scene: { nodes: this.sceneNodes(), meta: this.sceneMeta() }, history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
+      state: { ...(template ? { template } : {}), ...(this.palette ? { palette: this.palette } : {}), ...(titleFont ? { titleFont } : {}), ...(bodyFont ? { bodyFont } : {}) },
+      fontBook: book.map(f => ({ family: f.family, source: f.source, ...(f.zh ? { zh: f.zh } : {}), ...(f.mood ? { mood: f.mood } : {}), ...(f.hint ? { hint: f.hint } : {}) })),
+      photoSearch: hasSource({ key: unsplashKey(this.app, this.plugin.settings.unsplashSecret), proxy: this.plugin.settings.unsplashProxy }),
     };
   }
   /** Sends a request to the selected assistant and applies what comes back. Shared by the chat box, retry and auto-design. */
@@ -1042,12 +1186,22 @@ export class CoverView extends FileView implements CoverApi {
     if (this.busy || this.restoring || !this.canvas) return;
     const list = this.plugin.assistantList(); const extras = list.some(p => p.id !== 'ai' && p.id !== 'offline'); const provider = (extras ? list.find(p => p.id === this.plugin.settings.assistant) : list.find(p => p.id === 'ai')) ?? list[0]!;
     this.busy = true; this.lastPrompt = prompt; this.chat.push({ role: 'user', text: display }); this.setProgress(this.t('progressPlan'));
+    this.beginTurn();
     try {
       const generation = this.generation;
       const request = this.assistantInput(prompt);
-      const result = picturePolicy(await provider.run(request), !request.noPicture);
+      let result = picturePolicy(await provider.run(request), !request.noPicture);
       if (generation !== this.generation) return;
-      const proposals = result.designs?.length ? result.designs : request.chooseDesigns ? result.ops.filter((o): o is Extract<Op, { op: 'design' }> => o.op === 'design' && !!o.title) : [];
+      // One silent second chance: models sometimes narrate instead of emitting commands, and a reworded
+      // nudge usually snaps them back to JSON. The miss never reaches the chat or the history.
+      if (!result.ops.length && !result.designs?.length && !result.options?.length) {
+        result = picturePolicy(await provider.run({ ...request, prompt: `${prompt}\n\n${this.t('noOpsHint')}` }), !request.noPicture);
+        if (generation !== this.generation) return;
+      }
+      // Two or more full design commands are layout proposals to choose from; a single design command on an
+      // existing cover is a tweak (new colours, new fonts) and must apply right away, not turn into candidates.
+      const designOps = request.chooseDesigns ? result.ops.filter((o): o is Extract<Op, { op: 'design' }> => o.op === 'design' && !!o.title) : [];
+      const proposals = result.designs?.length ? result.designs : designOps.length > 1 ? designOps : [];
       if (proposals.length) {
         const variants = await this.designChoices(proposals);
         if (generation !== this.generation || !this.canvas) return;
@@ -1055,15 +1209,39 @@ export class CoverView extends FileView implements CoverApi {
         this.chat.push({ role: 'assistant', text: this.t('chooseDirection'), variants });
         return;
       }
+      // The model would rather ask than guess: show its question with tappable answers and change nothing.
+      if (!result.ops.length && result.options?.length) {
+        this.chat.push({ role: 'assistant', text: result.reply || this.t('chatNothing'), options: result.options });
+        return;
+      }
+      // The model narrated a change but issued no commands (or none survived validation): say so, offer a retry,
+      // instead of letting a "done" claim stand over an untouched canvas.
+      if (!result.ops.length) {
+        this.chat.push({ role: 'assistant', text: result.reply || this.t('chatNothing'), warn: [this.t('aiNoOps')], retry: true });
+        return;
+      }
       if (!this.canvas) return;
-      const applied = await this.runAssistantOps(result.ops);
+      const run = await this.runAssistantOps(result.ops); let reply = result.reply;
+      // Closed loop: commands that could not be carried out (a missing #id, no library match) go back to the model once,
+      // with the fresh scene, and its corrected commands run in the same turn and the same undo step.
+      if (run.problems.length && provider.id !== 'offline' && generation === this.generation && this.canvas) {
+        this.setProgress(this.t('progressFix'));
+        const second = picturePolicy(await provider.run({ ...this.assistantInput(prompt), feedback: run.problems }), !request.noPicture);
+        if (generation !== this.generation || !this.canvas) return;
+        if (second.ops.length) { const again = await this.runAssistantOps(second.ops); run.done.push(...again.done); run.problems = again.problems; if (second.reply) reply = second.reply; }
+      }
+      run.done.push(...this.selfCheck());
+      const applied = run.done;
       const designed = result.ops.some(o => o.op === 'design');
-      const message: ChatMessage = { role: 'assistant', text: result.reply || (applied.length ? this.t('chatDone') : this.t('chatNothing')), applied: usefulFeedback(applied), retry: designed, tweaks: applied.length > 0 };
+      const message: ChatMessage = { role: 'assistant', text: reply || (applied.length ? this.t('chatDone') : this.t('chatNothing')), applied: usefulFeedback(applied), retry: designed, tweaks: applied.length > 0 };
+      if (run.problems.length) { message.warn = run.problems; message.retry = true; }
+      if (this.turnPicks.length) message.picks = this.turnPicks.slice(-3);
+      if (applied.length) { message.snapshot = this.snapshot(); message.suggestions = this.thumbSuggestions(); }
       this.chat.push(message);
       if (designed) void this.variantThumbs().then(v => { message.variants = v; this.onChat?.(); }).catch(() => undefined);
     } catch (e) {
       this.chat.push({ role: 'assistant', text: this.t('error', { message: e instanceof Error ? e.message : String(e) }) });
-    } finally { this.busy = false; this.pictureRequested = false; this.setProgress(); }
+    } finally { this.endTurn(); this.busy = false; this.pictureRequested = false; this.setProgress(); this.persistChat(); }
   }
   /**
    * Other layouts for the same words, rendered offline in a blink, so a first pass is a choice and not a gamble. They come from
@@ -1105,8 +1283,22 @@ export class CoverView extends FileView implements CoverApi {
       for (const v of message.variants ?? []) v.selected = v === variant;
       message.text = this.t('directionApplied');
       message.tweaks = true;
+      message.snapshot = this.snapshot();
+      message.suggestions = this.thumbSuggestions();
     } catch (e) { new Notice(this.t('error', { message: e instanceof Error ? e.message : String(e) })); }
-    finally { this.busy = false; this.onChat?.(); }
+    finally { this.busy = false; this.onChat?.(); this.persistChat(); }
+  }
+  /** Returns the canvas to the state captured right after that chat turn — the chat doubles as a version history. */
+  async restoreSnapshot(snapshot: string): Promise<void> {
+    if (this.busy || !this.canvas) return;
+    let d: Design; try { d = this.codec.decode(snapshot); } catch { return; }
+    this.restoring = true;
+    try {
+      this.canvas.discardActiveObject(); await this.canvas.loadFromJSON(d.canvas); this.design = d; await this.afterLoad();
+      this.applyZoom(); this.updatePlatformLabel(); this.renderGuides();
+    } finally { this.restoring = false; }
+    this.dirty = true; ++this.revision; this.refreshAll(); this.commitHistory(); await this.flush();
+    new Notice(this.t('msgRestored'));
   }
   async variantThumbs(n = 3): Promise<Variant[]> {
     const d = this.design, c = this.canvas; if (!d || !c) return [];
@@ -1159,6 +1351,31 @@ export class CoverView extends FileView implements CoverApi {
       .map(o => ({ role: o.qcRole as 'title' | 'subtitle', size: o.fontSize * o.scaleY, text: o.qcWrapped ? unwrap(o.text) : o.text }));
     return thumbCheck(texts, d.width, this.platform()?.id).map(x => x.kind === 'long' ? this.t('thumbLong') : this.t('thumbSmall', { role: this.t(x.role === 'title' ? 'roleTitle' : 'roleSubtitle'), px: x.px ?? 0, min: x.min ?? 0 }));
   }
+  private thumbTexts(): { role: 'title' | 'subtitle'; size: number; text: string }[] {
+    const c = this.canvas; if (!c) return [];
+    return c.getObjects().filter((o): o is Textbox & QObject => o instanceof Textbox && ((o as QObject).qcRole === 'title' || ((o as QObject).qcRole === 'subtitle' && !(o instanceof BadgeBox))))
+      .map(o => ({ role: o.qcRole as 'title' | 'subtitle', size: o.fontSize * o.scaleY, text: o.qcWrapped ? unwrap(o.text) : o.text }));
+  }
+  /** Feed-size problems as one-tap fixes, offered on the assistant message right after a change. */
+  thumbSuggestions(): Suggestion[] {
+    const d = this.design; if (!d) return [];
+    return thumbCheck(this.thumbTexts(), d.width, this.platform()?.id).map(x => x.kind === 'small'
+      ? { id: `small:${x.role}`, label: this.t('sugBigger', { role: this.t(x.role === 'title' ? 'roleTitle' : 'roleSubtitle') }) }
+      : { id: 'long:title', label: this.t('sugShorter') });
+  }
+  /** Runs a feed-size fix: small words grow to the readable floor locally; a long headline asks the designer to shorten it. */
+  async runThumbSuggestion(id: string): Promise<void> {
+    const [kind, role] = id.split(':');
+    if (kind === 'long') { await this.ask(this.t('tweakShortP'), this.t('tweakShort')); return; }
+    const d = this.design; if (!d || (role !== 'title' && role !== 'subtitle')) return;
+    const k = (FEED_WIDTH[this.platform()?.id ?? ''] ?? 150) / d.width;
+    this.styleText(role, { size: Math.ceil(THUMB_MIN[role] / k) });
+    // The turn that offered the fix now reflects the fix: its snapshot and remaining suggestions stay true.
+    const last = [...this.chat].reverse().find(m => m.role === 'assistant' && m.suggestions?.length);
+    if (last) { last.snapshot = this.snapshot(); last.suggestions = this.thumbSuggestions(); }
+    new Notice(this.t('sugDone'));
+    this.onChat?.(); this.persistChat();
+  }
   private patternCache = new Map<string, Promise<string>>();
   /** Thumbnail of a pattern at this canvas's size (cached per platform and size). */
   patternThumb(id: string): Promise<string> {
@@ -1171,7 +1388,14 @@ export class CoverView extends FileView implements CoverApi {
   async applyPatternNow(id: string): Promise<void> {
     const p = patternById(id); if (!p || this.busy || !this.canvas) return;
     this.busy = true;
-    try { const notes = await this.applyDesign({ pattern: id, title: p.sample.title, subtitle: p.sample.subtitle, badge: p.sample.badge, points: p.sample.points }); this.chat.push({ role: 'assistant', text: this.t('patternApplied', { name: this.zh ? p.zh : p.en }), applied: usefulFeedback(notes) }); }
+    try {
+      const notes = await this.applyDesign({ pattern: id, title: p.sample.title, subtitle: p.sample.subtitle, badge: p.sample.badge, points: p.sample.points });
+      // Trying styles is high-frequency and reversible: the canvas and the active card already say it worked,
+      // so a toast is enough. Only warnings worth keeping (readability, failures) stay in the chat.
+      new Notice(this.t('patternApplied', { name: this.zh ? p.zh : p.en }));
+      const applied = usefulFeedback(notes);
+      if (applied.length) this.chat.push({ role: 'assistant', text: this.t('patternApplied', { name: this.zh ? p.zh : p.en }), applied });
+    }
     finally { this.busy = false; this.onChat?.(); }
   }
   /** Touch edit: redraws one picture layer from its own prompt (optionally edited) and keeps its place on the canvas. */
@@ -1198,38 +1422,269 @@ export class CoverView extends FileView implements CoverApi {
     this.plugin.settings.drawer = 'assistant'; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom();
     await this.ask(`${this.t('briefPrefix')}\n${brief}`, brief.length > 140 ? `${brief.slice(0, 140)}…` : brief);
   }
-  styleText(target: 'selection' | 'title' | 'subtitle', change: { text?: string; size?: number; scale?: number; color?: string; font?: string; bold?: boolean; italic?: boolean; align?: 'left' | 'center' | 'right' }): boolean {
+  styleText(target: Target, change: TextChange): boolean {
     const c = this.canvas; if (!c) return false;
     const texts = c.getObjects().filter((o): o is Textbox & QObject => o instanceof Textbox);
-    let targets: Textbox[];
-    if (target === 'selection') targets = this.texts();
-    else {
+    let targets: (Textbox & QObject)[];
+    if (target === 'title' || target === 'subtitle') {
       const info = this.copyText();
       const hit = texts.find(o => o.qcRole === target) ?? texts.find(o => o.text === (target === 'title' ? info.title : info.subtitle));
       targets = hit ? [hit] : [];
-    }
+    } else if (target === 'selection') targets = this.texts() as (Textbox & QObject)[];
+    else targets = this.targets(target).filter((o): o is Textbox & QObject => o instanceof Textbox);
     if (!targets.length && target === 'selection') targets = texts.filter(o => o.qcRole === 'title').slice(0, 1);
     if (!targets.length) return false;
+    const pal = this.currentPalette();
     for (const o of targets) {
       const props: Record<string, unknown> = {};
       if (change.text !== undefined) props.text = change.text;
       if (change.size) props.fontSize = change.size; if (change.scale) props.fontSize = Math.round(o.fontSize * change.scale);
-      if (change.color) props.fill = change.color; if (change.bold !== undefined) props.fontWeight = change.bold ? 'bold' : 'normal';
+      const fill = change.color ?? (change.tone ? pal[change.tone] : undefined);
+      if (fill) { props.fill = fill; o.qcTone = change.tone ?? toneOf(fill, pal); }
+      if (change.bold !== undefined) props.fontWeight = change.bold ? 'bold' : 'normal';
       if (change.italic !== undefined) props.fontStyle = change.italic ? 'italic' : 'normal'; if (change.align) props.textAlign = change.align;
+      if (change.lineHeight) props.lineHeight = change.lineHeight; if (change.letterSpacing !== undefined) props.charSpacing = change.letterSpacing;
+      if (change.highlight !== undefined) props.textBackgroundColor = change.highlight;
+      if (change.stroke !== undefined) { props.stroke = change.stroke || null; props.strokeWidth = change.stroke ? change.strokeWidth ?? Math.max(o.strokeWidth || 0, 4) : 0; props.paintFirst = 'stroke'; }
+      else if (change.strokeWidth !== undefined) { props.strokeWidth = change.strokeWidth; props.paintFirst = 'stroke'; }
       o.set(props); if (change.text !== undefined) o.splitByGrapheme = hasCjk(change.text);
-      if (change.font) { o.set({ fontFamily: change.font }); void this.plugin.fonts.ensure(this.doc, change.font).then(() => { o.initDimensions(); this.canvas?.requestRenderAll(); }); }
-      o.initDimensions(); o.setCoords();
+      if (change.font) { o.set({ fontFamily: change.font }); void this.plugin.fonts.ensure(this.doc, change.font).then(() => { o.initDimensions(); if (o.qcHug) this.rehug(o); this.canvas?.requestRenderAll(); }); }
+      if (change.shadow !== undefined) {
+        const glow = typeof props.fill === 'string' ? props.fill : typeof o.fill === 'string' ? o.fill : '#111111';
+        o.set({ shadow: SHADOWS[change.shadow]?.(glow) ?? null }); o.qcShadow = change.shadow === 'none' ? undefined : change.shadow;
+      }
+      o.initDimensions(); if (o.qcHug && (change.text !== undefined || change.size || change.scale || change.letterSpacing !== undefined)) this.rehug(o); o.setCoords(); this.touched.add(this.idOf(o));
     }
     c.requestRenderAll(); this.changed(); this.refreshInspector(true); return true;
+  }
+
+  /* ---------- scene graph & layer commands (the assistant's hands) ---------- */
+  /** True while an assistant turn runs: its edits become one undo step. */
+  private inTurn = false; private turnStart = new Set<string>(); private touched = new Set<string>(); private turnPicks: AssetPick[] = [];
+  private kindOf(o: QObject): NodeKind {
+    const role = o.qcRole ?? '';
+    if (o instanceof Textbox) return 'text';
+    if (['bgfx', 'grain', 'scrim', 'ghost'].includes(role)) return 'effect';
+    if (o instanceof FabricImage) return role === 'subject' ? 'subject' : 'image';
+    if (role === 'decor' || role === 'flourish') return 'decor';
+    if (o.qcAsset?.startsWith('line:')) return 'icon'; if (o.qcAsset?.startsWith('sticker:')) return 'sticker';
+    return 'shape';
+  }
+  /** The colour a layer shows: text fill, an icon's stroke, a shape's fill (or stroke for lines). */
+  private colorOf(o: FabricObject): string | undefined {
+    const hexOf = (v: unknown): string | undefined => typeof v === 'string' && /^#[\da-f]{6}$/i.test(v) ? v.toLowerCase() : undefined;
+    if (o instanceof Group) { for (const ch of o.getObjects()) { const v = hexOf(ch.stroke) ?? hexOf(ch.fill); if (v) return v; } return undefined; }
+    if ((o as QObject).qcAsset?.startsWith('line:') || o instanceof Line) return hexOf(o.stroke) ?? hexOf(o.fill);
+    return hexOf(o.fill) ?? hexOf(o.stroke);
+  }
+  /** Every layer as a scene node. Layers without an id (or sharing one after a copy) get the next free id for their kind. */
+  sceneNodes(): SceneNode[] {
+    const c = this.canvas; if (!c) return [];
+    const objs = c.getObjects() as QObject[]; const kinds = objs.map(o => this.kindOf(o));
+    const ids = assignIds(objs.map((o, i) => ({ id: o.qcId, kind: kinds[i]! }))); const pal = this.currentPalette();
+    return objs.map((o, i) => {
+      o.qcId = ids[i]; const b = o.getBoundingRect(); const kind = kinds[i]!;
+      const node: SceneNode = { id: ids[i]!, kind, box: { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }, z: i };
+      if (o.qcRole) node.role = o.qcRole;
+      const name = o.qcAsset ?? (kind === 'decor' || kind === 'shape' || kind === 'effect' ? o.qcKind : undefined); if (name) node.name = name;
+      if (o instanceof Textbox) { node.text = o.text.trim(); node.font = o.fontFamily; node.size = Math.round(o.fontSize * o.scaleY); }
+      if (kind !== 'sticker' && kind !== 'image' && kind !== 'subject' && kind !== 'effect') { const col = this.colorOf(o); if (col) { node.color = col; const tone = o.qcTone ?? toneOf(col, pal); if (tone) node.tone = tone; } }
+      if (o.lockMovementX) node.locked = true; if (o.opacity < 0.99) node.opacity = Math.round(o.opacity * 100) / 100; if (o.angle) node.angle = Math.round(o.angle);
+      return node;
+    });
+  }
+  sceneMeta(): SceneMeta {
+    const d = this.design!; const pf = this.platform(); const bg = d.bg?.kind === 'solid' ? d.bg.color : d.bg ? `渐变 ${d.bg.from}→${d.bg.to}` : undefined;
+    return {
+      width: d.width, height: d.height, ...(pf ? { platform: pf.id, platformName: this.zh ? pf.zh : pf.en } : {}),
+      ...(pf?.avoid.length ? { avoid: pf.avoid.map(a => ({ zh: a.zh, en: a.en, x: a.x, y: a.y, w: a.w, h: a.h })) } : {}),
+      palette: { ...this.currentPalette() }, selection: this.selection().map(o => o.qcId).filter((x): x is string => !!x),
+      ...(d.template ? { template: d.template } : {}), ...(bg ? { background: bg + (this.hasMesh() ? '（弥散光）' : '') } : {}),
+    };
+  }
+  /** The id of a layer, assigning ids first when it has none yet. */
+  private idOf(o: QObject): string { if (!o.qcId) this.sceneNodes(); return o.qcId ?? ''; }
+  /** Layers a target names. Throws an `OpProblem` the model can act on when it names nothing. */
+  private targets(target: Target | undefined): QObject[] {
+    const c = this.canvas!, d = this.design!; const nodes = this.sceneNodes();
+    const last = nodes.filter(n => !this.turnStart.has(n.id) && n.kind !== 'effect').map(n => n.id);
+    const ids = resolveTarget(target, nodes, { selection: this.selection().map(o => o.qcId!).filter(Boolean), width: d.width, height: d.height, last });
+    const hit = (c.getObjects() as QObject[]).filter(o => o.qcId && ids.includes(o.qcId));
+    if (!hit.length) throw new OpProblem(target === undefined || target === 'selection' ? (this.zh ? '没有选中的对象；请用场景里的 #id 指定' : 'Nothing is selected; name a layer by its #id') : (this.zh ? `找不到 ${JSON.stringify(target)}；请用场景里存在的 #id` : `No layer matches ${JSON.stringify(target)}; use an #id from the scene`));
+    return hit;
+  }
+  private boxOf(objs: FabricObject[]): SceneBox {
+    const rs = objs.map(o => o.getBoundingRect()); const x = Math.min(...rs.map(r => r.left)), y = Math.min(...rs.map(r => r.top));
+    return { x, y, w: Math.max(...rs.map(r => r.left + r.width)) - x, h: Math.max(...rs.map(r => r.top + r.height)) - y };
+  }
+  /** Moves layers together to a placement; words and platform zones are obstacles for anything that is not itself text. */
+  private placeObjects(objs: QObject[], place: Placement, avoidText: boolean): void {
+    const d = this.design!; const box = this.boxOf(objs);
+    const near = place.near !== undefined ? this.boxOf(this.targets(place.near)) : undefined;
+    const others = this.canvas!.getObjects().filter(o => !objs.includes(o as QObject) && o.visible);
+    const obstacles = avoidText ? others.filter(o => o instanceof Textbox || ['subject'].includes((o as QObject).qcRole ?? '') || (o as QObject).qcAsset).map(o => this.boxOf([o])) : [];
+    const avoid = (this.platform()?.avoid ?? []).map(z => ({ x: z.x * d.width, y: z.y * d.height, w: z.w * d.width, h: z.h * d.height }));
+    const onlyNudge = !place.to && !near && place.x === undefined && place.y === undefined;
+    const to = onlyNudge ? { x: box.x + (place.dx ?? 0) * d.width, y: box.y + (place.dy ?? 0) * d.height }
+      : placeBox({ w: box.w, h: box.h }, { anchor: place.to, near, side: place.side, x: place.x, y: place.y, dx: place.dx, dy: place.dy }, { width: d.width, height: d.height }, obstacles, avoid);
+    const dx = to.x - box.x, dy = to.y - box.y;
+    for (const o of objs) { o.set({ left: o.left + dx, top: o.top + dy }); o.setCoords(); }
+  }
+  private edited(objs: QObject[], note: [string, string]): string {
+    for (const o of objs) { o.setCoords(); this.touched.add(this.idOf(o)); }
+    this.canvas?.requestRenderAll(); this.changed(); this.refreshInspector(true); return this.zh ? note[0] : note[1];
+  }
+  moveLayers(target: Target | undefined, place: Placement): string {
+    const objs = this.targets(target).filter(o => !o.lockMovementX); if (!objs.length) throw new OpProblem(this.zh ? '目标已锁定，先解锁（set lock:false）' : 'Target is locked');
+    this.placeObjects(objs, place, !objs.every(o => o instanceof Textbox) || !!place.to);
+    return this.edited(objs, ['已移动', 'Moved']);
+  }
+  resizeLayers(target: Target | undefined, o: { scale?: number; w?: number }): string {
+    const objs = this.targets(target); const d = this.design!;
+    for (const x of objs) {
+      const b = x.getBoundingRect(); const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+      const k = o.w ? o.w * d.width / Math.max(b.width, 1) : o.scale ?? 1;
+      if (x instanceof Textbox) { x.set({ fontSize: Math.round(x.fontSize * k), width: x.width * k }); x.initDimensions(); if ((x as QObject).qcHug) this.rehug(x as Textbox & QObject); }
+      else x.set({ scaleX: x.scaleX * k, scaleY: x.scaleY * k });
+      x.setCoords(); const nb = x.getBoundingRect(); x.set({ left: x.left + cx - (nb.left + nb.width / 2), top: x.top + cy - (nb.top + nb.height / 2) });
+    }
+    return this.edited(objs, ['已调整大小', 'Resized']);
+  }
+  orderLayers(target: Target | undefined, to: OpOf<'layer'>['to']): string {
+    const c = this.canvas!; const objs = this.targets(target);
+    for (const o of to === 'front' || to === 'forward' ? objs : [...objs].reverse()) {
+      if (to === 'front') c.bringObjectToFront(o); else if (to === 'forward') c.bringObjectForward(o); else if (to === 'backward') c.sendObjectBackwards(o); else c.sendObjectToBack(o);
+    }
+    // Background effects stay at the very bottom whatever happens above them.
+    if (to === 'back') for (const fx of c.getObjects().filter(x => ['bgfx', 'grain'].includes((x as QObject).qcRole ?? '')).reverse()) c.sendObjectToBack(fx);
+    return this.edited(objs, ['已调整图层顺序', 'Reordered']);
+  }
+  removeLayers(target: Target): string {
+    const c = this.canvas!; const objs = this.targets(target); c.discardActiveObject(); c.remove(...objs); c.requestRenderAll(); this.changed(); this.refreshInspector(true);
+    return this.zh ? `已删除 ${objs.length} 个元素` : `Removed ${objs.length}`;
+  }
+  async duplicateLayers(target: Target | undefined, count: number): Promise<string> {
+    const c = this.canvas!, d = this.design!; const objs = this.targets(target); const step = Math.min(d.width, d.height) * 0.04; const made: QObject[] = [];
+    for (let i = 1; i <= count; i++) for (const o of objs) { const copy = await o.clone(PROPS) as QObject; copy.qcId = undefined; copy.set({ left: o.left + step * i, top: o.top + step * i }); c.add(copy); made.push(copy); }
+    return this.edited(made, [`已复制 ${made.length} 个`, `Duplicated ${made.length}`]);
+  }
+  setLayers(target: Target | undefined, o: Omit<OpOf<'set'>, 'op' | 'target'>): string {
+    const objs = this.targets(target);
+    for (const x of objs) {
+      if (o.opacity !== undefined) x.set({ opacity: o.opacity });
+      if (o.rotate !== undefined) x.rotate(o.rotate);
+      if (o.flipX !== undefined) x.set({ flipX: o.flipX }); if (o.flipY !== undefined) x.set({ flipY: o.flipY });
+      if (o.lock !== undefined) x.set({ lockMovementX: o.lock, lockMovementY: o.lock, lockScalingX: o.lock, lockScalingY: o.lock, lockRotation: o.lock, hasControls: !o.lock, ...(x instanceof Textbox ? { editable: !o.lock } : {}) });
+      if (o.radius !== undefined && (x instanceof FabricImage || x instanceof Rect)) this.setCorner(x, o.radius);
+      if (o.fit && x instanceof FabricImage) this.fitImage(x, o.fit);
+    }
+    return this.edited(objs, ['已更新属性', 'Updated']);
+  }
+  /** Paints one layer: text fill, a line icon's strokes, a shape's fill (a line's stroke); decoration groups recolour every painted part. */
+  private paint(o: FabricObject, color: string): boolean {
+    const painted = (v: unknown): boolean => typeof v === 'string' && v !== '' && v !== 'none' && v !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(v);
+    if (o instanceof Textbox) { o.set({ fill: color }); return true; }
+    // A line icon is drawn by its strokes; a one-path icon is not a group, and filling it would turn the outline into a blob.
+    if ((o as QObject).qcAsset?.startsWith('line:') && !(o instanceof Group)) { o.set({ stroke: color, ...(painted(o.fill) ? { fill: color } : {}) }); return true; }
+    if (o instanceof Group) { for (const ch of o.getObjects()) { if (painted(ch.stroke)) ch.set({ stroke: color }); if (painted(ch.fill)) ch.set({ fill: color }); ch.set('dirty', true); } o.set('dirty', true); return true; }
+    if (o instanceof Line) { o.set({ stroke: color }); return true; }
+    if (o instanceof FabricImage) return false;
+    o.set({ fill: color }); return true;
+  }
+  recolorLayers(target: Target | undefined, o: Omit<OpOf<'recolor'>, 'op' | 'target'>): string {
+    const objs = this.targets(target); const pal = this.currentPalette(); const color = o.color ?? (o.tone ? pal[o.tone] : undefined); let skipped = 0;
+    for (const x of objs) {
+      if (color) { if ((x.qcAsset?.startsWith('sticker:')) || !this.paint(x, color)) { skipped++; continue; } x.qcTone = o.tone ?? toneOf(color, pal); }
+      if (o.stroke !== undefined) x.set({ stroke: o.stroke, strokeWidth: o.strokeWidth ?? Math.max(x.strokeWidth || 0, 4), ...(x instanceof Textbox ? { paintFirst: 'stroke' } : {}) });
+      else if (o.strokeWidth !== undefined) x.set({ strokeWidth: o.strokeWidth });
+    }
+    if (skipped === objs.length) throw new OpProblem(this.zh ? '彩色贴纸和图片不能单色化；要换颜色请换成线性图标（icon style:line）' : 'Stickers and pictures cannot be recoloured');
+    return this.edited(objs, ['已换颜色', 'Recoloured']);
+  }
+  distributeLayers(target: Target, axis: 'horizontal' | 'vertical'): string {
+    const objs = this.targets(target); if (objs.length < 3) throw new OpProblem(this.zh ? '等距分布至少需要 3 个元素' : 'Distribute needs at least 3 layers');
+    const h = axis === 'horizontal'; const items = objs.map(o => ({ o, b: o.getBoundingRect() })).sort((a, b) => h ? a.b.left - b.b.left : a.b.top - b.b.top);
+    const first = items[0]!.b, last = items[items.length - 1]!.b; const span = h ? last.left + last.width - first.left : last.top + last.height - first.top;
+    const gap = (span - items.reduce((s, it) => s + (h ? it.b.width : it.b.height), 0)) / (items.length - 1); let at = h ? first.left : first.top;
+    for (const it of items) { const delta = at - (h ? it.b.left : it.b.top); it.o.set(h ? { left: it.o.left + delta } : { top: it.o.top + delta }); at += (h ? it.b.width : it.b.height) + gap; }
+    return this.edited(objs, ['已等距分布', 'Distributed']);
+  }
+  selectLayers(target: Target): string {
+    const c = this.canvas!; const objs = this.targets(target); c.discardActiveObject();
+    c.setActiveObject(objs.length === 1 ? objs[0]! : new ActiveSelection(objs, { canvas: c })); c.requestRenderAll(); this.refreshInspector(true);
+    return this.zh ? `已选中 ${objs.length} 个元素` : `Selected ${objs.length}`;
+  }
+  /** The palette the cover follows: the template's, the saved one, or one read off the canvas for hand-made covers. */
+  currentPalette(): Palette {
+    if (this.palette) return this.palette;
+    const d = this.design; const c = this.canvas; const texts = (c?.getObjects() ?? []).filter((o): o is Textbox & QObject => o instanceof Textbox);
+    const bg = d?.bg?.kind === 'solid' ? d.bg.color : d?.bg?.kind === 'linear' ? d.bg.from : '#ffffff'; const fill = (o?: Textbox): string | undefined => typeof o?.fill === 'string' && /^#[\da-f]{6}$/i.test(o.fill) ? o.fill : undefined;
+    const ink = fill(texts.find(o => o.qcRole === 'title')) ?? readableOn(bg); const sub = fill(texts.find(o => o.qcRole === 'subtitle')) ?? ink;
+    // The accent is the most used saturated colour on the canvas that is not the ink or the ground.
+    const tally = new Map<string, number>();
+    for (const o of c?.getObjects() ?? []) { const col = this.colorOf(o); if (col && ![bg, ink, sub].map(x => x.toLowerCase()).includes(col) && hexToHsl(col)[1] > 0.35) tally.set(col, (tally.get(col) ?? 0) + 1); }
+    const accent = [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '#ef4444';
+    return { bg, bg2: d?.bg?.kind === 'linear' ? d.bg.to : bg, ink, sub, accent, accentInk: readableOn(accent) };
+  }
+  /**
+   * A new palette, applied in place: every colour that was a token becomes the new token (text, icons, shapes, decoration,
+   * gradient stops, the background), layers that remember their token follow it, and nothing moves.
+   */
+  setPalette(o: Omit<OpOf<'palette'>, 'op'>): string {
+    const c = this.canvas, d = this.design; if (!c || !d) return '';
+    const from = this.currentPalette(); const mood = o.mood ? MOOD_PALETTES.find(m => m.id === o.mood) : undefined;
+    let to: Palette = mood ? fixPalette({ ...mood.p }) : o.adjust ? adjustPalette(from, o.adjust) : from;
+    if (o.palette) to = mergePalette(to, o.palette);
+    const map = colorMap(from, to); const swap = (v: unknown): unknown => typeof v === 'string' ? map.get(v.toLowerCase()) ?? v : v;
+    const walk = (x: FabricObject): void => {
+      const q = x as QObject; const tone = q.qcTone as Tone | undefined;
+      if (tone && to[tone]) this.paint(x, to[tone]);
+      else {
+        x.set({ fill: x.fill instanceof Gradient ? x.fill : swap(x.fill), stroke: swap(x.stroke) });
+        if (x instanceof Textbox && x.textBackgroundColor) x.set({ textBackgroundColor: swap(x.textBackgroundColor) as string });
+        if (x.fill instanceof Gradient) for (const st of x.fill.colorStops) st.color = swap(st.color) as string;
+        if (x instanceof Group && !q.qcAsset?.startsWith('sticker:')) x.getObjects().forEach(walk);
+      }
+      x.set('dirty', true);
+    };
+    for (const x of c.getObjects()) if (!(x instanceof FabricImage) && (x as QObject).qcRole !== 'grain') walk(x);
+    const bg = d.bg; if (bg?.kind === 'solid') this.applyBackground({ kind: 'solid', color: map.get(bg.color.toLowerCase()) ?? to.bg }, false);
+    else if (bg?.kind === 'linear') this.applyBackground({ ...bg, from: map.get(bg.from.toLowerCase()) ?? to.bg, to: map.get(bg.to.toLowerCase()) ?? to.bg2 }, false);
+    this.palette = to; d.palette = to;
+    c.requestRenderAll(); this.changed(); this.refreshInspector(true);
+    const name = mood ? (this.zh ? mood.zh : mood.id) : o.adjust ? (this.zh ? ADJUST_ZH[o.adjust] : o.adjust) : '';
+    return this.zh ? `已换配色${name ? `：${name}` : ''}` : `Palette updated${name ? `: ${name}` : ''}`;
+  }
+  /** Starts an assistant turn: pending edits are committed first so the turn becomes exactly one undo step. */
+  private beginTurn(): void {
+    this.commitHistory(); this.inTurn = true; this.turnStart = new Set(this.sceneNodes().map(n => n.id)); this.touched = new Set(); this.turnPicks = [];
+  }
+  private endTurn(): void { this.inTurn = false; if (this.dirty) { this.commitHistory(); void this.flush(); } }
+  /**
+   * Geometry check after a turn for the layers it touched: a new icon or shape that ended up over the words is moved to the
+   * nearest free spot, a layer pushed off the canvas is brought back. Text collisions are only reported.
+   */
+  private selfCheck(): string[] {
+    const d = this.design; if (!d || !this.canvas) return [];
+    const nodes = this.sceneNodes(); const added = nodes.filter(n => !this.turnStart.has(n.id)).map(n => n.id);
+    const issues = layoutIssues(nodes, d, [...new Set([...this.touched, ...added])]); const notes: string[] = [];
+    for (const issue of issues) {
+      const o = (this.canvas.getObjects() as QObject[]).find(x => x.qcId === issue.id); if (!o) continue;
+      if (issue.kind === 'covers-text' && !o.lockMovementX) { this.placeObjects([o], { to: 'top-right' }, true); notes.push(this.zh ? `已把 #${issue.id} 挪开，避免压住文字` : `Moved #${issue.id} off the text`); }
+      else if (issue.kind === 'off-canvas' && !o.lockMovementX) { const b = this.boxOf([o]); this.placeObjects([o], { x: Math.min(0.9, Math.max(0.1, (b.x + b.w / 2) / d.width)), y: Math.min(0.9, Math.max(0.1, (b.y + b.h / 2) / d.height)) }, false); notes.push(this.zh ? `已把 #${issue.id} 移回画布内` : `Brought #${issue.id} back onto the canvas`); }
+      else if (issue.kind === 'text-overlap') notes.push(this.zh ? `#${issue.id} 和 #${issue.other} 两段文字有重叠` : `#${issue.id} overlaps #${issue.other}`);
+    }
+    if (notes.length) { this.canvas.requestRenderAll(); this.changed(); }
+    return notes;
   }
   fontsInUse(): string[] {
     return [...new Set((this.canvas?.getObjects() ?? []).filter((o): o is Textbox => o instanceof Textbox).map(o => o.fontFamily))];
   }
-  async runAssistantOps(ops: Op[]): Promise<string[]> {
-    const done = await runOps(this, ops, this.zh);
+  async runAssistantOps(ops: Op[]): Promise<RunResult> {
+    const result = await runOps(this, ops, this.zh);
     // Any change (a new background, a new colour) can leave words unreadable, so readability is re-checked after every run.
-    if (ops.some(o => o.op !== 'design' && o.op !== 'undo' && o.op !== 'redo')) done.push(...this.qualityPass());
-    return done;
+    if (ops.some(o => o.op !== 'design' && o.op !== 'undo' && o.op !== 'redo')) result.done.push(...this.qualityPass());
+    return result;
   }
 
   /* ---------- images ---------- */
@@ -1302,9 +1757,9 @@ export class CoverView extends FileView implements CoverApi {
     else if (!mod && event.key === 'Escape') run = () => { this.canvas?.discardActiveObject(); this.canvas?.requestRenderAll(); };
     else if (!mod && event.key === 'Delete' || event.key === 'Backspace') run = () => this.removeSelection();
     else if (!mod && !event.altKey && k === 't') run = () => { this.addText(); };
-    else if (!mod && !event.altKey && k === 'r') run = () => this.addShape('rect');
-    else if (!mod && !event.altKey && k === 'o') run = () => this.addShape('circle');
-    else if (!mod && !event.altKey && k === 'l') run = () => this.addShape('line');
+    else if (!mod && !event.altKey && k === 'r') run = () => { this.addShape('rect'); };
+    else if (!mod && !event.altKey && k === 'o') run = () => { this.addShape('circle'); };
+    else if (!mod && !event.altKey && k === 'l') run = () => { this.addShape('line'); };
     else if (event.key === '?') run = () => { new ShortcutsModal(this.plugin).open(); };
     else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
       const n = event.shiftKey ? 10 : 1;

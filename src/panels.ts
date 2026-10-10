@@ -15,10 +15,11 @@ import { Palette, Template, gradient, templateById, templatesFor } from './templ
 import { colorControl, emptyState, field, group, iconButton, numberBox, onEnter, segmented, slider, textButton } from './ui';
 import { openFontPopover } from './fontbrowser';
 import { IMAGE_STYLES, startersFor } from './prompts';
-import { Pattern, patternById, patternsFor, playbookFor } from './playbook';
+import { playbookFor } from './playbook';
 import { MESH_PRESETS, meshCss } from './mesh';
 import { Background } from './model';
 import { bytes } from './ui';
+import { assetThumb, loadAssets, type AssetCat } from './assets';
 
 /* ---------- left rail and drawers ---------- */
 const TABS: { id: DrawerTab; icon: string; key: 'tabTemplates' | 'tabAdd' | 'tabFonts' | 'tabAssistant' }[] = [
@@ -105,11 +106,11 @@ function selectPlaceholder(input: HTMLTextAreaElement): void {
 }
 const STYLE_SW: Record<string, [string, string]> = { auto: ['#e5e7eb', '#cbd5e1'], none: ['#ffffff', '#f1f5f9'], '3d': ['#fde68a', '#fca5a5'], flat: ['#93c5fd', '#f9a8d4'], photo: ['#374151', '#9ca3af'], neon: ['#0f172a', '#a855f7'], minimal: ['#f3f4f6', '#d1d5db'], watercolor: ['#bfdbfe', '#fecdd3'], memphis: ['#fde047', '#34d399'], guofeng: ['#fecaca', '#d6c7a1'], isometric: ['#a5b4fc', '#67e8f9'], collage: ['#e7d9c0', '#fda4af'] };
 
-type TrayTab = 'style' | 'prompt' | 'picture';
-let trayTab: TrayTab | undefined = 'style'; let trayScroll = 0;
-interface TrayCtx { input: HTMLTextAreaElement; picOn: boolean; family: Pattern[]; groups: ReturnType<typeof startersFor>; chips: Record<TrayTab, HTMLElement> }
+type TrayTab = 'template' | 'prompt' | 'picture';
+let trayTab: TrayTab | undefined = 'template'; let trayScroll = 0;
+interface TrayCtx { input: HTMLTextAreaElement; picOn: boolean; templates: Template[]; groups: ReturnType<typeof startersFor>; chips: Record<TrayTab, HTMLElement> }
 /**
- * What you can pick from opens inside the composer card, above the text box, and is driven by the chips under it. Styles are visual
+ * What you can pick from opens inside the composer card, above the text box, and is driven by the chips under it. Templates are visual
  * (a strip of thumbnails that stays open so you can try several); prompts are text rows; picture looks are small pills.
  * A prompt closes the tray after you pick it, because the next thing you do is write.
  */
@@ -119,15 +120,17 @@ function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: 
     host.empty(); host.toggleClass('qc-hidden', !trayTab);
     for (const [id, chip] of Object.entries(ctx.chips)) chip.classList.toggle('is-active', trayTab === id);
     if (!trayTab) return;
-    if (trayTab === 'style') {
+    if (trayTab === 'template') {
+      // The same templates, thumbnails and keep-your-words behaviour as the Templates tab, just one click closer to the composer.
       const strip = host.createDiv('qc-tray-strip'); strip.addEventListener('scroll', () => { trayScroll = strip.scrollLeft; });
-      for (const pt of ctx.family) {
-        const c = strip.createEl('button', { cls: 'qc-tray-card', attr: { type: 'button' } }); c.classList.toggle('is-active', view.currentPattern === pt.id);
-        const thumb = c.createDiv('qc-tray-thumb is-loading'); view.patternThumb(pt.id).then(url => { thumb.removeClass('is-loading'); const img = thumb.createEl('img', { attr: { src: url, alt: pt.zh } }); img.addEventListener('load', () => { const r = Math.min(2.6, Math.max(0.7, img.naturalWidth / Math.max(1, img.naturalHeight))); thumb.style.aspectRatio = String(r); c.style.flexBasis = `${Math.round(Math.min(176, Math.max(76, r * 76)))}px`; }); }, () => thumb.removeClass('is-loading'));
-        c.createSpan({ text: zh ? pt.zh : pt.en, cls: 'qc-tray-name' });
-        c.addEventListener('click', () => { void view.applyPatternNow(pt.id); strip.querySelectorAll('.qc-tray-card').forEach(x => x.classList.toggle('is-active', x === c)); });
+      const copy = view.copyText();
+      for (const t of ctx.templates) {
+        const c = strip.createEl('button', { cls: 'qc-tray-card', attr: { type: 'button', title: view.zh ? t.zhUse : t.enUse } }); c.classList.toggle('is-active', view.design?.template === t.id);
+        const thumb = c.createDiv('qc-tray-thumb is-loading'); templateThumb(view.doc, view.zh, view.design!.width, view.design!.height, t, copy.title, copy.subtitle, { ...(copy.badge ? { badge: copy.badge } : {}), pair: view.pairing(t.id) }).then(url => { thumb.removeClass('is-loading'); const img = thumb.createEl('img', { attr: { src: url, alt: '' } }); img.addEventListener('load', () => { const r = Math.min(2.6, Math.max(0.7, img.naturalWidth / Math.max(1, img.naturalHeight))); thumb.style.aspectRatio = String(r); c.style.flexBasis = `${Math.round(Math.min(176, Math.max(76, r * 76)))}px`; }); }, () => thumb.removeClass('is-loading'));
+        c.createSpan({ text: zh ? t.zh : t.en, cls: 'qc-tray-name' });
+        c.addEventListener('click', () => { void view.action(() => { view.applyTemplate(t.id, {}, true); }); strip.querySelectorAll('.qc-tray-card').forEach(x => x.classList.toggle('is-active', x === c)); });
       }
-      const more = strip.createEl('button', { cls: 'qc-tray-more', attr: { type: 'button' } }); setIcon(more.createSpan(), 'layout-template'); more.createSpan({ text: zh ? '更多版式' : 'More layouts' });
+      const more = strip.createEl('button', { cls: 'qc-tray-more', attr: { type: 'button' } }); setIcon(more.createSpan(), 'layout-template'); more.createSpan({ text: view.t('browseTemplates') });
       more.addEventListener('click', () => { plugin.settings.drawer = 'templates'; void plugin.saveSettings(); view.refreshDrawer(); });
       strip.scrollLeft = trayScroll;
     } else if (trayTab === 'prompt') {
@@ -141,7 +144,7 @@ function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: 
       const wrap = host.createDiv('qc-tray-pills');
       const opt = wrap.createEl('button', { text: view.t('pictureThisTime'), cls: 'qc-tray-pill', attr: { type: 'button', 'aria-pressed': String(view.pictureRequested) } });
       opt.disabled = !ctx.picOn; opt.classList.toggle('is-active', view.pictureRequested);
-      opt.addEventListener('click', () => { view.pictureRequested = !view.pictureRequested; if (view.pictureRequested && plugin.settings.imageStyle === 'none') { plugin.settings.imageStyle = 'auto'; void plugin.saveSettings(); } opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); ctx.chips.picture.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureOptional'); });
+      opt.addEventListener('click', () => { view.pictureRequested = !view.pictureRequested; if (view.pictureRequested && plugin.settings.imageStyle === 'none') { plugin.settings.imageStyle = 'auto'; void plugin.saveSettings(); } opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); ctx.chips.picture.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle'); });
       if (!ctx.picOn) { wrap.createSpan({ text: view.t('pictureOffDesc'), cls: 'qc-hint' }); textButton(wrap, view.t('pictureEnable'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm'); }
       else for (const st of IMAGE_STYLES) {
         const [c1, c2] = STYLE_SW[st.id] ?? ['#e5e7eb', '#cbd5e1'];
@@ -191,14 +194,23 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const cfg = plugin.settings.ai;
   const messages = body.createDiv('qc-chat-messages');
   const compose = body.createDiv('qc-chat-compose'); const trayEl = compose.createDiv('qc-tray qc-hidden');
-  const book = playbookFor(view.platform()?.id); const family = patternsFor(book.family); const current = patternById(view.currentPattern);
+  const book = playbookFor(view.platform()?.id); const current = templateById(view.design?.template ?? '');
+  // The current canvas pick shows above the box, so "make it bigger / change its colour" has a visible referent.
+  const selChip = compose.createDiv({ cls: 'qc-sel-chip qc-hidden' });
+  const updateSelChip = (): void => {
+    const label = view.selectionLabel();
+    selChip.toggleClass('qc-hidden', !label); selChip.empty();
+    if (label) { setIcon(selChip.createSpan({ cls: 'qc-sel-chip-icon' }), 'text-cursor-input'); selChip.createSpan({ text: view.t('selChip', { what: label }) }); }
+  };
+  view.onSelection = updateSelChip; updateSelChip();
   const input = compose.createEl('textarea', { cls: 'qc-chat-input', attr: { rows: '2', placeholder: current ? view.t('chatPlaceholderPattern', { name: view.zh ? current.zh : current.en }) : view.t(sel.value === 'ai' ? 'chatPlaceholderAi' : 'chatPlaceholder') } });
   const bar = compose.createDiv('qc-compose-bar');
-  const styleBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(styleBtn.createSpan({ cls: 'qc-chip-icon' }), 'layout-template'); styleBtn.createSpan({ text: current ? (view.zh ? current.zh : current.en) : view.t('styleChip'), cls: 'qc-chip-label' });
+  const templateBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(templateBtn.createSpan({ cls: 'qc-chip-icon' }), 'layout-template'); templateBtn.createSpan({ text: current ? (view.zh ? current.zh : current.en) : view.t('templateChip'), cls: 'qc-chip-label' });
   const promptBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(promptBtn.createSpan({ cls: 'qc-chip-icon' }), 'message-square-text'); promptBtn.title = view.zh ? '提示词' : 'Prompts'; promptBtn.addClass('is-icon');
   const picOn = sel.value === 'ai' && ai.imageReady();
-  const picBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(picBtn.createSpan({ cls: 'qc-chip-icon' }), 'image');
-  picBtn.createSpan({ text: view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureOptional'), cls: 'qc-chip-label' });
+  // The picture chip only exists when a picture model is actually configured; before that it is noise ("配图可选" meant nothing).
+  const picBtn = bar.createEl('button', { cls: `qc-chip-btn${picOn ? '' : ' qc-hidden'}`, attr: { type: 'button' } }); setIcon(picBtn.createSpan({ cls: 'qc-chip-icon' }), 'image');
+  picBtn.createSpan({ text: view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle'), cls: 'qc-chip-label' });
   bar.createDiv({ cls: 'qc-compose-spacer' });
   // Models are set once and rarely changed, so they live behind one small button instead of taking a row of their own.
   if (sel.value === 'ai') {
@@ -217,8 +229,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const send = iconButton(bar, 'arrow-up', view.t('send'), () => void submit(), 'qc-primary qc-send');
 
   // The chips under the input are the tabs of a tray that opens inside the same card, so choosing and writing feel like one gesture.
-  const tray = buildTray(view, trayEl, { input, picOn, family, groups: startersFor(view.platform()?.id), chips: { style: styleBtn, prompt: promptBtn, picture: picBtn } });
-  styleBtn.addEventListener('click', () => tray.toggle('style')); promptBtn.addEventListener('click', () => tray.toggle('prompt')); picBtn.addEventListener('click', () => tray.toggle('picture'));
+  const tray = buildTray(view, trayEl, { input, picOn, templates: templatesFor(view.platform()?.id), groups: startersFor(view.platform()?.id), chips: { template: templateBtn, prompt: promptBtn, picture: picBtn } });
+  templateBtn.addEventListener('click', () => tray.toggle('template')); promptBtn.addEventListener('click', () => tray.toggle('prompt')); picBtn.addEventListener('click', () => tray.toggle('picture'));
 
   const starters = (): void => {
     const empty = messages.createDiv('qc-chat-empty');
@@ -241,43 +253,74 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     guide.createDiv({ text: `${view.t('playbookAvoid')}：${book.avoid.join('；')}`, cls: 'qc-hint' });
   };
   const draw = (): void => {
-    if (!body.isConnected) { view.onChat = undefined; return; }
+    if (!body.isConnected) { view.onChat = undefined; view.onSelection = undefined; return; }
     messages.empty();
     if (!view.chat.length && !view.busy) { starters(); return; }
     view.chat.forEach((m, index) => {
       const bubble = messages.createDiv({ cls: `qc-msg qc-msg-${m.role}` });
       bubble.createDiv({ text: m.text, cls: 'qc-msg-text' });
       for (const a of m.applied ?? []) { const li = bubble.createDiv('qc-msg-applied'); setIcon(li.createSpan(), 'check'); li.createSpan({ text: a }); }
-      if (index === view.chat.length - 1 && !view.busy) {
-        if (m.variants?.length) {
-          if (!m.variants.some(v => v.spec)) bubble.createDiv({ text: view.t('variantsTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-variants');
-          strip.setAttribute('aria-label', view.t('variantsTitle'));
-          strip.addEventListener('scroll', () => { m.variantScroll = strip.scrollLeft; });
-          strip.addEventListener('keydown', e => {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-            const cards = Array.from(strip.querySelectorAll<HTMLButtonElement>('.qc-variant'));
-            const index = cards.indexOf(view.doc.activeElement as HTMLButtonElement);
-            const next = cards[index + (e.key === 'ArrowRight' ? 1 : -1)];
-            if (next) { e.preventDefault(); next.focus({ preventScroll: true }); next.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
-          });
-          let startX = 0, startY = 0, initialScroll = 0, pointer: number | undefined, dragged = false;
-          strip.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; pointer = e.pointerId; startX = e.clientX; startY = e.clientY; initialScroll = strip.scrollLeft; dragged = false; });
-          strip.addEventListener('pointermove', e => {
-            if (e.pointerId !== pointer || !e.buttons) return;
-            const dx = e.clientX - startX;
-            if (!dragged && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(e.clientY - startY)) { dragged = true; strip.setPointerCapture(e.pointerId); }
-            if (dragged) { e.preventDefault(); strip.scrollLeft = initialScroll - dx; }
-          });
-          const release = (): void => { pointer = undefined; };
-          strip.addEventListener('pointerup', release); strip.addEventListener('pointercancel', release);
-          strip.addEventListener('click', e => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
-          view.win.requestAnimationFrame(() => { strip.scrollLeft = m.variantScroll ?? 0; });
-          for (const v of m.variants) {
-            const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button', title: v.label } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
-            image.addEventListener('load', () => { if (image.naturalWidth > image.naturalHeight) card.style.flexBasis = '176px'; }); card.createSpan({ text: v.label });
-            card.classList.toggle('is-active', !!v.selected); card.setAttribute('aria-pressed', String(!!v.selected)); card.disabled = view.busy;
-            card.addEventListener('click', () => void view.chooseVariant(m, v));
+      for (const w of m.warn ?? []) { const li = bubble.createDiv('qc-msg-applied qc-msg-warn'); setIcon(li.createSpan(), 'alert-triangle'); li.createSpan({ text: w }); }
+      // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
+      if (m.role === 'assistant' && m.snapshot) {
+        const restore = bubble.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button', title: view.t('msgRestore'), 'aria-label': view.t('msgRestore') } });
+        setIcon(restore, 'history');
+        restore.addEventListener('click', () => void view.action(() => view.restoreSnapshot(m.snapshot!)));
+      }
+      // Variant strips stay visible (and clickable) on older messages, so going back to an earlier
+      // candidate is always possible; tweaks and retry act on the current state, so they stay on the last message.
+      if (m.variants?.length) {
+        if (!m.variants.some(v => v.spec)) bubble.createDiv({ text: view.t('variantsTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-variants');
+        strip.setAttribute('aria-label', view.t('variantsTitle'));
+        strip.addEventListener('scroll', () => { m.variantScroll = strip.scrollLeft; });
+        strip.addEventListener('keydown', e => {
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+          const cards = Array.from(strip.querySelectorAll<HTMLButtonElement>('.qc-variant'));
+          const index = cards.indexOf(view.doc.activeElement as HTMLButtonElement);
+          const next = cards[index + (e.key === 'ArrowRight' ? 1 : -1)];
+          if (next) { e.preventDefault(); next.focus({ preventScroll: true }); next.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+        });
+        let startX = 0, startY = 0, initialScroll = 0, pointer: number | undefined, dragged = false;
+        strip.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; pointer = e.pointerId; startX = e.clientX; startY = e.clientY; initialScroll = strip.scrollLeft; dragged = false; });
+        strip.addEventListener('pointermove', e => {
+          if (e.pointerId !== pointer || !e.buttons) return;
+          const dx = e.clientX - startX;
+          if (!dragged && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(e.clientY - startY)) { dragged = true; strip.setPointerCapture(e.pointerId); }
+          if (dragged) { e.preventDefault(); strip.scrollLeft = initialScroll - dx; }
+        });
+        const release = (): void => { pointer = undefined; };
+        strip.addEventListener('pointerup', release); strip.addEventListener('pointercancel', release);
+        strip.addEventListener('click', e => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
+        view.win.requestAnimationFrame(() => { strip.scrollLeft = m.variantScroll ?? 0; });
+        for (const v of m.variants) {
+          const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button', title: v.label } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
+          image.addEventListener('load', () => { if (image.naturalWidth > image.naturalHeight) card.style.flexBasis = '176px'; }); card.createSpan({ text: v.label });
+          card.classList.toggle('is-active', !!v.selected); card.setAttribute('aria-pressed', String(!!v.selected)); card.disabled = view.busy;
+          card.addEventListener('click', () => void view.chooseVariant(m, v));
+        }
+      }
+      // Icons a turn picked from the library keep their runners-up (like layout variants): one tap swaps the icon in place.
+      for (const pick of m.picks ?? []) {
+        bubble.createDiv({ text: view.t('picksTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-picks');
+        void loadAssets(view.app, plugin.manifest.dir ?? '').then(data => {
+          for (const it of [pick.chosen, ...pick.items.map(x => `${x.cat}:${x.id}`)]) {
+            const [cat, id] = it.split(':') as [AssetCat, string]; const item = (cat === 'line' ? data.lines : data.stickers).find(a => a.id === id); if (!item) continue;
+            const b = strip.createEl('button', { cls: 'qc-pick', attr: { type: 'button', title: cat === 'sticker' ? item.zh : item.id, 'aria-pressed': String(it === pick.chosen) } });
+            b.createEl('img', { attr: { src: assetThumb(item), alt: item.zh, draggable: 'false' } }); b.classList.toggle('is-active', it === pick.chosen);
+            b.disabled = view.busy; b.addEventListener('click', () => { if (it === pick.chosen || view.busy) return; void view.action(async () => { await view.swapAsset(pick.target, cat, id); pick.chosen = it; view.persistChat(); draw(); }); });
           }
+        });
+      }
+      if (index === view.chat.length - 1 && !view.busy) {
+        // The model would rather ask than guess: its clarifying question comes with tappable answers.
+        if (m.options?.length) {
+          const chips = bubble.createDiv('qc-tweaks');
+          for (const opt of m.options) { const b = chips.createEl('button', { text: opt, cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => void view.ask(opt)); }
+        }
+        // Feed-size problems found by the quality pass become one-tap fixes.
+        if (m.suggestions?.length) {
+          bubble.createDiv({ text: view.t('sugTitle'), cls: 'qc-msg-sub' }); const chips = bubble.createDiv('qc-tweaks');
+          for (const s of m.suggestions) { const b = chips.createEl('button', { text: s.label, cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => void view.runThumbSuggestion(s.id)); }
         }
         if (m.tweaks) {
           bubble.createDiv({ text: view.t('tweaksTitle'), cls: 'qc-msg-sub' }); const chips = bubble.createDiv('qc-tweaks');
@@ -294,7 +337,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     });
     if (view.busy) { const b = messages.createDiv('qc-msg qc-msg-assistant qc-thinking'); setIcon(b.createSpan(), 'loader-circle'); b.createSpan({ text: view.progress || view.t('thinking') }); }
     messages.scrollTop = messages.scrollHeight; send.disabled = view.busy;
-    picBtn.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureOptional');
+    picBtn.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle');
     const opt = trayEl.querySelector<HTMLButtonElement>('[aria-pressed]'); if (opt) { opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); }
   };
   view.onChat = draw;

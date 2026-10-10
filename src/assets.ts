@@ -4,6 +4,7 @@
  * is read from disk, so inserting never depends on a network; both licences need no attribution.
  */
 import { normalizePath, type App } from 'obsidian';
+import { lucideZh } from './lucidezh';
 
 export type AssetCat = 'sticker' | 'line';
 export interface AssetItem { id: string; cat: AssetCat; zh: string; /** Lower-cased searchable text, Chinese and English. */ hay: string; body: string }
@@ -31,7 +32,7 @@ export function loadAssets(app: App, dir: string): Promise<{ stickers: AssetItem
       const pack = JSON.parse(text) as Pack;
       return {
         stickers: pack.emoji.map(([id, zh, zhTags, en, body]): AssetItem => ({ id, cat: 'sticker', zh, hay: clean(`${zh} ${zhTags} ${en} ${id.replace(/-/g, ' ')}`), body })),
-        lines: pack.line.map(([id, body]): AssetItem => ({ id, cat: 'line', zh: id.replace(/-/g, ' '), hay: clean(id.replace(/-/g, ' ')), body })),
+        lines: pack.line.map(([id, body]): AssetItem => ({ id, cat: 'line', zh: id.replace(/-/g, ' '), hay: clean(`${id.replace(/-/g, ' ')} ${lucideZh(id)}`), body })),
       };
     } catch { cache = undefined; return { stickers: [], lines: [] }; }
   })();
@@ -48,7 +49,8 @@ export function searchAssets(all: { stickers: AssetItem[]; lines: AssetItem[] },
     const rank = new Map(PINNED.map((id, i) => [id, i])); const first = PINNED.map(id => pool.find(p => p.id === id)).filter((p): p is AssetItem => !!p);
     return [...first, ...pool.filter(p => !rank.has(p.id))];
   }
-  if (cat === 'line' && /[㐀-鿿]/.test(q)) q = LINE_ZH[query.trim()] ?? Object.entries(LINE_ZH).find(([k]) => query.includes(k))?.[1] ?? q;
+  // Line icons carry Chinese tags from their name's words; the short list still maps the most common asks to the best icon.
+  if (cat === 'line' && /[㐀-鿿]/.test(q)) q = LINE_ZH[query.trim()] ?? (pool.some(p => p.hay.includes(q)) ? q : Object.entries(LINE_ZH).find(([k]) => query.includes(k))?.[1] ?? q);
   const score = (p: AssetItem): number => p.zh === query.trim() || p.id === q ? 0 : p.zh.includes(query.trim()) ? 1 : p.id.includes(q.replace(/\s+/g, '-')) ? 2 : p.hay.includes(q) ? 3 : 9;
   return pool.map(p => [p, score(p)] as const).filter(([, s]) => s < 9).sort((a, b) => a[1] - b[1]).map(([p]) => p);
 }

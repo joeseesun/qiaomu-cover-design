@@ -12,7 +12,7 @@ import { NewCoverModal, PickFile } from './modals';
 import { CoverSettings, SettingsTab } from './settings';
 import { PROPS, CoverView, VIEW } from './view';
 import { platformById, DEFAULT_PLATFORM } from './platforms';
-import { templateById } from './templates';
+import { builtPalette, templateById } from './templates';
 import { SerialWriter } from './model';
 
 export default class CoverPlugin extends Plugin {
@@ -180,7 +180,8 @@ export default class CoverPlugin extends Plugin {
     const p = platformById(platformId) ?? platformById(this.settings.defaultPlatform) ?? platformById(DEFAULT_PLATFORM)!;
     const result = (templateById(template) ?? templateById('minimal')!).build({ width: p.width, height: p.height, title, subtitle, zh: this.isZh() });
     const bg = result.background;
-    return { format: 'qiaomu-cover-design', schema: 1, width: p.width, height: p.height, source, platform: p.id, bg, canvas: { version: '7.4.0', background: bg.kind === 'solid' ? bg.color : bg.from, objects: result.objects.map(o => o.toObject(PROPS)) } };
+    const palette = builtPalette();
+    return { format: 'qiaomu-cover-design', schema: 1, width: p.width, height: p.height, source, platform: p.id, bg, ...(palette ? { palette } : {}), canvas: { version: '7.4.0', background: bg.kind === 'solid' ? bg.color : bg.from, objects: result.objects.map(o => o.toObject(PROPS)) } };
   }
   saveSettings(): Promise<void> { syncProfiles(this.settings.ai); return this.saveData(this.settings); }
   rememberFont(family: string): void { this.settings.recentFonts = [family, ...this.settings.recentFonts.filter(f => f !== family)].slice(0, 12); void this.saveSettings(); }

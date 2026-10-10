@@ -5,6 +5,7 @@
 import { StaticCanvas, Textbox } from 'fabric';
 import { Notice, setIcon } from 'obsidian';
 import { faceFor, isSingleWeight, pillFor, styleText, TEXT_GROUPS, TEXT_PRESETS, type TextPreset } from './textstyles';
+import { PATH_SHAPES } from './shapes';
 import type { CoverView } from './view';
 import { ASSET_CATS, AssetCat, AssetItem, assetSvg, assetThumb, loadAssets, searchAssets } from './assets';
 import { DECOR, drawDecor } from './decor';
@@ -60,7 +61,7 @@ function assetsTab(view: CoverView, body: HTMLElement, close: () => void): void 
   const input = searchBox(body, zh ? '搜索：火箭、爱心、箭头、礼物…' : 'Search: rocket, heart, arrow…', q => { query = q.trim(); shown = PAGE; render(); });
   const tabs = body.createDiv('qc-assets-tabs'); const tags = body.createDiv('qc-assets-tags'); const grid = body.createDiv('qc-assets-grid'); const foot = body.createDiv('qc-hint qc-assets-foot');
   let data: Awaited<ReturnType<typeof loadAssets>> | undefined;
-  const insert = async (a: AssetItem, ev: MouseEvent): Promise<void> => { try { await view.addAssetSvg(assetSvg(a, view.palette?.ink ?? '#171717')); done(ev, close); } catch (e) { new Notice(e instanceof Error ? e.message : String(e)); } };
+  const insert = async (a: AssetItem, ev: MouseEvent): Promise<void> => { try { await view.addAssetSvg(assetSvg(a, view.palette?.ink ?? '#171717'), { asset: `${a.cat}:${a.id}`, ...(a.cat === 'line' && view.palette ? { tone: 'ink' } : {}) }); done(ev, close); } catch (e) { new Notice(e instanceof Error ? e.message : String(e)); } };
   const render = (): void => {
     tabs.empty(); tags.empty(); grid.empty(); foot.empty();
     for (const c of ASSET_CATS) { const b = tabs.createEl('button', { cls: 'qc-assets-tab', text: zh ? c.zh : c.en, attr: { type: 'button' } }); b.classList.toggle('is-active', c.id === cat); b.addEventListener('click', () => { cat = c.id; shown = PAGE; render(); }); }
@@ -113,20 +114,12 @@ function textTab(view: CoverView, body: HTMLElement, close: () => void): void {
   }
   body.createDiv({ text: zh ? '添加后双击画布改字；右侧能改字体、颜色、描边和阴影。装了字体包，艺术字会自动用更好看的字体。' : 'Double-click to edit; fonts, colours, stroke and shadow are on the right.', cls: 'qc-hint' });
 }
-/** 24 × 24 outlines for the extra shapes; filled with the cover's accent colour. */
-const PATH_SHAPES: [string, string, string][] = [
-  ['diamond', '菱形', 'M12 1 22.5 12 12 23 1.5 12Z'], ['pentagon', '五边形', 'M12 1.5 22.5 9 18.5 21.5h-13L1.5 9Z'], ['hexagon', '六边形', 'M12 1.5 21.5 6.8v10.4L12 22.5 2.5 17.2V6.8Z'],
-  ['cross', '十字', 'M9 2h6v7h7v6h-7v7H9v-7H2V9h7Z'], ['arrow', '箭头', 'M2 9h12V3l8 9-8 9v-6H2Z'], ['chevron', '折角箭头', 'M7 2l10 10L7 22l-3-3 7-7-7-7Z'],
-  ['heart', '爱心', 'M12 21.5S2.5 15.8 2.5 9.2A5.2 5.2 0 0 1 12 6.5a5.2 5.2 0 0 1 9.5 2.7c0 6.600-9.500 12.300-9.500 12.300Z'], ['drop', '水滴', 'M12 2s7.500 8 7.500 13.200a7.500 7.500 0 0 1-15 0C4.500 10 12 2 12 2Z'],
-  ['bubble', '对话框', 'M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-5 4v-4H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z'], ['cloud', '云朵', 'M7 19a4.500 4.500 0 0 1-.8-8.900A6.500 6.500 0 0 1 18.700 11 4 4 0 0 1 18 19Z'],
-  ['half', '半圆', 'M1.500 18a10.500 10.500 0 0 1 21 0Z'], ['burst', '爆炸星', 'M12 1l2.300 5.200L19.800 4l-1.400 5.600L24 12l-5.600 2.400L19.800 20l-5.500-2.200L12 23l-2.300-5.200L4.200 20l1.400-5.600L0 12l5.600-2.400L4.200 4l5.500 2.200Z'],
-  ['ticket', '票券', 'M2 5h20v4a3 3 0 0 0 0 6v4H2v-4a3 3 0 0 0 0-6Z'], ['ribbon', '标签', 'M3 4h18l-3 5 3 5H3Z'], ['moon', '月牙', 'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z'], ['bolt', '闪电', 'M13 1 4 14h6l-1 9 10-14h-6Z'],
-];
+/** 24 × 24 outlines for the extra shapes; filled with the cover's accent colour. Ids and paths live in shapes.ts so the assistant can call them too. */
 function shapeTab(view: CoverView, body: HTMLElement, close: () => void): void {
   const zh = view.zh; body.createDiv({ text: zh ? '基础形状' : 'Basic', cls: 'qc-insert-sub' });
   const sg = body.createDiv('qc-shape-grid');
   const kinds: ['rect' | 'rounded' | 'circle' | 'triangle' | 'line' | 'star', string, string][] = [['rect', 'square', 'rectangle'], ['rounded', 'rectangle-horizontal', 'rounded'], ['circle', 'circle', 'circle'], ['triangle', 'triangle', 'triangle'], ['line', 'minus', 'line'], ['star', 'star', 'star']];
-  for (const [kind, icon, key] of kinds) { const b = iconButton(sg, icon, view.t(key as 'rectangle'), () => undefined, 'qc-shape-btn'); b.addEventListener('click', e => { void view.action(() => view.addShape(kind)); done(e, close); }); }
+  for (const [kind, icon, key] of kinds) { const b = iconButton(sg, icon, view.t(key as 'rectangle'), () => undefined, 'qc-shape-btn'); b.addEventListener('click', e => { void view.action(() => { view.addShape(kind); }); done(e, close); }); }
   body.createDiv({ text: zh ? '更多形状' : 'More shapes', cls: 'qc-insert-sub' });
   const more = body.createDiv('qc-shape-more');
   for (const [id, name, d] of PATH_SHAPES) {

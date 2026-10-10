@@ -14,7 +14,7 @@ test('extracts JSON from fenced or chatty model replies', () => {
 test('design ops keep only known platforms, templates and valid hex colours', () => {
   const out = sanitizeOps({ reply: '好', ops: [{ op: 'design', platform: 'nope', template: 'number', title: ' 7 个技巧 ', badge: '7', palette: { bg: '#fff', ink: 'red', accent: '#EF4444' }, points: ['a', '', 'b'] }] }, catalog);
   assert.equal(out.reply, '好');
-  assert.deepEqual(out.ops, [{ op: 'design', template: 'number', title: '7 个技巧', badge: '7', points: ['a', 'b'], palette: { bg: '#fff', accent: '#ef4444' } }]);
+  assert.deepEqual(out.ops, [{ op: 'design', template: 'number', title: '7 个技巧', badge: '7', points: ['a', 'b'], palette: { bg: '#ffffff', accent: '#ef4444' } }]);
 });
 
 test('a model reply can never trigger export or unknown commands', () => {
@@ -24,7 +24,7 @@ test('a model reply can never trigger export or unknown commands', () => {
 
 test('values are clamped and a bare op object is accepted', () => {
   const out = sanitizeOps({ op: 'style', target: 'title', scale: 99, size: 1, color: 'javascript:x' }, catalog);
-  assert.deepEqual(out.ops[0], { op: 'style', target: 'title', scale: 3, size: 8, text: undefined, color: undefined, font: undefined, bold: undefined, italic: undefined, align: undefined });
+  assert.deepEqual(out.ops[0], { op: 'style', target: 'title', scale: 3, size: 8 });
   assert.equal(sanitizeOps(null, catalog).ops.length, 0);
 });
 
