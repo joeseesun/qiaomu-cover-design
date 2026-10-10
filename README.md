@@ -16,7 +16,9 @@ Create editable covers and posters from your notes, ideas and images—inside Ob
 
 **桌面端 Obsidian 1.11.4+ · MIT 开源 · 基础编辑无需账号 · AI 服务按需配置**
 
-原名 Qiaomu Cover Design，现名 Qiaomu Design。插件 ID 仍为 `qiaomu-cover-design`，设计格式仍为 `.qcover`；改名不会要求你迁移已有设计、模型配置或图片历史。本文按 **0.2.3** 实现整理。
+原名 Qiaomu Cover Design，现名 Qiaomu Design。插件 ID 仍为 `qiaomu-cover-design`，设计格式仍为 `.qcover`；改名不会要求你迁移已有设计、模型配置或图片历史。本文按 **0.2.4** 实现整理。
+
+AI 设计师遵循当前选区：选中元素时只调整选中的元素，多选同样有效；未选中时才调整整张画布。明确的改色指令直接采用指定颜色，生成期间切换选择不会改变本次调整对象。
 
 [安装](#quick-start) · [AI 排版](#ai-layout) · [平台模板](#platforms) · [画布图层](#canvas) · [字体素材](#fonts) · [图库](#gallery) · [AI 生图](#image-ai) · [模型配置](#models) · [导出](#export) · [快捷键](#shortcuts) · [备份隐私](#storage)
 

@@ -30,9 +30,10 @@ ${input.chooseDesigns ? '新封面：{"intent":"…","reply":"选一个喜欢的
 # 精准修改的原则
 1. 最小改动：只动用户点名的东西。“标题大一点”只改标题字号；“换下配色”只换颜色，不动版式、文案和位置；“加个图标”只新增一个图标。局部修改绝不用 design 重做整页。反过来，用户明确说“重新排版 / 重排 / 换个版式 / 换个风格 / 再来一版”时，必须给整页方案（候选模式下输出 designs，否则输出 design），即使同一句话还带着字体、颜色等要求——把这些要求写进每个方案（titleFont、palette 等）。
 2. 指代：用场景里的 #id 指定对象（如 "target":"#i3"）。“这个 / 它 / 选中的”= 选中的对象（target 写 "selection"）；“标题 / 副标题”= 对应 role；“右上角那个图标”= 在场景里按位置找到它的 #id。刚新增的对象用 "last"。
+${input.editScope?.kind === 'selection' || input.scene?.meta.selection.length ? `本轮是严格的选区编辑，目标仅限 ${(input.editScope?.kind === 'selection' ? input.editScope.ids : input.scene?.meta.selection ?? []).map(id => '#' + id).join('、')}。“改成红色 / 换颜色”必须用 recolor + color 修改这些元素；不能使用 palette/background/design/template/platform 或 designs，也不能调整未选中元素。多选时对选区内适用元素一起操作。若要求整页操作，提醒先取消选择。` : '当前没有选区，可按要求调整整张画布。'}
 3. 相对调整（大一点、往左一点、暖一点、暗一点）以场景里的当前值为基准，幅度适中：大小约 ±15%，位置约 ±4% 画布。
 4. 不确定时：用户的话有多种合理解法且做错代价大时，不要硬猜，输出 {"intent":"…","reply":"一个简短的澄清问题","ops":[],"options":["选项A","选项B"]}（2~4 个、每个 ≤20 字）。意思够明确时绝不用 options。
-5. 颜色：优先用 tone（bg / ink / sub / accent / accentInk）让元素跟随配色；插件会自动保证文字反差。`;
+5. 颜色：用户明确指定颜色时使用 color 的准确 HEX，不用 tone 替换；只有没有点名颜色时才用 tone 跟随配色。不要为了反差自行改变用户要求的颜色。`;
 }
 /** Emoji and composition hints that complement the capability cards. */
 function extrasGuide(input: AssistantInput): string {

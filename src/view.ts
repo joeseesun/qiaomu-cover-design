@@ -38,8 +38,9 @@ import { Anchor, decorPlacement, defaultSubjectBox, SubjectBox, TitleBox } from 
 import { contrast, ensureReadable, FEED_WIDTH, readableOn, THUMB_MIN, thumbCheck, toContrast } from './quality';
 import { addSeries, pickVariants, Series } from './series';
 import { imageStyleById } from './prompts';
-import { Align, AssistantInput, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op, OpOf, OpProblem, Placement, TextChange } from './ops';
+import { Align, AssistantInput, AssistantResult, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op, OpOf, OpProblem, Placement, TextChange } from './ops';
 import { runOps } from './capabilities';
+import { guardSelection, simpleColour } from './edit-scope';
 import { Key } from './i18n';
 import type CoverPlugin from './main';
 import { renderDrawer, renderInspector, renderLayers, renameLayersDialog } from './panels';
@@ -102,7 +103,7 @@ export class CoverView extends FileView implements CoverApi {
     try {
       const raw = await this.app.vault.read(file); const design = parseDesign(raw);
       if (generation !== this.generation) return;
-      this.expected = raw; this.design = design; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History(); this.busy = false; this.inTurn = false;
+      this.expected = raw; this.design = design; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History(); this.busy = false; this.inTurn = false; this.turnSelection = undefined; this.turnSelectedObjects = [];
       await this.plugin.fonts.register(this.doc);
       this.build();
       if (generation !== this.generation || !this.canvas) return;
@@ -659,8 +660,10 @@ export class CoverView extends FileView implements CoverApi {
   selection(): QObject[] { return (this.canvas?.getActiveObjects() ?? []) as QObject[]; }
   /** What the composer chip shows about the current pick, so "make it bigger" has a visible referent. */
   selectionLabel(): string | undefined {
-    const o = this.selection()[0];
-    return o instanceof Textbox ? this.layerLabel(o) : undefined;
+    const selected = this.inTurn ? this.turnSelectedObjects : this.selection();
+    if (selected.length > 1) return this.t('selected', { n: selected.length });
+    const o = selected[0];
+    return o instanceof Textbox ? this.layerLabel(o) : o ? o.qcName || this.t(o instanceof FabricImage ? 'image' : 'shape') : undefined;
   }
   /** A text layer named the way people talk about it: 标题「保留的 作品」. */
   layerLabel(o: Textbox): string {
@@ -1406,9 +1409,13 @@ export class CoverView extends FileView implements CoverApi {
     const titleFont = texts.find(o => o.qcRole === 'title')?.fontFamily, bodyFont = texts.find(o => o.qcRole === 'subtitle')?.fontFamily;
     const template = this.design?.template ?? this.templateId;
     const book = this.plugin.fonts.catalog();
+    const nodes = this.sceneNodes(), meta = this.sceneMeta();
+    const ids = this.inTurn ? this.turnSelection : meta.selection;
+    if (this.inTurn) meta.selection = [...(ids ?? [])];
     return {
+      editScope: ids?.length ? { kind: 'selection', ids: [...ids] } : { kind: 'canvas' },
       prompt, zh: this.zh, fonts: book.map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
-      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), scene: { nodes: this.sceneNodes(), meta: this.sceneMeta() }, history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
+      selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), scene: { nodes, meta }, history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !ids?.length && !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
       state: { ...(template ? { template } : {}), ...(this.palette ? { palette: this.palette } : {}), ...(titleFont ? { titleFont } : {}), ...(bodyFont ? { bodyFont } : {}) },
       fontBook: book.map(f => ({ family: f.family, source: f.source, ...(f.zh ? { zh: f.zh } : {}), ...(f.mood ? { mood: f.mood } : {}), ...(f.hint ? { hint: f.hint } : {}), ...(f.cjk !== undefined ? { cjk: f.cjk } : {}) })),
       photoSearch: hasSource({ key: unsplashKey(this.app, this.plugin.settings.unsplashSecret), proxy: this.plugin.settings.unsplashProxy }),
@@ -1425,7 +1432,8 @@ export class CoverView extends FileView implements CoverApi {
     this.beginTurn();
     try {
       const request = this.assistantInput(prompt);
-      let result = picturePolicy(await provider.run(request), !request.noPicture);
+      const colour = this.turnSelection?.length ? simpleColour(prompt) : undefined;
+      let result: AssistantResult = colour ? { reply: this.t('chatSelectionUpdated'), ops: [{ op: 'recolor', target: [...this.turnSelection!], color: colour }] } : picturePolicy(await provider.run(request), !request.noPicture);
       if (generation !== this.generation) return;
       // One silent second chance: models sometimes narrate instead of emitting commands, and a reworded
       // nudge usually snaps them back to JSON. The miss never reaches the chat or the history.
@@ -1433,6 +1441,7 @@ export class CoverView extends FileView implements CoverApi {
         result = picturePolicy(await provider.run({ ...request, prompt: `${prompt}\n\n${this.t('noOpsHint')}` }), !request.noPicture);
         if (generation !== this.generation) return;
       }
+      const scoped = guardSelection(result, request); result = scoped.result;
       // Two or more full design commands are layout proposals to choose from; a single design command on an
       // existing cover is a tweak (new colours, new fonts) and must apply right away, not turn into candidates.
       const designOps = request.chooseDesigns ? result.ops.filter((o): o is Extract<Op, { op: 'design' }> => o.op === 'design' && !!o.title) : [];
@@ -1445,34 +1454,37 @@ export class CoverView extends FileView implements CoverApi {
         return;
       }
       // The model would rather ask than guess: show its question with tappable answers and change nothing.
-      if (!result.ops.length && result.options?.length) {
+      if (!result.ops.length && !scoped.problems.length && result.options?.length) {
         this.chat.push({ role: 'assistant', text: result.reply || this.t('chatNothing'), options: result.options });
         return;
       }
       // The model narrated a change but issued no commands (or none survived validation): say so, offer a retry,
       // instead of letting a "done" claim stand over an untouched canvas.
-      if (!result.ops.length) {
+      if (!result.ops.length && !scoped.problems.length) {
         this.chat.push({ role: 'assistant', text: result.reply || this.t('chatNothing'), warn: [this.t('aiNoOps')], retry: true });
         return;
       }
       if (!this.canvas) return;
-      const run = await this.runAssistantOps(result.ops); let reply = result.reply;
+      const run = await this.runAssistantOps(result.ops); run.problems.push(...scoped.problems); let reply = result.reply;
       // Closed loop: commands that could not be carried out (a missing #id, no library match) go back to the model once,
       // with the fresh scene, and its corrected commands run in the same turn and the same undo step.
-      if (run.problems.length && provider.id !== 'offline' && generation === this.generation && this.canvas) {
+      if (run.problems.length && !colour && provider.id !== 'offline' && generation === this.generation && this.canvas) {
         this.setProgress(this.t('progressFix'));
-        const second = picturePolicy(await provider.run({ ...this.assistantInput(prompt), feedback: run.problems }), !request.noPicture);
+        const secondInput = { ...this.assistantInput(prompt), feedback: run.problems };
+        const correction = guardSelection(picturePolicy(await provider.run(secondInput), !request.noPicture), secondInput);
+        const second = correction.result;
         if (generation !== this.generation || !this.canvas) return;
-        if (second.ops.length) { const again = await this.runAssistantOps(second.ops); run.done.push(...again.done); run.problems = again.problems; if (second.reply) reply = second.reply; }
+        if (second.ops.length) { const again = await this.runAssistantOps(second.ops); run.done.push(...again.done); run.problems = [...again.problems, ...correction.problems]; if (second.reply) reply = second.reply; }
       }
-      run.done.push(...this.selfCheck());
+      if (!this.turnSelection?.length) run.done.push(...this.selfCheck());
+      if (this.turnSelection?.length) reply = this.t(run.problems.length ? 'chatSelectionBlocked' : 'chatSelectionUpdated');
       const applied = run.done;
       const designed = result.ops.some(o => o.op === 'design');
       const message: ChatMessage = { role: 'assistant', text: reply || (applied.length ? this.t('chatDone') : this.t('chatNothing')), applied: usefulFeedback(applied), retry: designed, tweaks: applied.length > 0 };
       if (run.problems.length) { message.warn = run.problems; message.retry = true; }
       if (this.turnNotes.length) message.warn = [...(message.warn ?? []), ...new Set(this.turnNotes)];
       if (this.turnPicks.length) message.picks = this.turnPicks.slice(-3);
-      if (applied.length) { message.snapshot = this.snapshot(); message.suggestions = this.thumbSuggestions(); }
+      if (applied.length) { message.snapshot = this.snapshot(); if (!this.turnSelection?.length) message.suggestions = this.thumbSuggestions(); }
       this.chat.push(message);
       if (designed) void this.variantThumbs().then(v => { message.variants = v; this.onChat?.(); }).catch(() => undefined);
     } catch (e) {
@@ -1720,6 +1732,8 @@ export class CoverView extends FileView implements CoverApi {
   /* ---------- scene graph & layer commands (the assistant's hands) ---------- */
   /** True while an assistant turn runs: its edits become one undo step. */
   private inTurn = false; private turnStart = new Set<string>(); private touched = new Set<string>(); private turnPicks: AssetPick[] = [];
+  private turnSelection?: string[];
+  private turnSelectedObjects: QObject[] = [];
   /** Text the user explicitly recoloured this turn: the readability pass warns about it instead of silently overriding the choice. */
   private chosenColor = new Set<FabricObject>(); private turnNotes: string[] = [];
   private kindOf(o: QObject): NodeKind {
@@ -1921,8 +1935,9 @@ export class CoverView extends FileView implements CoverApi {
   /** Starts an assistant turn: pending edits are committed first so the turn becomes exactly one undo step. */
   private beginTurn(): void {
     this.commitHistory(); this.inTurn = true; this.turnStart = new Set(this.sceneNodes().map(n => n.id)); this.touched = new Set(); this.turnPicks = []; this.chosenColor = new Set(); this.turnNotes = [];
+    this.turnSelectedObjects = [...this.selection()]; this.turnSelection = this.turnSelectedObjects.map(o => this.idOf(o)).filter(Boolean);
   }
-  private endTurn(): void { this.inTurn = false; if (this.dirty) { this.commitHistory(); void this.flush(); } }
+  private endTurn(): void { this.inTurn = false; this.turnSelection = undefined; this.turnSelectedObjects = []; if (this.dirty) { this.commitHistory(); void this.flush(); } }
   /**
    * Geometry check after a turn for the layers it touched: a new icon or shape that ended up over the words is moved to the
    * nearest free spot, a layer pushed off the canvas is brought back. Text collisions are only reported.
@@ -1944,9 +1959,10 @@ export class CoverView extends FileView implements CoverApi {
     return [...new Set((this.canvas?.getObjects() ?? []).filter((o): o is Textbox => o instanceof Textbox).map(o => o.fontFamily))];
   }
   async runAssistantOps(ops: Op[]): Promise<RunResult> {
+    if (this.turnSelection?.length && this.turnSelectedObjects.some(o => !this.canvas?.getObjects().includes(o))) return { done: [], problems: [this.t('chatSelectionMissing')] };
     const result = await runOps(this, ops, this.zh);
     // Any change (a new background, a new colour) can leave words unreadable, so readability is re-checked after every run.
-    if (ops.some(o => o.op !== 'design' && o.op !== 'undo' && o.op !== 'redo')) result.done.push(...this.qualityPass());
+    if (!this.turnSelection?.length && ops.some(o => o.op !== 'design' && o.op !== 'undo' && o.op !== 'redo')) result.done.push(...this.qualityPass());
     return result;
   }
 

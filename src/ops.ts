@@ -107,6 +107,8 @@ export interface CoverApi {
 export interface CanvasItem { role?: string; text?: string; size?: number; color?: string; kind: string }
 export interface AssistantInput {
   prompt: string; zh: boolean; fonts: string[]; platform?: string; size: { width: number; height: number }; selected?: string;
+  /** Frozen when the user sends the request; the model cannot expand this edit boundary. */
+  editScope?: { kind: 'canvas' } | { kind: 'selection'; ids: string[] };
   /** What is on the canvas now, so "make the title bigger" has something to refer to. */
   canvas?: CanvasItem[]; history?: { role: 'user' | 'assistant'; text: string }[]; imageStyle?: string;
   /** Every layer with a stable id, box and colours; preferred over `canvas` when present. */
