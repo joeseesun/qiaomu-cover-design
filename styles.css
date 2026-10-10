@@ -477,8 +477,6 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-root button.qc-drawer-tab.is-active { color: var(--qc-ink); border-bottom-color: var(--qc-ink); font-weight: 600; }
 .qc-drawer-tab-icon { display: inline-flex; } .qc-drawer-tab-icon svg { width: 14px; height: 14px; }
 .qc-drawer-body { padding-top: 12px; }
-.qc-empty-hint { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 26px; border-radius: 14px; text-align: center; background: color-mix(in srgb, var(--qc-paper) 88%, transparent); box-shadow: 0 0 0 1px var(--qc-line); pointer-events: none; }
-.qc-empty-hint-icon svg { width: 22px; height: 22px; color: var(--qc-muted); } .qc-empty-hint-title { font-weight: 600; font-size: 14px; } .qc-empty-hint-body { color: var(--qc-muted); font-size: 12.5px; }
 .qc-mesh-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
 .qc-root button.qc-mesh { position: relative; height: 62px; border-radius: 10px; box-shadow: 0 0 0 1px var(--qc-line); overflow: hidden; text-align: left; }
 .qc-root button.qc-mesh:hover { box-shadow: var(--qc-hov); }

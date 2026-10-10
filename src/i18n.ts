@@ -133,7 +133,7 @@ const T = {
   playbookTitle: ['这个平台怎么做封面', 'How covers work on this platform'], playbookFormulas: ['标题公式', 'Headline formulas'], playbookAvoid: ['避免', 'Avoid'],
   startersMore: ['更多示例提示词', 'More example prompts'],
   fillPlaceholder: ['先把【】里的提示换成你的主题或内容，再发送。', 'Replace the text in 【】 with your own topic or content first.'],
-  openExisting: ['打开已有封面…', 'Open an existing cover…'], emptyHintTitle: ['从这里开始', 'Start here'], emptyHintBody: ['在左边选一个封面套路，或直接说一句话。', 'Pick a cover pattern on the left, or just say what you want.'], togglePanel: ['显示 / 隐藏左侧面板', 'Show / hide the side panel'], openOther: ['打开其他封面…', 'Open another cover…'],
+  openExisting: ['打开已有封面…', 'Open an existing cover…'], togglePanel: ['显示 / 隐藏左侧面板', 'Show / hide the side panel'], openOther: ['打开其他封面…', 'Open another cover…'],
   bgMesh: ['弥散', 'Mesh'], bgMeshHint: ['弥散背景由柔和光斑和细颗粒组成，比普通渐变更有质感；想换回纯色，点“纯色”。', 'Mesh backgrounds use soft light and fine grain, which looks richer than a plain gradient. Pick Solid to go back.'],
   pictureThisTime: ['本次生成配图', 'Generate a picture this time'], pictureThisTimeChip: ['本次配图', 'Picture this time'], pictureOptional: ['配图可选', 'Optional picture'],
   chooseDirection: ['选一个喜欢的方向，再继续调整。', 'Choose a direction, then refine it.'], directionApplied: ['已应用，可以继续调整。', 'Applied. Keep refining.'], previewFailed: ['方案预览失败，请重试。', 'Could not preview the designs. Try again.'],
