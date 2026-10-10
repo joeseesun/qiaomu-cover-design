@@ -106,6 +106,7 @@ const T = {
   chatTitleAi: ['说一句话，我来做封面', 'Say one sentence and I design the cover'], chatIntroAi: ['粘贴文案或只说个主题，我来定标题、版式和配色。做完后还可以接着说“标题再大点”“换个配色”。', 'Paste your text or just a topic. I pick the headline, layout and colours. Then keep refining: “bigger title”, “new colours”.'],
   chatPlaceholderAi: ['粘贴内容，或说想要什么封面…（Enter 发送）', 'Paste your text, or describe the cover… (Enter to send)'],
   chatAiNote: ['模型：{model} · 你的文字会发送到该接口', 'Model: {model} · your text is sent to that endpoint'],
+  chatChanges: ['已完成 {n} 项调整', '{n} changes applied'],
   thinking: ['正在设计…', 'Designing…'], retry: ['换一版', 'Another take'], retryHint: ['请换一个不同的模板和配色再设计一版。', 'Design another version with a different template and palette.'], exportShort: ['导出', 'Export'],
   briefPrefix: ['把下面这段内容做成封面，标题、模板和配色都由你决定：', 'Turn the following into a cover. You decide the headline, template and colours:'],
   imageStyle: ['配图风格', 'Picture style'], imageSkipped: ['配图已跳过：还没开启 AI 配图。到设置里打开“让 AI 给封面配图”。', 'Picture skipped: AI pictures are off. Turn on “Let AI add pictures” in settings.'], imageFailed: ['配图没成功：{message}。版面已完成，可以稍后再试。', 'The picture did not work: {message}. The layout is done; try again later.'], imageDropped: ['封面已关闭，配图已丢弃。', 'The cover was closed; the picture was discarded.'],

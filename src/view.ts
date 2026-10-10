@@ -43,7 +43,7 @@ export interface Variant { id: string; label: string; url: string; spec?: Design
 /** One-tap fix offered after an AI turn, e.g. a headline that reads too small in a phone feed. */
 export interface Suggestion { id: string; label: string }
 export interface AssetPick { target: string; chosen: string; items: { cat: AssetCat; id: string }[] }
-export interface ChatMessage { role: 'user' | 'assistant'; text: string; applied?: string[]; /** Notes that need attention (e.g. the model narrated without acting), shown with a warning icon. */ warn?: string[]; retry?: boolean; variants?: Variant[]; variantScroll?: number; tweaks?: boolean; options?: string[]; suggestions?: Suggestion[]; /** Runner-up library items for icons this turn added; tapping one swaps it in. */ picks?: AssetPick[]; /** Canvas state right after this turn, so the chat doubles as a visual version history. */ snapshot?: string }
+export interface ChatMessage { role: 'user' | 'assistant'; text: string; failed?: boolean; applied?: string[]; /** Notes that need attention (e.g. the model narrated without acting), shown with a warning icon. */ warn?: string[]; retry?: boolean; variants?: Variant[]; variantScroll?: number; tweaks?: boolean; options?: string[]; suggestions?: Suggestion[]; /** Runner-up library items for icons this turn added; tapping one swaps it in. */ picks?: AssetPick[]; /** Canvas state right after this turn, so the chat doubles as a visual version history. */ snapshot?: string }
 export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean; /** Stable short id the assistant refers to (t1, i3…). */ qcId?: string; /** Palette token the colour follows. */ qcTone?: string; /** Library item, e.g. line:guitar or sticker:rocket. */ qcAsset?: string };
 export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit', 'qcId', 'qcTone', 'qcAsset'];
 type Layout = Pick<DesignSpec, 'title' | 'subtitle' | 'badge' | 'points' | 'palette' | 'titleFont' | 'bodyFont'>;
@@ -68,6 +68,7 @@ export class CoverView extends FileView implements CoverApi {
   private unsubscribeFonts?: () => void;
   /** Conversation with the designer. It lives on the view so it survives drawer redraws. */
   pictureRequested = false;
+  chatDraft = '';
   chat: ChatMessage[] = []; busy = false; progress = ''; private centerEl?: HTMLElement; private progressEl?: HTMLElement; onChat?: () => void; /** Redraws the composer chip when the canvas pick changes. */ onSelection?: () => void; private lastPrompt = ''; currentPattern?: string; private lastSpec?: DesignSpec; palette?: import('./templates').Palette; private templateId?: string;
 
   constructor(leaf: WorkspaceLeaf, public plugin: CoverPlugin) { super(leaf); }
@@ -1259,7 +1260,7 @@ export class CoverView extends FileView implements CoverApi {
       this.chat.push(message);
       if (designed) void this.variantThumbs().then(v => { message.variants = v; this.onChat?.(); }).catch(() => undefined);
     } catch (e) {
-      this.chat.push({ role: 'assistant', text: this.t('error', { message: e instanceof Error ? e.message : String(e) }) });
+      this.chat.push({ role: 'assistant', text: this.t('error', { message: e instanceof Error ? e.message : String(e) }), failed: true });
     } finally { this.endTurn(); this.busy = false; this.pictureRequested = false; this.setProgress(); this.persistChat(); }
   }
   /**
