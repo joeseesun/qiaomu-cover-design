@@ -150,7 +150,7 @@ export const PATTERNS: Pattern[] = [
     decor: [{ kind: 'glow', at: 'subject', x: 0, y: 0, w: 2.2, tone: 'accent', opacity: 0.6 }, { kind: 'beam', x: 0.1, y: -0.05, w: 0.4, tone: 'accent', opacity: 0.4 }, { kind: 'burst', at: 'subject', x: -0.5, y: -0.3, w: 0.5, tone: 'accentInk' }],
     picture: { kind: 'subject', at: 'right', hint: 'stylised hero character in a dynamic action pose, dramatic rim lighting, saturated neon colours' }, fonts: ['Dela Gothic One', '得意黑'], copy: '标题 ≤8 字，动词开头，带结果词（秒杀/翻盘/极限）。' }),
   P({ id: 'bili-vlog', family: 'video', zh: '生活 Vlog', en: 'Vlog photo', use: '生活、旅行、日常；真实画面 + 简短标题', enUse: 'Lifestyle with a real photo',
-    sample: { title: '搬进新家的第一天', badge: 'VLOG' }, template: 'photo', palette: { bg: '#111111', ink: '#ffffff' }, decor: [],
+    sample: { title: '搬进新家的第一天', badge: 'VLOG' }, template: 'polaroid', palette: { bg: '#111111', ink: '#ffffff' }, decor: [],
     picture: { kind: 'background', hint: 'bright candid lifestyle photograph, natural window light, warm tones, shallow depth of field, authentic and unposed' }, fonts: ['霞鹜文楷', '思源黑体'], copy: '标题 ≤10 字，像一句日记；图要真实明亮。' }),
   P({ id: 'bili-tutorial', family: 'video', zh: '教程步骤', en: 'Tutorial', use: '教程、攻略、工具；清晰告诉观众学到什么', enUse: 'Tutorials and guides',
     sample: { title: '5 分钟学会 Obsidian', subtitle: '从零到能用', badge: '教程' }, template: 'split', palette: { accent: '#00a1d6' },

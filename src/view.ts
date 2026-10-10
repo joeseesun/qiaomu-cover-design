@@ -956,9 +956,8 @@ export class CoverView extends FileView implements CoverApi {
     const imageOkEarly = this.plugin.ai.imageReady(); const picture = !!spec.imagePrompt && imageOkEarly;
     let role: 'background' | 'side' | undefined = picture ? spec.imageRole ?? 'background' : undefined;
     // An omitted template keeps the current one, like every other omitted field; only a blank canvas falls back to the platform default.
-    let tpl = (spec.template ? templateById(spec.template) : undefined) ?? templateById(d.template ?? this.templateId ?? '') ?? templatesFor(this.platform()?.id)[0]!;
+    const tpl = (spec.template ? templateById(spec.template) : undefined) ?? templateById(d.template ?? this.templateId ?? '') ?? templatesFor(this.platform()?.id)[0]!;
     if (role === 'side' && !tpl.slot?.({ width: d.width, height: d.height, title: '', subtitle: '', zh })) role = 'background';
-    if (role === 'background' && !tpl.photo) tpl = templateById('photo')!;
     // Re-theming or re-wording must not throw away a picture the user already likes: keep artwork unless this design brings new.
     const newArt = !!spec.imagePrompt || !!spec.subjectPrompt; const keep = newArt ? [] : spec.decor ? ['image', 'subject'] : ['image', 'subject', 'decor'];
     // An omitted palette keeps the current colours, so a font-only or copy-only tweak does not reset the theme.

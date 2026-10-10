@@ -22,7 +22,7 @@ export const STARTERS: StarterGroup[] = [
   { id: 'youtube', zh: 'YouTube', en: 'YouTube', platforms: ['youtube', 'wide', 'bilibili-hd'], prompts: [
     sp('yt-tutorial', '教程', 'Tutorial', '做 YouTube 缩略图：视频主题【用 AI 十分钟做出一个 App】。标题不超过 4 个词，黄字黑描边，右侧留人像位置，用红色标签点出“新手”。', 'Make a YouTube thumbnail: video 【Build an app with AI in 10 minutes】. At most 4 words, yellow type with a black outline, leave the right side for a face, red tag saying “Beginner”.'),
     sp('yt-vs', '对比测评', 'Versus review', '做 YouTube 缩略图：主题【iPhone 对比 安卓，谁更值得买】，用对比模板，副标题写【iPhone | Android】。', 'Make a YouTube thumbnail: 【iPhone vs Android — which is worth it】, versus layout, subtitle 【iPhone | Android】.'),
-    sp('yt-mystery', '悬念', 'Curiosity gap', '做 YouTube 缩略图：主题【我连续 30 天只用 AI 工作】。要有悬念和冲击力，全图氛围，配戏剧化光影的主体图，大字压在暗角上。', 'Make a YouTube thumbnail: 【I worked only with AI for 30 days】. Curiosity and impact, full-image look with dramatic lighting, big type on the scrim.'),
+    sp('yt-mystery', '悬念', 'Curiosity gap', '做 YouTube 缩略图：主题【我连续 30 天只用 AI 工作】。要有悬念和冲击力，摄影封面，配戏剧化光影的主体图，大字压在暗角上。', 'Make a YouTube thumbnail: 【I worked only with AI for 30 days】. Curiosity and impact, full-image look with dramatic lighting, big type on the scrim.'),
     sp('yt-top', '榜单', 'Top list', '做 YouTube 缩略图：主题【2026 年最好用的 5 款笔记软件】，数字做钩子，鲜艳高对比。', 'Make a YouTube thumbnail: 【the 5 best note apps of 2026】, number as the hook, vivid and high contrast.'),
     sp('yt-story', '故事', 'Story', '做 YouTube 缩略图：主题【我是怎么被裁员后做出月入十万的产品】，情绪化，深色底，一句话大字。', 'Make a YouTube thumbnail: 【How I built a six-figure product after getting laid off】, emotional, dark backdrop, one big line.'),
     sp('yt-para', '一段话直出', 'Paste a paragraph', '根据下面的视频简介做一张缩略图，把标题压缩到 4 个词以内：\n【粘贴视频简介】', 'Make a thumbnail from this video description, compress the headline to 4 words or fewer:\n【paste description】'),
@@ -32,7 +32,7 @@ export const STARTERS: StarterGroup[] = [
     sp('bili-game', '游戏', 'Gaming', '做 B 站封面：主题【零氪通关全流程】，高饱和对比色，油管冲击风格，右侧留角色位置。', 'Make a Bilibili cover: 【Full no-spend clear】, saturated contrast, impact style, leave the right side for a character.'),
     sp('bili-tech', '数码开箱', 'Unboxing', '做 B 站封面：主题【M5 MacBook 一个月真实体验】，深色科技风，标题不超过 10 个字，加“真实体验”角标。', 'Make a Bilibili cover: 【One month with the M5 MacBook】, dark tech look, headline within 10 characters, add a tag “Honest review”.'),
     sp('bili-series', '系列教程', 'Series', '做 B 站封面：主题【零基础学 Python 第 3 集】，用数字干货模板，数字写 03。', 'Make a Bilibili cover: 【Python from zero, episode 3】, big-number layout with 03.'),
-    sp('bili-vlog', 'Vlog', 'Vlog', '做 B 站封面：主题【在大理住了 30 天】，全图氛围，配一张日落古城的摄影风格图，标题简短有画面感。', 'Make a Bilibili cover: 【30 days in Dali】, full-image look with a sunset old-town photograph, short evocative title.'),
+    sp('bili-vlog', 'Vlog', 'Vlog', '做 B 站封面：主题【在大理住了 30 天】，摄影封面，配一张日落古城的摄影风格图，标题简短有画面感。', 'Make a Bilibili cover: 【30 days in Dali】, full-image look with a sunset old-town photograph, short evocative title.'),
     sp('bili-para', '一段话直出', 'Paste a paragraph', '根据下面的视频简介做 B 站封面，标题要有点击欲：\n【粘贴视频简介】', 'Make a Bilibili cover from this description with a click-worthy headline:\n【paste description】'),
   ] },
   { id: 'short', zh: '竖屏短视频', en: 'Vertical video', platforms: ['vertical'], prompts: [

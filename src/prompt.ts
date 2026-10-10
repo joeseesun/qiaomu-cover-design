@@ -192,12 +192,12 @@ ${playbookPrompt(input.platform, imageOn)}
   · 系列文章 / 周刊 / 播客头图 → serial（badge 写“栏目名 + 期号”）
   · 文化 / 设计 / 潮流 → riso、print、collage；口号 / 金句 → stack（短标题）
   · 每个模板写了能装多少字（“标题 a–b 字”）：标题超出就换一个装得下的模板，或把标题改短，不要硬塞；局部修改（换色、换字）时保留它的“改它时保留”项，那是这个模板的识别度
-  · 渐变类（acid、glass、aurora、photo 无图时）只在用户点名要“弥散 / 玻璃 / 极光 / 暗黑发布会”时用。
+  · 渐变类（acid、glass）只在用户点名要“弥散 / 玻璃 / 极光 / 暗黑发布会”时用。
 - 配色：同一张图里只用一个强调色；深底配亮字，浅底配深字，保证文字和背景明显反差。
 ${imageOn ? `
 # 生图
 design 里可写 imagePrompt（英文，按「主体 + 风格 + 色调 + 构图 + 细节」五段写，不要写任何文字内容；要给标题留出干净的空白区，并写明留在哪一侧；插件会自动追加“无文字、无水印、不模糊不变形”要求）。
-- imageRole=background：整张图做底，插件会自动改用 photo 模板（impact 也可）。imageRole=side：图放进模板的图位，只适合有图位的模板：split、keyword、polaroid、bili、number（竖版）。
+- imageRole=background：整张图做底，保留所选模板的文字版式。imageRole=side：图放进模板的图位，只适合有图位的模板：split、keyword、polaroid、bili、number（竖版）。
 - 用户明确选择本次配图才允许生成；生图服务已配置不代表每次都需要配图。
 - 可参考的风格：${styles}。用户指定了风格就必须采用。
 ` : '\n# 生图\n本次先做文案和版式，不要写 subjectPrompt/imagePrompt，也不要用 image 指令。\n'}${input.imageStyle ? `\n用户偏好的配图风格：${input.imageStyle}\n` : ''}

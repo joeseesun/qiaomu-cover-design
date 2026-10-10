@@ -178,7 +178,7 @@ test('template ids are unique, picture slots stay on the artboard, and the studi
     if (slot) assert.ok(slot.w > 0 && slot.h > 0 && slot.x >= -1 && slot.y >= -1 && slot.x + slot.w <= pf.width + 1 && slot.y + slot.h <= pf.height + 1, `${t.id} slot on ${pf.id}`);
   }
   const gallery = templatesFor('xhs').map(t => t.id);
-  for (const id of ['highlight', 'notes', 'chat', 'keyword', 'riso', 'ticket', 'window', 'newspaper', 'polaroid', 'stack', 'serial', 'aurora']) assert.ok(gallery.includes(id), id);
+  for (const id of ['highlight', 'notes', 'chat', 'keyword', 'riso', 'ticket', 'window', 'newspaper', 'polaroid', 'stack', 'serial']) assert.ok(gallery.includes(id), id);
 });
 
 test('wrapping glues a lone last character back onto its line', () => {

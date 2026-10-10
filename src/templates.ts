@@ -367,24 +367,7 @@ export const TEMPLATES: Template[] = [
       ] };
     },
   },
-  {
-    id: 'photo', zh: '全图氛围', en: 'Full image', fit: [...VIDEO, ...XHS, ...SHORT, ...BANNER], zhUse: '整张图做底 + 底部渐变压字；没有图时是柔和的日出光斑底，配 AI 生图最稳', enUse: 'A full-bleed picture with a gentle bottom scrim; a soft sunrise glow stands in until you add a picture', photo: true,
-    build(i) {
-      const p = palette(i, { bg: '#ff9a8b', bg2: '#ffd9a8', ink: '#ffffff', sub: '#fff6ee', accent: '#1d1d1f', accentInk: '#ffffff' });
-      const { u, m, w, h, wide } = metrics(i); const inner = w - m * 2;
-      const size = fitTitle(i.title, inner, h * (wide ? 0.42 : 0.3), 150 * u, 40, 1.12);
-      const sub = i.subtitle.trim() ? 80 * u : 0; const top = h - m * 0.9 - sub - textHeight(i.title, inner, size, 1.12);
-      const glows = [kitGlow(w * 0.15, h * 0.2, Math.min(w, h) * 0.7, '#ff5fa2', 0.55), kitGlow(w * 0.9, h * 0.35, Math.min(w, h) * 0.65, '#6fb6ff', 0.5), kitGlow(w * 0.55, h * 0.75, Math.min(w, h) * 0.6, '#ffe27a', 0.55)];
-      // The fade starts above the headline and holds at least 0.6 behind the words (ppt-master's editorial rule), so white type reads on any picture.
-      const fadeTop = Math.max(0, Math.min(h * 0.4, top - h * 0.12)); const fh = h - fadeTop; const at = Math.min(0.9, Math.max(0.2, (top - fadeTop) / fh));
-      const scrim = rect(0, fadeTop, w, fh, new Gradient({ type: 'linear', gradientUnits: 'pixels', coords: { x1: 0, y1: 0, x2: 0, y2: fh }, colorStops: [{ offset: 0, color: 'rgba(30,10,24,0)' }, { offset: at, color: 'rgba(30,10,24,0.6)' }, { offset: 1, color: 'rgba(30,10,24,0.72)' }] }), { qcRole: 'scrim' });
-      return { background: linear(p, 160), objects: keep<FabricObject>(
-        ...glows, grain(w, h, 0.08, 23), scrim, ...badge(i.badge, m, m, p, Math.max(20, 30 * u)),
-        textbox(i.title, m, top, inner, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.12, shadow: shadowSoft(u) }),
-        textbox(i.subtitle, m, h - m * 0.9 - 48 * u, inner, { qcRole: 'subtitle', fontSize: Math.max(22, 32 * u), fill: p.sub }),
-      ) };
-    },
-  },
+
   {
     id: 'compare', zh: '对比', en: 'Versus', fit: [...XHS, ...VIDEO], zhUse: '左右两栏对比：副标题用 “A | B” 或“前 | 后”，评测 / 前后效果', enUse: 'Two panels; subtitle as “A | B”; reviews and before/after',
     build(i) {
@@ -916,9 +899,6 @@ const lineW = (line: string, size: number, weight = 'bold', spacing = -18): numb
 function echoOf(title: Textbox, text: string, left: number, top: number, width: number, o: TextOptions): Textbox {
   const e = textbox(text, left, top, width, o); e.set({ fontFamily: title.fontFamily, fontWeight: title.fontWeight }); return e;
 }
-const scrimFade = (x: number, y: number, w: number, h: number, horizontal: boolean, from: string, to: string): Rect =>
-  rect(x, y, w, h, new Gradient({ type: 'linear', gradientUnits: 'pixels', coords: horizontal ? { x1: 0, y1: 0, x2: w, y2: 0 } : { x1: 0, y1: 0, x2: 0, y2: h }, colorStops: [{ offset: 0, color: from }, { offset: 1, color: to }] }), { qcRole: 'scrim' });
-
 /** Polaroid geometry, shared by the picture slot and the build. */
 function polaroidFrame(i: TemplateInput): { x: number; y: number; w: number; h: number; b: number; photo: Slot } {
   const { m, w, h } = metrics(i); const side = w / h > 1.2;
@@ -1188,34 +1168,18 @@ const STUDIO: Template[] = [
       ) };
     },
   },
-  {
-    id: 'aurora', zh: '极光暗场', en: 'Aurora dark', fit: [...VIDEO, ...BANNER, ...XHS], zhUse: '近黑底 + 顶部紫青粉极光 + 胶囊标签 + 居中白色大标题；产品发布、AI、开发者内容（发布会页面的语汇）', enUse: 'Near-black with an aurora at the top, a pill label and a centred white headline; launches, AI and developer content',
-    build(i) {
-      const p = palette(i, { bg: '#07080c', bg2: '#0d0f18', ink: '#f5f5f7', sub: '#a1a1aa', accent: '#8b7bff', accentInk: '#ffffff' });
-      const { u, m, w, h, wide } = metrics(i); const inner = w - m * 2; const tw = wide ? inner * 0.8 : inner;
-      const size = fitTitle(i.title, tw, h * (wide ? 0.44 : 0.34), 190 * u, 36, 1.06); const th = textHeight(i.title, tw, size, 1.06);
-      const ps = Math.max(20, size * 0.2); const pillH = i.badge?.trim() ? ps * 1.8 + 34 * u : 0; const subSize = Math.max(24, size * 0.3); const subH = i.subtitle.trim() ? textHeight(i.subtitle, inner, subSize, 1.25) + 30 * u : 0;
-      const top = (h - th - pillH - subH) / 2 + pillH + h * 0.05; const R = Math.max(w, h);
-      return { background: linear(p, 180), objects: keep<FabricObject>(
-        kitGlow(w * 0.28, -h * 0.06, R * 0.42, p.accent, 0.8), kitGlow(w * 0.6, -h * 0.12, R * 0.4, '#22d3ee', 0.55), kitGlow(w * 0.84, h * 0.02, R * 0.28, '#f472b6', 0.5),
-        scrimFade(0, h * 0.45, w, h * 0.55, false, 'rgba(7,8,12,0)', 'rgba(7,8,12,0.92)'), grain(w, h, 0.07, 137),
-        ...(i.badge?.trim() ? [pill('✦ ' + i.badge.trim(), 0, top - pillH, 'rgba(255,255,255,0.12)', p.ink, ps, { qcRole: 'badge', radius: 0.5 })].map(b => { b.set({ left: w / 2 - b.width / 2 }); return b; }) : []),
-        textbox(i.title, m + (inner - tw) / 2, top, tw, { qcRole: 'title', fontSize: size, fill: p.ink, fontWeight: 'bold', lineHeight: 1.06, textAlign: 'center' }),
-        ...sub(i, m, top + th + 30 * u, inner, subSize, p.sub, { textAlign: 'center' }),
-      ) };
-    },
-  },
+
 ];
 
 // Premium styles first; the three plainest classics (editorial, centred label, old sticker) are superseded by these.
 const RETIRED = new Set(['editorial', 'center', 'sticker', 'dark', 'gradient', 'checklist', 'soft', 'compare', 'split', 'impact', 'bili']);
 for (let k = TEMPLATES.length - 1; k >= 0; k--) if (RETIRED.has(TEMPLATES[k]!.id)) TEMPLATES.splice(k, 1);
-const MOODY = new Set(['neon', 'cinema', 'quote', 'aurora']); // dark by nature: still available, but never the first thing a new user sees
+const MOODY = new Set(['neon', 'cinema', 'quote']); // dark by nature: still available, but never the first thing a new user sees
 TEMPLATES.unshift(...GAODING, ...STUDIO.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => !MOODY.has(t.id)), ...PREMIUM.filter(t => MOODY.has(t.id)), ...STUDIO.filter(t => MOODY.has(t.id)));
 // The first screen of the gallery alternates quiet and loud, paper and colour, so the range is visible without scrolling.
 const LEAD = ['folio', 'brush', 'keyword', 'regeng', 'highlight', 'frame', 'sage', 'notes', 'interview', 'riso', 'kicker', 'numeral', 'calendar', 'ticket', 'corner', 'polaroid', 'serial', 'chat', 'window', 'newspaper', 'stack', 'bili', 'pop'];
 // Looks built on mesh gradients and soft glows read as generic in a feed, so they are offered last.
-const GRADIENT_LED = new Set(['acid', 'glass', 'photo', 'aurora']); TEMPLATES.sort((x, y) => (LEAD.indexOf(x.id) + 1 || (GRADIENT_LED.has(x.id) ? 199 : 99)) - (LEAD.indexOf(y.id) + 1 || (GRADIENT_LED.has(y.id) ? 199 : 99)));
+const GRADIENT_LED = new Set(['acid', 'glass']); TEMPLATES.sort((x, y) => (LEAD.indexOf(x.id) + 1 || (GRADIENT_LED.has(x.id) ? 199 : 99)) - (LEAD.indexOf(y.id) + 1 || (GRADIENT_LED.has(y.id) ? 199 : 99)));
 
 /**
  * Typographic finish applied to every template, so the system is consistent rather than each layout inventing its own rules:
