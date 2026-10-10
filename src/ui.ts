@@ -30,7 +30,7 @@ export function segmented<T extends string>(parent: HTMLElement, options: { valu
     const b = seg.createEl('button', { cls: 'qc-seg-btn', attr: { type: 'button' } });
     if (o.icon) setIcon(b, o.icon);
     if (o.label) b.createSpan({ text: o.label, cls: o.icon ? 'qc-sr-only' : '' });
-    if (o.disabled) b.disabled = true;
+    b.disabled = Boolean(o.disabled);
     b.classList.toggle('is-active', o.value === value); b.setAttribute('aria-pressed', String(o.value === value));
     b.addEventListener('click', () => {
       for (const sibling of Array.from(seg.children)) { sibling.classList.remove('is-active'); sibling.setAttribute('aria-pressed', 'false'); }

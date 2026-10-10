@@ -107,7 +107,7 @@ export class ExportModal extends Modal {
   onOpen(): void {
     const view = this.view; const t = view.t.bind(view); const d = view.design!; const note = d.source ? view.app.vault.getAbstractFileByPath(d.source) : null; const hasNote = note instanceof TFile;
     const platform = platformFor(d.width, d.height, d.platform);
-    this.titleEl.setText(t('export')); this.modalEl.addClass('qc-modal-wide'); this.contentEl.addClass('qc-modal');
+    this.titleEl.setText(t('export')); this.modalEl.addClass('qc-modal-wide', 'qc-export-modal'); this.contentEl.addClass('qc-modal');
     if (!hasNote && this.prefs.destination === 'note') this.prefs.destination = 'folder';
     const wrap = this.contentEl.createDiv('qc-export');
     const update = (): void => this.schedule();
@@ -144,7 +144,7 @@ export class ExportModal extends Modal {
 
     const fFormat = cols.createDiv('qc-export-field');
     fFormat.createSpan({ text: t('format'), cls: 'qc-label' });
-    segmented<ExportFormat>(fFormat, [{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG' }, { value: 'webp', label: 'WebP' }], this.prefs.format, v => { this.prefs.format = v; syncQuality(); update(); });
+    segmented<ExportFormat>(fFormat, [{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPG' }, { value: 'webp', label: 'WebP' }], this.prefs.format, v => { this.prefs.format = v; syncQuality(); update(); });
 
     const fScale = cols.createDiv('qc-export-field');
     fScale.createSpan({ text: t('exportSize'), cls: 'qc-label' });
@@ -177,23 +177,23 @@ export class ExportModal extends Modal {
       { value: 'folder', label: t('destFolder') },
       { value: 'note', label: t('destNote'), disabled: !hasNote },
       { value: 'system', label: t('destSystem') },
-    ], this.prefs.destination, v => { this.prefs.destination = v; pathErr.addClass('qc-hidden'); drawDest(); });
+    ], this.prefs.destination, v => { this.prefs.destination = v; pathErr.addClass('qc-hidden'); drawDest(); update(); });
     const detail = where.createDiv('qc-dest-detail');
     const pathErr = where.createDiv({ cls: 'qc-export-error qc-hidden' });
     const drawDest = (): void => {
       detail.empty();
       if (this.prefs.destination === 'folder') {
         const row = detail.createDiv('qc-row qc-row-tight'); const input = row.createEl('input', { type: 'text', cls: 'qc-input', attr: { spellcheck: 'false' } }); input.value = this.prefs.folder || view.plugin.settings.exportFolder;
-        input.addEventListener('input', () => { this.prefs.folder = input.value.trim(); });
-        textButton(row, t('choose'), () => new PickFolder(view.app, p => { this.prefs.folder = p; input.value = p; }, t('folderPick')).open(), 'qc-btn-sm', 'folder-open');
+        input.addEventListener('input', () => { this.prefs.folder = input.value.trim(); update(); });
+        textButton(row, t('choose'), () => new PickFolder(view.app, p => { this.prefs.folder = p; input.value = p; update(); }, t('folderPick')).open(), 'qc-btn-sm', 'folder-open');
         detail.createDiv({ text: t('destFolderHint'), cls: 'qc-hint' });
       } else if (this.prefs.destination === 'note') {
         detail.createDiv({ text: t('destNoteHint', { folder: (note as TFile).parent?.path || '/' }), cls: 'qc-hint' });
       } else {
         const row = detail.createDiv('qc-row qc-row-tight'); const input = row.createEl('input', { type: 'text', cls: 'qc-input', attr: { spellcheck: 'false', placeholder: '~/Downloads' } }); input.value = this.prefs.systemDir;
         this.systemInput = input;
-        input.addEventListener('input', () => { this.prefs.systemDir = input.value.trim(); input.removeClass('qc-invalid'); pathErr.addClass('qc-hidden'); });
-        textButton(row, t('choose'), () => void view.plugin.chooseSystemFolder(view.doc).then(p => { if (p) { this.prefs.systemDir = p; input.value = p; input.removeClass('qc-invalid'); pathErr.addClass('qc-hidden'); } }), 'qc-btn-sm', 'folder-open');
+        input.addEventListener('input', () => { this.prefs.systemDir = input.value.trim(); input.removeClass('qc-invalid'); pathErr.addClass('qc-hidden'); update(); });
+        textButton(row, t('choose'), () => void view.plugin.chooseSystemFolder(view.doc).then(p => { if (p) { this.prefs.systemDir = p; input.value = p; input.removeClass('qc-invalid'); pathErr.addClass('qc-hidden'); update(); } }), 'qc-btn-sm', 'folder-open');
         detail.createDiv({ text: t('destSystemHint'), cls: 'qc-hint' });
       }
     };
@@ -224,7 +224,7 @@ export class ExportModal extends Modal {
       });
     }, 'qc-primary', 'download');
     this.scope.register(['Mod'], 'Enter', () => { go.click(); return false; });
-    syncQuality(); showDims(); update();
+    syncQuality(); showDims(); showName(); update();
   }
   /** Report a bad path on the field itself, where the fix is, instead of only in a notice. */
   private failPath(message: string, box: HTMLElement): void {
@@ -239,12 +239,12 @@ export class ExportModal extends Modal {
   }
   private schedule(): void {
     const w = this.view.win; if (this.timer !== undefined) w.clearTimeout(this.timer);
-    this.timer = w.setTimeout(() => void this.refresh(), 280);
+    const token = ++this.run;
+    this.timer = w.setTimeout(() => void this.refresh(token), 280);
   }
-  private async refresh(): Promise<void> {
-    const token = ++this.run; const view = this.view; const t = view.t.bind(view);
+  private async refresh(token: number): Promise<void> { const view = this.view; const t = view.t.bind(view);
     try {
-      const platform = view.platform(); const out = await view.encode(this.prefs, platform?.maxBytes);
+      const platform = view.platform(); const out = await view.encode({ ...this.prefs }, platform?.maxBytes);
       if (token !== this.run || !this.contentEl.isConnected) return;
       const url = URL.createObjectURL(out.blob); const old = this.shot.src;
       this.shot.onload = () => { if (old.startsWith('blob:')) URL.revokeObjectURL(old); };
@@ -258,7 +258,7 @@ export class ExportModal extends Modal {
       this.summary.createDiv({ text: t('summaryWill', { what: `${out.format.toUpperCase()} · ${out.width} × ${out.height} · ${size}`, where: this.destLabel() }), cls: 'qc-export-summary-line' });
       if (over) this.summary.createDiv({ text: t('overLimit', { size: bytes(platform!.maxBytes!) }), cls: 'is-warn' });
       if (out.format !== this.prefs.format) this.summary.createDiv({ text: t('exportConverted', { format: out.format.toUpperCase() }), cls: 'qc-hint' });
-    } catch (e) { this.summary.setText(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { if (token === this.run && this.contentEl.isConnected) this.summary.setText(e instanceof Error ? e.message : String(e)); }
   }
   onClose(): void {
     if (this.timer !== undefined) this.view.win.clearTimeout(this.timer); ++this.run;

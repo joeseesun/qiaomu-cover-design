@@ -57,9 +57,9 @@ const T = {
   limitNote: ['该平台上传限制 {size}，导出时可自动压缩。', 'Platform upload limit is {size}; export can compress automatically.'],
   background: ['背景', 'Background'], solid: ['纯色', 'Solid'], gradientLabel: ['渐变', 'Gradient'], gradientFrom: ['起始色', 'From'], gradientTo: ['结束色', 'To'], angle: ['角度', 'Angle'],
   // export
-  format: ['格式', 'Format'], quality: ['质量', 'Quality'], exportSize: ['导出倍率', 'Scale'], filename: ['文件名', 'File name'],
   lossless: ['无损', 'Lossless'], formatQuality: ['格式与质量', 'Format & quality'], dimsLabel: ['尺寸 px', 'Size px'], estSize: ['预计体积', 'Estimated size'],
   saveGroup: ['保存', 'Save'], summaryWill: ['将导出 {what} → {where}', 'Will export {what} → {where}'],
+  format: ['格式', 'Format'], quality: ['质量', 'Quality'], exportSize: ['导出倍率', 'Scale'], filename: ['文件名', 'File name'],
   filenameHint: ['可用变量：{name} {platform} {size} {date} {time}', 'Variables: {name} {platform} {size} {date} {time}'],
   destination: ['导出位置', 'Destination'], destFolder: ['库内文件夹', 'Vault folder'], destNote: ['笔记所在文件夹', 'Next to the note'], destSystem: ['系统文件夹', 'System folder'],
   destFolderHint: ['保存到当前库内；已有文件不会被覆盖，会自动编号。', 'Saved inside this vault. Existing files are never overwritten.'],
