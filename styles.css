@@ -269,15 +269,15 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-modal-wide { width: min(880px, 94vw); }
 .qc-modal { display: flex; flex-direction: column; gap: 12px; }
 .qc-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--qc-line); }
-.qc-new { display: flex; flex-direction: column; gap: 8px; max-height: 66vh; overflow: auto; padding-right: 4px; }
+.qc-new { display: flex; flex-direction: column; gap: 8px; max-height: 66vh; overflow: auto; padding: 6px; scroll-padding: 6px; }
 .qc-new > label, .qc-export-label { font-weight: 600; font-size: 12.5px; margin-top: 8px; }
 .qc-new-field { display: flex; flex-direction: column; gap: 6px; }
-.qc-plat-grid-wide { grid-template-columns: repeat(3, 1fr); }
-.qc-template-grid-modal { grid-template-columns: repeat(5, 1fr); }
+.qc-plat-grid-wide { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.qc-template-grid-modal { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* The result and form are separate grid tracks; intrinsic image width must never size a track. */
 .qc-export-modal { max-height: calc(100dvh - 48px); }
 .qc-export-modal .modal-content { min-height: 0; overflow: hidden; }
-.qc-export { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 24px; min-height: 0; max-height: 66vh; overflow: auto; padding: 2px; }
+.qc-export { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 24px; min-height: 0; max-height: 66vh; overflow: auto; padding: 6px; scroll-padding: 6px; }
 .qc-export-result { min-width: 0; display: flex; flex-direction: column; gap: 16px; align-self: start; }
 .qc-export-shot { min-width: 0; width: 100%; height: 280px; display: flex; align-items: center; justify-content: center; padding: 12px; border-radius: 8px; background: var(--qc-surface); box-sizing: border-box; overflow: hidden; }
 .qc-export-shot > img { display: block; width: 100%; height: 100%; min-width: 0; object-fit: contain; }
@@ -585,7 +585,7 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 /* ---------- composer tray: styles, prompts and picture looks open inside the input card ---------- */
 .qc-tray { margin: -4px -6px 0; padding: 8px 10px 8px; border-bottom: 1px solid var(--qc-line); display: flex; flex-direction: column; gap: 8px; }
 .qc-tray-head { display: flex; align-items: center; justify-content: space-between; } .qc-tray-title { font-size: 12px; color: var(--qc-muted); } .qc-tray-x svg { width: 14px; height: 14px; }
-.qc-tray-strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 4px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.qc-tray-strip { display: flex; gap: 12px; overflow-x: auto; padding: 6px 8px 10px; scroll-padding-inline: 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
 .qc-root button.qc-tray-card { flex: 0 0 116px; display: flex; flex-direction: column; gap: 6px; padding: 0; text-align: left; background: none; box-shadow: none; height: auto; scroll-snap-align: start; }
 .qc-tray-thumb { position: relative; aspect-ratio: 1.6; border-radius: 10px; overflow: hidden; background: var(--qc-surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--qc-line) 70%, transparent); line-height: 0; transition: box-shadow .15s, transform .15s; }
 .qc-tray-thumb img { width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; } .qc-tray-thumb.is-loading { animation: qc-pulse 1.2s ease-in-out infinite; }
@@ -634,7 +634,7 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 /* ---------- add-model dialog ---------- */
 .qc-model-dialog { display: flex; flex-direction: column; gap: 12px; min-width: min(560px, 90vw); }
 .qc-md-search { width: 100%; }
-.qc-md-gallery { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow: auto; padding-right: 4px; }
+.qc-md-gallery { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow: auto; padding: 6px; scroll-padding: 6px; }
 .qc-md-group { font-size: 12px; font-weight: 600; color: var(--qc-muted); margin-top: 6px; }
 .qc-md-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .qc-md-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; cursor: pointer; background: var(--qc-paper); box-shadow: 0 0 0 1px var(--qc-line); transition: box-shadow .15s, background .15s; } .qc-md-card:hover { box-shadow: var(--qc-hov); background: var(--qc-surface); } .qc-md-card:focus-visible { outline: 2px solid color-mix(in srgb, var(--interactive-accent) 70%, transparent); }
@@ -711,8 +711,35 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 /* short windows: the transcript gives way, the composer never gets cut */
 .qc-root .qc-chat-messages { min-height: 0; }
 .qc-root .qc-chat-compose { flex: 0 0 auto; }
-.qc-root .qc-chat-compose:has(.qc-tray:not(.qc-hidden)) textarea.qc-chat-input { min-height: 44px; }
+.qc-root .qc-chat-compose textarea.qc-chat-input, .qc-root .qc-chat-compose:has(.qc-tray:not(.qc-hidden)) textarea.qc-chat-input { min-height: 96px; max-height: 180px; overflow-y: auto; }
 .qc-tray-strip { flex: 0 0 auto; }
+
+/* Keep the preview edge inside its card, including when horizontal scrolling clips the track. */
+.qc-tray-thumb { box-shadow: none; }
+.qc-tray-thumb::before { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--qc-line); pointer-events: none; z-index: 1; }
+.qc-tray-card:hover .qc-tray-thumb, .qc-tray-card.is-active .qc-tray-thumb { transform: none; box-shadow: none; }
+.qc-tray-card.is-active .qc-tray-thumb::before { box-shadow: inset 0 0 0 1.5px var(--qc-ink); }
+.qc-tray-card:focus-visible { outline: 1px solid var(--qc-muted); outline-offset: 3px; }
+.qc-root .qc-chat-messages { gap: 20px; padding: 10px 8px 14px; overflow-anchor: none; }
+.qc-msg { min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; }
+.qc-msg-user { max-width: 88%; padding: 9px 12px; border-radius: 12px 12px 4px 12px; }
+.qc-msg-assistant { max-width: 100%; width: 100%; padding: 0 2px; }
+.qc-msg-text { white-space: pre-wrap; }
+.qc-msg-author { margin-bottom: 6px; color: var(--qc-muted); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+.qc-msg-details { margin-top: 8px; }
+.qc-msg-details > summary { width: fit-content; cursor: pointer; font-size: 11.5px; color: var(--qc-muted); padding: 3px 0; }
+.qc-msg-details[open] > summary { margin-bottom: 4px; }
+.qc-msg-applied { align-items: flex-start; line-height: 1.6; }
+.qc-msg-applied svg { flex: none; margin-top: 3px; }
+.qc-thinking { padding: 8px 2px; }
+.qc-root .qc-chat-compose { padding: 12px 14px 10px; gap: 10px; }
+.qc-root .qc-compose-bar { padding-top: 8px; gap: 8px; }
+.qc-root .qc-compose-bar .qc-send { width: 32px; height: 32px; min-height: 32px; }
+.qc-root .qc-compose-bar .qc-send:disabled { opacity: .3; }
+@media (max-height: 650px) {
+  .qc-root .qc-chat-compose textarea.qc-chat-input, .qc-root .qc-chat-compose:has(.qc-tray:not(.qc-hidden)) textarea.qc-chat-input { min-height: 72px; max-height: 128px; }
+}
+@media (prefers-reduced-motion: reduce) { .qc-thinking svg, .qc-tray-thumb.is-loading { animation: none; } }
 
 /* my series */
 .qc-series { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--qc-line); }
@@ -729,9 +756,18 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-feed-warn { color: var(--text-warning); } .qc-feed-ok { color: var(--text-success); }
 
 /* Compact previews leave the conversation readable; browse horizontally. */
-.qc-variants { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: thin; padding: 4px 2px 8px; min-width: 0; max-width: 100%; }
+.qc-variants { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scroll-padding-inline: 6px; scrollbar-width: thin; padding: 6px 6px 8px; min-width: 0; max-width: 100%; }
 .qc-variant[aria-pressed] { flex: 0 0 116px; min-width: 0; padding: 4px !important; scroll-snap-align: start; }
 .qc-variant[aria-pressed] img { width: 100%; height: 146px; object-fit: contain; background: var(--qc-bg); }
 .qc-variant[aria-pressed] span { white-space: normal; overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .qc-variant.is-active { color: var(--qc-ink); background: var(--qc-hov); }
 .qc-variant:focus-visible { outline: 1px solid var(--qc-ink); outline-offset: 2px; }
+
+/* Scroll containers reserve space for complete borders and keyboard focus. */
+.qc-tray-list { padding: 6px; scroll-padding: 6px; }
+.qc-model-dialog { min-width: 0; padding: 6px; }
+.qc-modal :is(.qc-new, .qc-export, .qc-md-gallery) { box-sizing: border-box; min-width: 0; }
+@media (max-width: 640px) {
+  .qc-plat-grid-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qc-template-grid-modal { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

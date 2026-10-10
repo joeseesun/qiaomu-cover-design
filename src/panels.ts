@@ -70,7 +70,7 @@ function drawerTemplates(view: CoverView, body: HTMLElement): void {
   const grid = body.createDiv('qc-template-grid'); const copy = view.copyText();
   const platformId = view.platform()?.id;
   for (const t of templatesFor(platformId)) {
-    const card = grid.createEl('button', { cls: 'qc-template', attr: { type: 'button', title: view.zh ? t.zhUse : t.enUse } });
+    const card = grid.createEl('button', { cls: 'qc-template', attr: { type: 'button', 'aria-pressed': String(view.design?.template === t.id) } });
     const thumb = card.createDiv('qc-template-thumb'); thumb.style.aspectRatio = `${view.design!.width} / ${view.design!.height}`;
     const label = card.createSpan({ text: view.zh ? t.zh : t.en, cls: 'qc-template-name' });
     if (t.fit.includes(platformId ?? '')) label.createSpan({ text: ` · ${view.t('recommended')}`, cls: 'qc-template-rec' });
@@ -102,6 +102,7 @@ function drawerSeries(view: CoverView, body: HTMLElement): void {
 /** Selects the first 【…】 placeholder so the user can type their own topic straight over it. */
 function selectPlaceholder(input: HTMLTextAreaElement): void {
   const open = input.value.indexOf('【'); const close = open < 0 ? -1 : input.value.indexOf('】', open);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
   input.focus(); if (open >= 0 && close > open) input.setSelectionRange(open + 1, close);
 }
 const STYLE_SW: Record<string, [string, string]> = { auto: ['#e5e7eb', '#cbd5e1'], none: ['#ffffff', '#f1f5f9'], '3d': ['#fde68a', '#fca5a5'], flat: ['#93c5fd', '#f9a8d4'], photo: ['#374151', '#9ca3af'], neon: ['#0f172a', '#a855f7'], minimal: ['#f3f4f6', '#d1d5db'], watercolor: ['#bfdbfe', '#fecdd3'], memphis: ['#fde047', '#34d399'], guofeng: ['#fecaca', '#d6c7a1'], isometric: ['#a5b4fc', '#67e8f9'], collage: ['#e7d9c0', '#fda4af'] };
@@ -123,12 +124,19 @@ function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: 
     if (trayTab === 'template') {
       // The same templates, thumbnails and keep-your-words behaviour as the Templates tab, just one click closer to the composer.
       const strip = host.createDiv('qc-tray-strip'); strip.addEventListener('scroll', () => { trayScroll = strip.scrollLeft; });
+      strip.addEventListener('keydown', e => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        const cards = Array.from(strip.querySelectorAll<HTMLButtonElement>('.qc-tray-card, .qc-tray-more'));
+        const index = cards.indexOf(view.doc.activeElement as HTMLButtonElement);
+        const next = cards[index + (e.key === 'ArrowRight' ? 1 : -1)];
+        if (index >= 0 && next) { e.preventDefault(); next.focus({ preventScroll: true }); next.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+      });
       const copy = view.copyText();
       for (const t of ctx.templates) {
-        const c = strip.createEl('button', { cls: 'qc-tray-card', attr: { type: 'button', title: view.zh ? t.zhUse : t.enUse } }); c.classList.toggle('is-active', view.design?.template === t.id);
+        const c = strip.createEl('button', { cls: 'qc-tray-card', attr: { type: 'button', 'aria-pressed': String(view.design?.template === t.id) } }); c.classList.toggle('is-active', view.design?.template === t.id);
         const thumb = c.createDiv('qc-tray-thumb is-loading'); templateThumb(view.doc, view.zh, view.design!.width, view.design!.height, t, copy.title, copy.subtitle, { ...(copy.badge ? { badge: copy.badge } : {}), pair: view.pairing(t.id) }).then(url => { thumb.removeClass('is-loading'); const img = thumb.createEl('img', { attr: { src: url, alt: '' } }); img.addEventListener('load', () => { const r = Math.min(2.6, Math.max(0.7, img.naturalWidth / Math.max(1, img.naturalHeight))); thumb.style.aspectRatio = String(r); c.style.flexBasis = `${Math.round(Math.min(176, Math.max(76, r * 76)))}px`; }); }, () => thumb.removeClass('is-loading'));
         c.createSpan({ text: zh ? t.zh : t.en, cls: 'qc-tray-name' });
-        c.addEventListener('click', () => { void view.action(() => { view.applyTemplate(t.id, {}, true); }); strip.querySelectorAll('.qc-tray-card').forEach(x => x.classList.toggle('is-active', x === c)); });
+        c.addEventListener('click', () => { void view.action(() => { view.applyTemplate(t.id, {}, true); }); strip.querySelectorAll('.qc-tray-card').forEach(x => { x.classList.toggle('is-active', x === c); x.setAttribute('aria-pressed', String(x === c)); }); });
       }
       const more = strip.createEl('button', { cls: 'qc-tray-more', attr: { type: 'button' } }); setIcon(more.createSpan(), 'layout-template'); more.createSpan({ text: view.t('browseTemplates') });
       more.addEventListener('click', () => { plugin.settings.drawer = 'templates'; void plugin.saveSettings(); view.refreshDrawer(); });
@@ -192,7 +200,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     textButton(card, view.t('aiConnect'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm');
   }
   const cfg = plugin.settings.ai;
-  const messages = body.createDiv('qc-chat-messages');
+  const messages = body.createDiv({ cls: 'qc-chat-messages', attr: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': view.t('tabAssistant') } });
   const compose = body.createDiv('qc-chat-compose'); const trayEl = compose.createDiv('qc-tray qc-hidden');
   const book = playbookFor(view.platform()?.id); const current = templateById(view.design?.template ?? '');
   // The current canvas pick shows above the box, so "make it bigger / change its colour" has a visible referent.
@@ -204,9 +212,10 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   };
   view.onSelection = updateSelChip; updateSelChip();
   const input = compose.createEl('textarea', { cls: 'qc-chat-input', attr: { rows: '2', placeholder: current ? view.t('chatPlaceholderPattern', { name: view.zh ? current.zh : current.en }) : view.t(sel.value === 'ai' ? 'chatPlaceholderAi' : 'chatPlaceholder') } });
+  input.value = view.chatDraft;
   const bar = compose.createDiv('qc-compose-bar');
   const templateBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(templateBtn.createSpan({ cls: 'qc-chip-icon' }), 'layout-template'); templateBtn.createSpan({ text: current ? (view.zh ? current.zh : current.en) : view.t('templateChip'), cls: 'qc-chip-label' });
-  const promptBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(promptBtn.createSpan({ cls: 'qc-chip-icon' }), 'message-square-text'); promptBtn.title = view.zh ? '提示词' : 'Prompts'; promptBtn.addClass('is-icon');
+  const promptBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(promptBtn.createSpan({ cls: 'qc-chip-icon' }), 'message-square-text'); promptBtn.createSpan({ text: view.zh ? '提示词' : 'Prompts', cls: 'qc-sr-only' }); promptBtn.addClass('is-icon');
   const picOn = sel.value === 'ai' && ai.imageReady();
   // The picture chip only exists when a picture model is actually configured; before that it is noise ("配图可选" meant nothing).
   const picBtn = bar.createEl('button', { cls: `qc-chip-btn${picOn ? '' : ' qc-hidden'}`, attr: { type: 'button' } }); setIcon(picBtn.createSpan({ cls: 'qc-chip-icon' }), 'image');
@@ -214,7 +223,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   bar.createDiv({ cls: 'qc-compose-spacer' });
   // Models are set once and rarely changed, so they live behind one small button instead of taking a row of their own.
   if (sel.value === 'ai') {
-    const modelBtn = iconButton(bar, 'cpu', view.zh ? `模型：排版 ${cfg.protocol === 'codex' ? 'Codex' : cfg.model || '—'} · 生图 ${!ai.imageReady() ? '关' : cfg.imageEngine === 'codex' ? 'Codex' : cfg.imageModel}` : 'Models', e => {
+    const modelBtn = iconButton(bar, 'settings', view.t('aiSettings'), e => {
       const m = new Menu(); m.addItem(i => i.setTitle(view.zh ? '排版模型' : 'Layout model').setIsLabel(true));
       for (const x of cfg.chats) m.addItem(i => i.setTitle(chatLabel(x.id === cfg.chatId ? { preset: cfg.preset, protocol: cfg.protocol, baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, codexBin: cfg.codexBin, codexModel: cfg.codexModel } : x.snap)).setChecked(x.id === cfg.chatId).onClick(() => { switchChat(cfg, x.id); void plugin.saveSettings(); view.refreshDrawer(); }));
       m.addItem(i => i.setTitle(view.zh ? '添加排版模型…' : 'Add layout model…').setIcon('plus').onClick(() => new ModelDialog(plugin, 'chat', () => view.refreshDrawer()).open()));
@@ -228,6 +237,16 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   }
   const send = iconButton(bar, 'arrow-up', view.t('send'), () => void submit(), 'qc-primary qc-send');
 
+  const syncInput = (): void => {
+    if (!input.isConnected) return;
+    view.chatDraft = input.value;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(180, input.scrollHeight)}px`;
+    send.disabled = view.busy || view.restoring || !input.value.trim();
+  };
+  input.addEventListener('input', syncInput);
+  view.win.requestAnimationFrame(syncInput);
+
   // The chips under the input are the tabs of a tray that opens inside the same card, so choosing and writing feel like one gesture.
   const tray = buildTray(view, trayEl, { input, picOn, templates: templatesFor(view.platform()?.id), groups: startersFor(view.platform()?.id), chips: { template: templateBtn, prompt: promptBtn, picture: picBtn } });
   templateBtn.addEventListener('click', () => tray.toggle('template')); promptBtn.addEventListener('click', () => tray.toggle('prompt')); picBtn.addEventListener('click', () => tray.toggle('picture'));
@@ -237,7 +256,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     if (sel.value !== 'ai') {
       setIcon(empty.createDiv('qc-empty-icon'), 'sparkles'); empty.createEl('h3', { text: view.t('chatTitle') }); empty.createEl('p', { text: view.t('chatIntro') });
       for (const prompt of [view.t('chatEx1'), view.t('chatEx2'), view.t('chatEx3'), view.t('chatEx4')]) {
-        const chip = empty.createEl('button', { text: prompt, cls: 'qc-chip', attr: { type: 'button' } }); chip.addEventListener('click', () => { input.value = prompt; input.focus(); });
+        const chip = empty.createEl('button', { text: prompt, cls: 'qc-chip', attr: { type: 'button' } }); chip.addEventListener('click', () => { input.value = prompt; selectPlaceholder(input); });
       }
       return;
     }
@@ -252,14 +271,23 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     guide.createDiv({ text: view.t('playbookFormulas'), cls: 'qc-msg-sub' }); const fl = guide.createEl('ul'); for (const x of book.formulas) { const li = fl.createEl('li'); li.createEl('strong', { text: `${x.zh}：` }); li.createSpan({ text: `${x.pattern} — ${x.example}` }); }
     guide.createDiv({ text: `${view.t('playbookAvoid')}：${book.avoid.join('；')}`, cls: 'qc-hint' });
   };
+  let previousCount = 0; let followNext = false;
   const draw = (): void => {
     if (!body.isConnected) { view.onChat = undefined; view.onSelection = undefined; return; }
+    const oldTop = messages.scrollTop;
+    const nearEnd = messages.scrollHeight - messages.clientHeight - oldTop < 40;
+    const anchor = Array.from(messages.children).findIndex(el => (el as HTMLElement).offsetTop + (el as HTMLElement).offsetHeight > messages.offsetTop + oldTop);
+    const anchorOffset = anchor >= 0 ? (messages.children[anchor] as HTMLElement).offsetTop - messages.offsetTop - oldTop : 0;
     messages.empty();
-    if (!view.chat.length && !view.busy) { starters(); return; }
+    messages.setAttribute('aria-busy', String(view.busy)); syncInput();
+    if (!view.chat.length && !view.busy) { starters(); previousCount = 0; return; }
     view.chat.forEach((m, index) => {
       const bubble = messages.createDiv({ cls: `qc-msg qc-msg-${m.role}` });
+      if (m.role === 'assistant') bubble.createDiv({ text: view.t('assistantAi'), cls: 'qc-msg-author' });
       bubble.createDiv({ text: m.text, cls: 'qc-msg-text' });
-      for (const a of m.applied ?? []) { const li = bubble.createDiv('qc-msg-applied'); setIcon(li.createSpan(), 'check'); li.createSpan({ text: a }); }
+      let changes = bubble;
+      if ((m.applied?.length ?? 0) > 2) { const details = bubble.createEl('details', { cls: 'qc-msg-details' }); details.createEl('summary', { text: view.t('chatChanges', { n: m.applied!.length }) }); changes = details.createDiv(); }
+      for (const a of m.applied ?? []) { const li = changes.createDiv('qc-msg-applied'); setIcon(li.createSpan(), 'check'); li.createSpan({ text: a }); }
       for (const w of m.warn ?? []) { const li = bubble.createDiv('qc-msg-applied qc-msg-warn'); setIcon(li.createSpan(), 'alert-triangle'); li.createSpan({ text: w }); }
       // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
       if (m.role === 'assistant' && m.snapshot) {
@@ -335,17 +363,29 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
         }
       }
     });
-    if (view.busy) { const b = messages.createDiv('qc-msg qc-msg-assistant qc-thinking'); setIcon(b.createSpan(), 'loader-circle'); b.createSpan({ text: view.progress || view.t('thinking') }); }
-    messages.scrollTop = messages.scrollHeight; send.disabled = view.busy;
+    if (view.busy) { const b = messages.createDiv({ cls: 'qc-msg qc-msg-assistant qc-thinking', attr: { role: 'status' } }); setIcon(b.createSpan(), 'loader-circle'); b.createSpan({ text: view.progress || view.t('thinking') }); }
+    if ((nearEnd || followNext) && view.chat.length > previousCount) {
+      const newest = messages.children[view.chat.length - 1] as HTMLElement;
+      messages.scrollTop = newest.offsetHeight > messages.clientHeight ? newest.offsetTop - messages.offsetTop - 8 : messages.scrollHeight;
+    } else if (anchor >= 0 && messages.children[anchor]) {
+      messages.scrollTop = (messages.children[anchor] as HTMLElement).offsetTop - messages.offsetTop - anchorOffset;
+    } else messages.scrollTop = oldTop;
+    previousCount = view.chat.length; followNext = false;
     picBtn.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle');
-    const opt = trayEl.querySelector<HTMLButtonElement>('[aria-pressed]'); if (opt) { opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); }
+    const opt = trayEl.querySelector<HTMLButtonElement>('.qc-tray-pill[aria-pressed]'); if (opt) { opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); }
   };
   view.onChat = draw;
   const submit = (): void => {
     const prompt = input.value.trim(); if (!prompt || view.busy || view.restoring) return;
     // A starter's 【placeholder】 left untouched would be designed literally, so ask for the real topic first.
     if (/【[^】]*(你的|粘贴|主题|摘要|内容)[^】]*】|【your |【paste /i.test(prompt)) { new Notice(view.t('fillPlaceholder')); selectPlaceholder(input); return; }
-    input.value = ''; void view.ask(prompt).then(() => input.focus());
+    input.value = ''; syncInput(); followNext = true;
+    void view.ask(prompt).then(() => {
+      // Preserve failed prompts without overwriting text typed while waiting.
+      if (view.chat.at(-1)?.failed && !input.value) input.value = prompt;
+      syncInput();
+      if (input.isConnected && (!view.doc.activeElement || view.doc.activeElement === view.doc.body || compose.contains(view.doc.activeElement))) input.focus({ preventScroll: true });
+    });
   };
   onEnter(input, e => { e.preventDefault(); submit(); });
   draw();
