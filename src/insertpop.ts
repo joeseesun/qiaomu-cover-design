@@ -113,7 +113,8 @@ function shapeTab(view: CoverView, body: HTMLElement, close: () => void): void {
   const more = body.createDiv('qc-shape-more');
   for (const [id, name, d] of PATH_SHAPES) {
     const b = more.createEl('button', { cls: 'qc-shape-card', attr: { type: 'button' } });
-    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}" fill="currentColor"/></svg>`; b.createSpan({ text: name });
+    const svg = b.createSvg('svg', { attr: { viewBox: '0 0 24 24', 'aria-hidden': 'true' } });
+    svg.createSvg('path', { attr: { d, fill: 'currentColor' } }); b.createSpan({ text: name });
     b.addEventListener('click', e => { view.addPathShape(d); done(e, close); }); b.dataset.id = id;
   }
   body.createDiv({ text: zh ? '装饰（跟随配色）' : 'Decorations (palette colours)', cls: 'qc-insert-sub' });

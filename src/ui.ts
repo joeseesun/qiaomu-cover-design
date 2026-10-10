@@ -115,7 +115,7 @@ export function colorControl(parent: HTMLElement, label: string, value: string, 
     hue.addEventListener('input', () => { h = Number(hue.value); apply(hsvToHex(h, s, v), false); }); hue.addEventListener('change', () => o.onCommit?.(current));
     hex.addEventListener('input', () => { const c = hex.value.trim(); if (/^#?[\da-f]{6}$/i.test(c)) apply(c.startsWith('#') ? c : `#${c}`); });
     const Eye = (win as Window & { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper;
-    if (Eye) iconButton(row, 'pipette', words.sample, () => { sampling = true; pop.style.visibility = 'hidden'; void new Eye().open().then(r => { if (!closed && wrap.isConnected) apply(r.sRGBHex); }).catch(() => undefined).finally(() => { sampling = false; if (!closed) { pop.style.visibility = ''; hex.focus(); } }); });
+    if (Eye) iconButton(row, 'pipette', words.sample, () => { sampling = true; pop.addClass('qc-color-sampling'); void new Eye().open().then(r => { if (!closed && wrap.isConnected) apply(r.sRGBHex); }).catch(() => undefined).finally(() => { sampling = false; if (!closed) { pop.removeClass('qc-color-sampling'); hex.focus(); } }); });
     if (o.none) textButton(pop, words.none, () => apply(''), 'qc-color-none qc-btn-sm', 'ban');
     const position = (): void => { if (!wrap.isConnected) { close(); return; } const r = trigger.getBoundingClientRect(), size = pop.getBoundingClientRect(); pop.style.left = `${Math.max(8, Math.min(r.left, win.innerWidth - size.width - 8))}px`; pop.style.top = `${Math.max(8, Math.min(r.bottom + 8, win.innerHeight - size.height - 8))}px`; };
     const outside = (e: PointerEvent): void => { if (!sampling && !pop.contains(e.target as Node) && !wrap.contains(e.target as Node)) close(); };

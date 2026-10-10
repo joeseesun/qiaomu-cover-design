@@ -1,10 +1,12 @@
 /**
  * Offline sticker and icon library. `assets/pack.json.gz` (built by scripts/build-asset-pack.py) holds about 1,200 Fluent Emoji
  * Flat stickers (MIT, Microsoft) with Chinese names and tags, and about 1,900 Lucide line icons (ISC). It ships beside main.js and
- * is read from disk, so inserting never depends on a network; both licences need no attribution.
+ * is embedded in main.js for official installs and also shipped on disk in the ZIP. Insertion never needs a network;
+ * copyright and full permission notices are included in the bundle and assets/licenses.
  */
 import { normalizePath, type App } from 'obsidian';
 import { lucideZh } from './lucidezh';
+import bundledPack from '../assets/pack.json.gz';
 
 export type AssetCat = 'sticker' | 'line';
 export interface AssetItem { id: string; cat: AssetCat; zh: string; /** Lower-cased searchable text, Chinese and English. */ hay: string; body: string }
@@ -27,7 +29,9 @@ let cache: Promise<{ stickers: AssetItem[]; lines: AssetItem[] }> | undefined;
 export function loadAssets(app: App, dir: string): Promise<{ stickers: AssetItem[]; lines: AssetItem[] }> {
   cache ??= (async () => {
     try {
-      const buf = await app.vault.adapter.readBinary(normalizePath(`${dir}/assets-pack.json.gz`));
+      // The official installer only downloads main.js, manifest.json and styles.css.
+      // Full ZIP installs can keep their disk copy; store installs use the identical bundled bytes.
+      const buf = await app.vault.adapter.readBinary(normalizePath(`${dir}/assets-pack.json.gz`)).catch(() => bundledPack.slice().buffer as ArrayBuffer);
       const text = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
       const pack = JSON.parse(text) as Pack;
       return {

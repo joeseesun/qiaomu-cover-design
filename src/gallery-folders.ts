@@ -1,7 +1,7 @@
 async function runtime():Promise<{fs:typeof import('fs');path:typeof import('path')}>{
-  const req=(globalThis as unknown as {window?:{require?:(id:string)=>unknown}}).window?.require;
+  const req=typeof window === 'undefined' ? undefined : (window as unknown as {require?:(id:string)=>unknown}).require;
   if(req)return {fs:req('fs') as typeof import('fs'),path:req('path') as typeof import('path')};
-  const fsName='node:fs',pathName='node:path';return {fs:await import(fsName),path:await import(pathName)};
+  return {fs:await import('node:fs'),path:await import('node:path')};
 }
 export interface FolderImage { name: string; path: string; type: string; size: number; modified: number }
 const types: Record<string,string>={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp'};

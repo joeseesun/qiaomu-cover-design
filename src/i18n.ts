@@ -6,7 +6,7 @@ const T = {
   imageSelectionHint: ['已将 {count} 个元素合成参考图。替换后变为一张图片，撤销可恢复原图层。', '{count} elements captured as a reference. Replacing turns them into one image; undo restores the original layers.'],
 
   // commands and general
-  open: ['打开封面设计器', 'Open cover designer'], fromNote: ['从当前笔记创建封面', 'Create cover from current note'], create: ['新建封面', 'New cover'], newCover: ['新建封面…', 'New cover…'],
+  open: ['打开 Qiaomu Design', 'Open Qiaomu Design'], fromNote: ['从当前笔记创建封面', 'Create cover from current note'], create: ['新建封面', 'New cover'], newCover: ['新建封面…', 'New cover…'],
   name: ['名称', 'Name'], coverTitle: ['封面标题', 'Cover title'], createAction: ['创建', 'Create'], cancel: ['取消', 'Cancel'], untitled: ['未命名封面', 'Untitled cover'], close: ['关闭', 'Close'],
   fromNoteHint: ['来自笔记「{note}」，导出后可一键插入。', 'From “{note}” — insert the export back with one click.'],
   chooseDesign: ['打开已有设计', 'Open an existing design'], recent: ['最近封面', 'Recent covers'], settings: ['设置', 'Settings'], more: ['更多', 'More'], choose: ['选择…', 'Choose…'],

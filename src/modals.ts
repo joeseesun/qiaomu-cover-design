@@ -1,4 +1,4 @@
-import { App, FuzzySuggestModal, Modal, Notice, setIcon, TFile, TFolder } from 'obsidian';
+import { App, FuzzySuggestModal, Modal, Notice, Platform, setIcon, TFile, TFolder } from 'obsidian';
 import type CoverPlugin from './main';
 import type { CoverView } from './view';
 import { Destination, ExportFormat, ExportPrefs, renderFilename, safeName, validSize } from './model';
@@ -273,7 +273,7 @@ export class ShortcutsModal extends Modal {
   constructor(private plugin: CoverPlugin) { super(plugin.app); }
   onOpen(): void {
     const t = this.plugin.t.bind(this.plugin); this.titleEl.setText(t('shortcuts')); this.contentEl.addClass('qc-modal');
-    const mod = /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl';
+    const mod = Platform.isMacOS ? '⌘' : 'Ctrl';
     const rows: [string, string][] = [
       ['T', t('text')], ['R', t('rectangle')], ['O', t('circle')], ['L', t('line')], [`${mod} Z / ⇧${mod} Z`, `${t('undo')} / ${t('redo')}`], [`${mod} C / V / D`, `${t('copyObj')} / ${t('paste')} / ${t('duplicate')}`],
       [`${mod} A`, t('selectAll')], ['Delete', t('remove')], [`${mod} ] / [`, `${t('forward')} / ${t('backward')}`], [`⇧${mod} ] / [`, `${t('front')} / ${t('back')}`], [`${mod} L`, t('locked')],

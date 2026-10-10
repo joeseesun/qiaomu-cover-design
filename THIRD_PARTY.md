@@ -14,7 +14,11 @@
 
 《通用规范汉字表》字表（`scripts/charset-8105.txt`）为教育部、国家语委 2013 年发布的规范汉字列表。
 
-不打包上游素材、云上传 SDK、Next.js 或 React。
+不打包上游网页素材、云上传 SDK、Next.js 或 React。
+
+## 离线贴纸与图标
+
+Fluent Emoji Flat — MIT — Copyright (c) Microsoft Corporation；Lucide — ISC，部分 Feather 图标采用 MIT — Copyright (c) Lucide Icons and Contributors / Cole Bemis。素材包嵌入 `main.js`，完整许可来自上游并保存在 `assets/licenses/`、生产 bundle 的注释和完整 ZIP 的 `asset-licenses/`。原始来源：https://github.com/microsoft/fluentui-emoji 与 https://github.com/lucide-icons/lucide 。
 
 ## 生图交互参考
 
