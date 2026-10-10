@@ -6,7 +6,7 @@ export interface ExportPrefs {
   folder: string; systemDir: string; filename: string; insert: boolean; cover: boolean; copy: boolean; fitLimit: boolean;
 }
 export const EXPORT_DEFAULTS: ExportPrefs = {
-  format: 'png', scale: 1, quality: 0.92, destination: 'folder', folder: '', systemDir: '', filename: '{name}-{platform}', insert: false, cover: false, copy: false, fitLimit: true,
+  format: 'jpeg', scale: 1, quality: 0.92, destination: 'folder', folder: '', systemDir: '', filename: '{name}-{platform}', insert: false, cover: false, copy: false, fitLimit: true,
 };
 export interface Design {
   format: 'qiaomu-cover-design'; schema: 1; width: number; height: number; source?: string;

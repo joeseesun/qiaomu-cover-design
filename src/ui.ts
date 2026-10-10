@@ -24,12 +24,13 @@ export function field(parent: HTMLElement, label: string, cls = ''): { wrap: HTM
   wrap.createSpan({ text: label, cls: 'qc-label' });
   return { wrap, body: wrap.createDiv('qc-control') };
 }
-export function segmented<T extends string>(parent: HTMLElement, options: { value: T; label?: string; icon?: string }[], value: T, onChange: (v: T) => void, cls = ''): HTMLElement {
+export function segmented<T extends string>(parent: HTMLElement, options: { value: T; label?: string; icon?: string; disabled?: boolean }[], value: T, onChange: (v: T) => void, cls = ''): HTMLElement {
   const seg = parent.createDiv({ cls: `qc-seg ${cls}`.trim(), attr: { role: 'group' } });
   for (const o of options) {
     const b = seg.createEl('button', { cls: 'qc-seg-btn', attr: { type: 'button' } });
     if (o.icon) setIcon(b, o.icon);
     if (o.label) b.createSpan({ text: o.label, cls: o.icon ? 'qc-sr-only' : '' });
+    b.disabled = Boolean(o.disabled);
     b.classList.toggle('is-active', o.value === value); b.setAttribute('aria-pressed', String(o.value === value));
     b.addEventListener('click', () => {
       for (const sibling of Array.from(seg.children)) { sibling.classList.remove('is-active'); sibling.setAttribute('aria-pressed', 'false'); }
