@@ -23,7 +23,7 @@ export interface Settings {
 }
 export const DEFAULTS: Settings = {
   designFolder: 'Cover designs', exportFolder: 'Cover designs/Exports', fontFolder: 'Cover designs/Fonts', language: 'auto', defaultPlatform: DEFAULT_PLATFORM,
-  galleryFolders: [], toolbarLabels: false, export: {}, guides: { safe: false, center: true, grid: false, snap: true },
+  galleryFolders: [], toolbarLabels: false, export: {}, guides: { safe: false, center: false, grid: false, snap: true },
   defaultFont: 'sans-serif', recentColors: [], recentFonts: [], favFonts: [], drawer: 'assistant', assistant: 'ai', ai: { ...AI_DEFAULTS }, imageStyle: 'auto', fontNudgeOff: false, unsplashSecret: '', unsplashProxy: '', series: [], chats: {}, conversations: {},
 };
 /** Keeps at most 30 turns per cover and 20 covers, so data.json stays small. */

@@ -1,139 +1,255 @@
-import { jimengModels } from './jimeng';
-/**
- * The "add model" dialog, modelled on the Qiaomu Clipper flow: pick a source from a card gallery, then a short form (key, model, and an
- * advanced fold for the address), instead of copying the current model and editing it in place. The same form edits a saved model.
- */
+/** Service → connection → model selection. Drafts stay local until Save succeeds. */
 import { Modal, requestUrl, setIcon } from 'obsidian';
+import { jimengModels } from './jimeng';
 import type CoverPlugin from './main';
-import type { ChatSnap, ImageSnap } from './aiparse';
-import { saveChat, saveImage } from './aiparse';
+import { ChatSnap, ImageSnap, saveChat, saveImage, syncProfiles, imageConnection, switchChat, switchImage } from './aiparse';
 import { CHAT_SOURCES, ChatSource, GROUPS, IMAGE_SOURCES, ImageSource, chatSnapFrom, chatSourceOf, imageSnapFrom, imageSourceOf, PopularModel } from './catalog';
+import { codexAccount, codexModels, startCodexLogin } from './codex';
+import { LoginHandle, startKeyLogin } from './authflow';
 import { textButton } from './ui';
 
 type Source = ChatSource | ImageSource;
 export type Kind = 'chat' | 'image';
 export interface Editing { id: string; snap: ChatSnap | ImageSnap }
-
-const TINTS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899'];
-const tint = (id: string): string => TINTS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % TINTS.length]!;
-function tile(parent: HTMLElement, s: Source, big = false): HTMLElement {
-  const t = parent.createDiv({ cls: `qc-brand${big ? ' is-big' : ''}` }); t.style.background = tint(s.id);
-  if (s.id === 'codex') setIcon(t, 'terminal'); else if (s.id === 'custom') setIcon(t, 'plus'); else if (s.id === 'ollama') setIcon(t, 'server'); else t.setText([...s.name.replace(/[^A-Za-z一-鿿]/g, '')][0]?.toUpperCase() ?? '?');
-  return t;
-}
+interface Draft { key: string; base: string; bin: string; models: Set<string>; all: PopularModel[]; loaded: boolean; note: string; alias: string }
 
 export class ModelDialog extends Modal {
-  private source?: Source; private error = '';
+  private source?: Source; private step: 'connection' | 'models' = 'connection';
+  private drafts = new Map<string, Draft>(); private generation = 0; private alive = false; private saving = false;
+  private login?: LoginHandle<unknown>;
   constructor(private plugin: CoverPlugin, private kind: Kind, private done: () => void, private editing?: Editing) { super(plugin.app); }
-  private get zh(): boolean { return this.plugin.isZh(); }
+  private get z(): boolean { return this.plugin.isZh(); }
   private sources(): Source[] { return this.kind === 'chat' ? CHAT_SOURCES : IMAGE_SOURCES; }
   onOpen(): void {
-    this.modalEl.addClass('qc-modal-wide'); this.contentEl.addClass('qc-modal', 'qc-model-dialog');
-    if (this.editing) this.source = this.kind === 'chat' ? chatSourceOf(this.editing.snap as ChatSnap) : imageSourceOf(this.editing.snap as ImageSnap);
+    this.alive = true; this.modalEl.addClass('qc-modal-wide'); this.contentEl.addClass('qc-modal', 'qc-model-dialog');
+    if (this.editing) this.source = this.kind === 'chat' ? chatSourceOf(this.editing.snap as ChatSnap) : imageSourceOf(imageConnection(this.plugin.settings.ai, this.editing.snap as ImageSnap));
     this.draw();
   }
-  onClose(): void { this.contentEl.empty(); }
-  private title(): string { const z = this.zh; return this.editing ? (z ? '编辑模型' : 'Edit model') : this.kind === 'chat' ? (z ? '添加排版模型' : 'Add a layout model') : (z ? '添加生图模型' : 'Add a picture model'); }
-  private draw(): void { this.titleEl.setText(this.title()); this.contentEl.empty(); this.error = ''; if (this.source) this.form(this.source); else this.gallery(); }
-
+  onClose(): void { this.alive = false; this.generation++; this.login?.cancel(); this.login = undefined; this.drafts.clear(); this.contentEl.empty(); }
+  private current(generation: number): boolean { return this.alive && this.generation === generation; }
+  private draw(): void {
+    this.generation++; this.contentEl.empty();
+    this.titleEl.setText(this.editing ? (this.z ? '编辑模型' : 'Edit model') : this.kind === 'chat' ? (this.z ? '添加排版模型' : 'Add layout models') : (this.z ? '添加生图模型' : 'Add image models'));
+    const steps = this.contentEl.createDiv('qc-md-steps');
+    const index = !this.source ? 0 : this.step === 'connection' ? 1 : 2;
+    (this.z ? ['选择服务', '连接账号', '选择模型'] : ['Service', 'Connect', 'Models']).forEach((text, i) => steps.createSpan({ text: `${i + 1}  ${text}`, cls: i === index ? 'is-current' : '' }));
+    if (!this.source) this.gallery(); else if (this.step === 'connection') this.connection(this.source); else this.models(this.source);
+  }
+  private draft(s: Source): Draft {
+    let d = this.drafts.get(s.id); if (d) return d;
+    let snap = this.editing?.snap;
+    const ai = this.plugin.settings.ai;
+    // Reuse an already configured connection only for its exact service and endpoint.
+    if (!snap) snap = this.kind === 'chat'
+      ? ai.chats.find(p => p.snap.preset === s.id && p.snap.baseUrl === s.baseUrl)?.snap
+      : ai.images.find(p => imageSourceOf(p.snap).id === s.id && p.snap.imageBaseUrl === s.baseUrl)?.snap;
+    let key = ''; let base = s.baseUrl; let model = ''; let bin = ai.codexBin;
+    if (snap) {
+      if ('protocol' in snap) { key = snap.apiKey; base = snap.baseUrl || s.baseUrl; model = snap.protocol === 'codex' ? snap.codexModel : snap.model; bin = snap.codexBin; }
+      else { const resolved = imageConnection(ai, snap); key = resolved.imageKey; base = resolved.imageBaseUrl || s.baseUrl; model = snap.imageModel; }
+    }
+    // Layout and image services can share a connection, while keeping their models independent.
+    if (!key && !this.editing && s.id !== 'custom') {
+      const match = ai.chats.find(p => p.snap.baseUrl === s.baseUrl && p.snap.apiKey);
+      const image = ai.images.find(p => p.snap.imageBaseUrl === s.baseUrl && p.snap.imageKey);
+      key = match?.snap.apiKey ?? image?.snap.imageKey ?? '';
+    }
+    d = { key, base, bin, models: new Set(this.editing ? [model] : []), all: [...s.models], loaded: false, note: '', alias: this.editing ? ('protocol' in this.editing.snap ? this.editing.snap.chatAlias : this.editing.snap.imageAlias) ?? '' : '' };
+    this.drafts.set(s.id, d); return d;
+  }
+  private brand(parent: HTMLElement, s: Source): void {
+    const icon = parent.createSpan({ cls: 'qc-md-service-icon', attr: { 'aria-hidden': 'true' } });
+    setIcon(icon, s.id === 'codex' ? 'terminal' : s.id === 'custom' ? 'plus' : s.group === 'local' ? 'server' : s.login ? 'log-in' : 'key-round');
+    const text = parent.createDiv('qc-md-card-text'); text.createDiv({ text: s.name, cls: 'qc-md-card-name' });
+    text.createDiv({ text: s.login ? (this.z ? '支持账号登录' : 'Account sign-in') : s.keyless ? (this.z ? '无需密钥' : 'No key required') : s.baseUrl ? new URL(s.baseUrl).host : (this.z ? 'OpenAI 兼容服务' : 'OpenAI-compatible service'), cls: 'qc-md-card-sub' });
+  }
   private gallery(): void {
-    const z = this.zh; const el = this.contentEl; el.createDiv({ text: z ? '先选一个来源，下一步填密钥和模型。' : 'Pick a source first; the next step asks for a key and a model.', cls: 'qc-hint' });
-    const search = el.createEl('input', { type: 'text', cls: 'qc-md-search', attr: { placeholder: z ? '搜索来源…' : 'Search…', spellcheck: 'false' } });
+    const el = this.contentEl; el.createDiv({ text: this.z ? '选择你已有账号的服务。支持登录的服务无需手动复制密钥。' : 'Choose a service you use. Supported sign-ins connect without copying a key.', cls: 'qc-hint' });
+    const search = el.createEl('input', { type: 'search', cls: 'qc-md-search', attr: { placeholder: this.z ? '搜索服务…' : 'Search services…', 'aria-label': this.z ? '搜索服务' : 'Search services' } });
     const grid = el.createDiv('qc-md-gallery');
     const render = (): void => {
-      grid.empty(); const q = search.value.trim().toLowerCase(); let n = 0;
-      for (const g of GROUPS) {
-        const list = this.sources().filter(s => s.group === g.id && (!q || `${s.name} ${s.sub} ${s.id}`.toLowerCase().includes(q))); if (!list.length) continue; n += list.length;
-        grid.createDiv({ text: g.zh, cls: 'qc-md-group' }); const row = grid.createDiv('qc-md-cards');
-        for (const s of list) { const c = row.createDiv({ cls: 'qc-md-card', attr: { role: 'button', tabindex: '0' } }); tile(c, s); const t = c.createDiv('qc-md-card-text'); t.createDiv({ text: s.name, cls: 'qc-md-card-name' }); t.createDiv({ text: s.sub, cls: 'qc-md-card-sub' }); const go = (): void => { this.source = s; this.draw(); }; c.addEventListener('click', go); c.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }); }
+      grid.empty(); const q = search.value.trim().toLowerCase(); let count = 0;
+      for (const group of GROUPS) {
+        const sources = this.sources().filter(s => s.group === group.id && `${s.name} ${s.sub} ${s.id}`.toLowerCase().includes(q)); if (!sources.length) continue; count += sources.length;
+        grid.createDiv({ text: this.z ? group.zh : group.en, cls: 'qc-md-group' }); const cards = grid.createDiv('qc-md-cards');
+        for (const s of sources) {
+          const card = cards.createEl('button', { cls: 'qc-md-card', attr: { type: 'button' } }); this.brand(card, s);
+          card.addEventListener('click', () => { this.source = s; this.step = 'connection'; this.draw(); });
+        }
       }
-      if (!n) grid.createDiv({ text: z ? '没有匹配的来源。可以选“自定义”，填一个 OpenAI 兼容的地址。' : 'No match. Use Custom with an OpenAI-compatible address.', cls: 'qc-md-empty' });
+      if (!count) grid.createDiv({ text: this.z ? '没有匹配的服务。清空搜索后可选择“自定义”。' : 'No match. Clear search to choose Custom.', cls: 'qc-md-empty' });
     };
-    search.addEventListener('input', render); render(); window.setTimeout(() => search.focus(), 30);
-    const act = el.createDiv('qc-md-actions'); textButton(act, z ? '取消' : 'Cancel', () => this.close());
+    search.addEventListener('input', render); render();
+    textButton(el.createDiv('qc-md-actions'), this.z ? '取消' : 'Cancel', () => this.close());
   }
-
-  private form(s: Source): void {
-    const z = this.zh; const el = this.contentEl; const snap = this.editing?.snap;
-    const cur = { key: '', baseUrl: s.baseUrl, model: '', bin: '', alias: '' };
-    if (snap) { if (this.kind === 'chat') { const c = snap as ChatSnap; cur.key = c.apiKey; cur.baseUrl = c.baseUrl || s.baseUrl; cur.model = c.protocol === 'codex' ? c.codexModel : c.model; cur.bin = c.codexBin; cur.alias = c.chatAlias ?? ''; } else { const c = snap as ImageSnap; cur.key = c.imageKey; cur.baseUrl = c.imageBaseUrl || s.baseUrl; cur.model = c.imageModel; cur.alias = c.imageAlias ?? ''; } }
-    else cur.model = s.models[0]?.id ?? '';
-    const head = el.createDiv('qc-md-head'); tile(head, s, true); head.createEl('strong', { text: s.name }); head.createSpan({ text: s.sub, cls: 'qc-hint' });
-    const field = (label: string, build: (box: HTMLElement) => HTMLElement, hint?: string): HTMLElement => { const row = el.createDiv('qc-md-field'); row.createEl('label', { text: label }); const input = build(row); if (hint) row.createDiv({ text: hint, cls: 'qc-hint' }); return input; };
-    const codex = s.id === 'codex';
-    if (codex) el.createDiv({ text: z ? '使用本机已登录的 Codex CLI（ChatGPT 账号），不需要密钥。模型留空就用它的默认模型。' : 'Uses the Codex CLI already signed in on this machine; no key needed.', cls: 'qc-md-note' });
+  private field(parent: HTMLElement, label: string, value: string, change: (v: string) => void, password = false): HTMLInputElement {
+    const row = parent.createDiv('qc-md-field'); const id = `qc-model-${this.kind}-${this.generation}-${parent.querySelectorAll('input').length}-${Math.random().toString(36).slice(2)}`;
+    row.createEl('label', { text: label, attr: { for: id } });
+    const wrap = row.createDiv('qc-md-wrap'); const input = wrap.createEl('input', { type: password ? 'password' : 'text', attr: { id, autocomplete: 'off', spellcheck: 'false' } }); input.value = value;
+    input.addEventListener('input', () => change(input.value));
+    if (password) textButton(wrap, this.z ? '显示' : 'Show', () => { input.type = input.type === 'password' ? 'text' : 'password'; reveal.setText(input.type === 'password' ? (this.z ? '显示' : 'Show') : (this.z ? '隐藏' : 'Hide')); }, 'qc-md-reveal');
+    const reveal = wrap.querySelector('button')!;
+    return input;
+  }
+  private connection(s: Source): void {
+    const el = this.contentEl; const z = this.z; const d = this.draft(s); const generation = this.generation; const codex = s.id === 'codex';
+    this.brand(el.createDiv('qc-md-head'), s);
+    const note = codex ? (z ? '使用 ChatGPT 账号里的 Codex，排版与生图都可使用。需要本机安装 Codex CLI；登录和续期由 Codex 管理。' : 'Use Codex through your ChatGPT account for layouts and images. Install Codex CLI locally; it manages sign-in and renewal.') : s.login ? (z ? '在浏览器中登录并授权，完成后自动回到这里。也可以填写已有 API Key。账号登录不代表免费，费用由服务商收取。' : 'Sign in and authorize in your browser, or enter an API key. Your provider’s usage charges still apply.') : (z ? '填写这个服务的 API Key，然后选择模型。' : 'Enter your service API key, then choose models.');
+    el.createDiv({ text: note, cls: 'qc-md-note' });
+    const status = el.createDiv({ cls: 'qc-md-status', attr: { role: 'status', 'aria-live': 'polite' } });
     let keyInput: HTMLInputElement | undefined;
-    if (!codex && !s.keyless) {
-      keyInput = field(z ? 'API 密钥' : 'API key', box => {
-        const wrap = box.createDiv('qc-md-wrap'); const i = wrap.createEl('input', { type: 'password', attr: { placeholder: 'sk-…', autocomplete: 'off', spellcheck: 'false' } }); i.value = cur.key;
-        const show = wrap.createEl('button', { cls: 'qc-md-reveal', text: z ? '显示' : 'Show', attr: { type: 'button' } }); show.addEventListener('click', () => { i.type = i.type === 'password' ? 'text' : 'password'; show.setText(i.type === 'password' ? (z ? '显示' : 'Show') : (z ? '隐藏' : 'Hide')); }); return i;
-      }) as HTMLInputElement;
-      if (s.keyUrl) { const a = keyInput.closest('.qc-md-field')!.createEl('a', { text: z ? '没有密钥？去获取' : 'Get a key', href: s.keyUrl, cls: 'qc-md-link' }); a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener noreferrer'); }
+    let authButton: HTMLButtonElement | undefined; let cancelButton: HTMLButtonElement | undefined;
+    if (s.login) {
+      const row = el.createDiv('qc-md-login-actions');
+      authButton = textButton(row, codex ? (z ? '登录 ChatGPT / Codex' : 'Sign in to ChatGPT / Codex') : `${z ? '登录' : 'Sign in to'} ${s.name}`, () => void login(), 'qc-primary', 'log-in');
+      cancelButton = textButton(row, z ? '取消登录' : 'Cancel sign-in', () => { this.login?.cancel(); this.login = undefined; }, 'qc-ghost'); cancelButton.hidden = true;
     }
-    const modelInput = field(z ? '模型' : 'Model', box => { const i = box.createEl('input', { type: 'text', cls: 'qc-md-model-id', attr: { placeholder: s.models[0]?.id ?? (codex ? (z ? '留空用默认' : 'default') : 'model-id'), spellcheck: 'false' } }); i.value = cur.model; return i; }) as HTMLInputElement;
-    const listWrap = modelInput.closest('.qc-md-field')!.createDiv('qc-md-models'); let all: PopularModel[] = [...s.models];
-    const pickerId = crypto.randomUUID(); listWrap.createEl('label', { cls: 'qc-sr-only', text: z ? '选择模型' : 'Choose a model', attr: { for: pickerId } });
-    const picker = listWrap.createEl('select', { cls: 'qc-md-model-picker', attr: { id: pickerId } });
-    const renderModels = (): void => {
-      picker.empty(); picker.createEl('option', { value: '', text: z ? '选择模型（也可在上方手动填写）' : 'Choose a model (or enter one above)' });
-      for (const m of all) picker.createEl('option', { value: m.id, text: m.name ? `${m.name} · ${m.id}` : m.id });
-      picker.value = all.some(m => m.id === modelInput.value) ? modelInput.value : ''; picker.disabled = !all.length;
+    if (codex) {
+      const a = el.createEl('a', { text: z ? '安装 Codex CLI' : 'Install Codex CLI', href: 'https://developers.openai.com/codex/cli', cls: 'qc-md-link', attr: { target: '_blank', rel: 'noopener noreferrer' } }); a.addClass('qc-md-install');
+      status.setText(z ? '正在检查本机登录…' : 'Checking local sign-in…');
+      void codexAccount(d.bin).then(account => { if (this.current(generation)) status.setText(account.signedIn ? `${z ? '已登录' : 'Signed in'} · ${account.label}` : (z ? '尚未登录，点击上方按钮连接。' : 'Not signed in. Use the button above.')); }).catch(() => { if (this.current(generation)) status.setText(z ? '没有检测到可用的 Codex CLI。请安装后重试，或在高级设置中指定路径。' : 'Codex CLI unavailable. Install it or specify its path under Advanced.'); });
+    } else if (!s.keyless) {
+      keyInput = this.field(el, s.login ? (z ? '或填写 API Key' : 'Or enter an API key') : 'API Key', d.key, value => { d.key = value.trim(); d.loaded = false; }, true);
+      if (d.key) status.setText(z ? '已填入此服务的已有密钥，可直接下一步。' : 'Existing connection filled in. Continue to models.');
+      if (s.keyUrl) el.createEl('a', { text: z ? '获取 API Key' : 'Get an API key', href: s.keyUrl, cls: 'qc-md-link', attr: { target: '_blank', rel: 'noopener noreferrer' } });
+    }
+    const adv = el.createEl('details', { cls: 'qc-md-adv' }); adv.createEl('summary', { text: z ? '高级设置' : 'Advanced' });
+    if (s.id === 'custom' || s.group === 'local') adv.open = true;
+    let baseInput: HTMLInputElement | undefined;
+    if (codex) this.field(adv, z ? 'Codex 可执行文件路径（可选）' : 'Codex executable path (optional)', d.bin, v => { d.bin = v.trim(); d.loaded = false; }).placeholder = '~/.local/bin/codex';
+    else {
+      baseInput = this.field(adv, z ? '接口地址' : 'Base URL', d.base, v => { d.base = v.trim(); d.loaded = false; }); baseInput.placeholder = 'https://…/v1';
+      adv.createDiv({ text: z ? '官方服务保持默认地址；自建代理填自己的地址。' : 'Keep the default for official services; change only for your own relay.', cls: 'qc-hint' });
+    }
+    const actions = el.createDiv('qc-md-actions');
+    if (!this.editing) textButton(actions, z ? '返回' : 'Back', () => { this.login?.cancel(); this.login = undefined; this.source = undefined; this.draw(); }, 'qc-ghost');
+    textButton(actions, z ? '取消' : 'Cancel', () => this.close());
+    const next = textButton(actions, z ? '下一步：选择模型' : 'Next: choose models', () => void proceed(), 'qc-primary');
+    const login = async (): Promise<void> => {
+      if (!s.login || !authButton) return;
+      authButton.disabled = true; next.disabled = true; status.removeClass('is-error'); status.setText(z ? '正在准备登录…' : 'Preparing sign-in…');
+      try {
+        const handle = s.login === 'codex' ? await startCodexLogin(d.bin) : await startKeyLogin(s.login, {
+          require: id => (window as unknown as { require: (id: string) => unknown }).require(id),
+          exchange: async (url, body) => { const res = await requestUrl({ url, method: 'POST', contentType: 'application/json', body, throw: false }); if (res.status >= 400) throw new Error(`HTTP ${res.status}`); return res.json as unknown; },
+        });
+        if (!this.current(generation)) { handle.cancel(); return; }
+        this.login = handle; if (cancelButton) cancelButton.hidden = false;
+        status.setText(z ? '请在浏览器完成登录和授权，完成后返回此窗口。' : 'Complete sign-in and authorization in your browser, then return here.');
+        const electron = (window as unknown as { require: (id: string) => unknown }).require('electron') as { shell: { openExternal(url: string): Promise<void> } };
+        await electron.shell.openExternal(handle.url);
+        const result = await handle.result;
+        if (!this.current(generation)) return;
+        if (result && 'key' in result) { d.key = result.key; if (keyInput) keyInput.value = result.key; d.base = s.baseUrl; if (baseInput) baseInput.value = d.base; d.loaded = false; }
+        status.setText(z ? '已登录，现在可以选择模型。' : 'Signed in. You can now choose models.');
+      } catch (error) {
+        this.login?.cancel();
+        if (this.current(generation)) { const code = error instanceof Error ? error.message : ''; status.setText(code === 'login-cancelled' ? (z ? '已取消登录，可重新登录或填写密钥。' : 'Sign-in cancelled. Try again or enter a key.') : code === 'login-timeout' ? (z ? '登录超时，请重试。' : 'Sign-in timed out. Please retry.') : (z ? '登录未完成，请重试。Codex 用户请确认已安装 CLI；其他服务也可填写 API Key。' : 'Sign-in did not complete. Retry; for Codex check CLI installation, or use an API key for other services.')); status.addClass('is-error'); }
+      } finally { if (this.current(generation)) { this.login = undefined; authButton.disabled = false; next.disabled = false; if (cancelButton) cancelButton.hidden = true; } }
     };
-    picker.addEventListener('change', () => { if (picker.value) modelInput.value = picker.value; });
-    modelInput.addEventListener('input', renderModels); renderModels();
-    const alias = field(z ? '显示名称' : 'Display name', box => box.createEl('input', { type: 'text', cls: 'qc-md-alias', attr: { maxlength: '80' } }), z ? '默认使用模型名称。改成好记的别名，模型 ID 和调用方式保持不变。' : 'Defaults to the model name. A nickname changes only its display name.') as HTMLInputElement; alias.value = cur.alias;
-    const aliasHint = (): void => { alias.placeholder = all.find(m => m.id === modelInput.value)?.name ?? (codex ? modelInput.value || 'Codex CLI' : modelInput.value || s.name); }; aliasHint(); modelInput.addEventListener('input', aliasHint); picker.addEventListener('change', aliasHint);
-    const status = el.createDiv('qc-md-status');
-    if (!codex) {
-      const fetchBtn = textButton(listWrap.parentElement!.createDiv('qc-md-fetch'), z ? '获取可用模型' : 'Load models', () => void load(), 'qc-btn-sm', 'refresh-cw');
-      const load = async (): Promise<void> => {
-        const base = (baseInput.value.trim() || s.baseUrl).replace(/\/+$/, ''); status.setText(z ? '正在获取…' : 'Loading…'); status.removeClass('is-error'); fetchBtn.disabled = true;
-        try { const got = await this.fetchModels(s, base, keyInput?.value.trim() ?? ''); if (got.length) { all = got; status.setText(z ? `获取到 ${got.length} 个模型` : `${got.length} models`); } else { status.setText(z ? '这个服务没有返回模型列表，已显示常用模型，也可以手动输入。' : 'No list returned; showing common ones.'); } renderModels(); aliasHint(); }
-        catch (e) { status.setText(z ? `没获取到列表（${e instanceof Error ? e.message : String(e)}），已显示常用模型，也可以手动输入。` : 'Could not load the list; type a model id.'); status.addClass('is-error'); }
-        finally { fetchBtn.disabled = false; }
-      };
-    }
-    const adv = el.createEl('details', { cls: 'qc-md-adv' }); adv.createEl('summary', { text: z ? '高级：接口地址' : 'Advanced: address' });
-    const baseInput = (() => { const row = adv.createDiv('qc-md-field'); row.createEl('label', { text: z ? '接口地址' : 'Base URL' }); const i = row.createEl('input', { type: 'text', attr: { placeholder: s.baseUrl || 'https://…/v1', spellcheck: 'false' } }); i.value = cur.baseUrl; row.createDiv({ text: z ? '用自建中转或代理时修改；官方服务保持默认就行。' : 'Change for a relay or proxy.', cls: 'qc-hint' }); return i; })();
-    if (s.id === 'custom') adv.setAttribute('open', '');
-    let binInput: HTMLInputElement | undefined;
-    if (codex) { const row = adv.createDiv('qc-md-field'); row.createEl('label', { text: z ? 'Codex 可执行文件路径' : 'Codex path' }); binInput = row.createEl('input', { type: 'text', attr: { placeholder: '~/.local/bin/codex', spellcheck: 'false' } }); binInput.value = cur.bin; }
-    const err = el.createDiv('qc-md-status is-error');
-    const act = el.createDiv('qc-md-actions');
-    if (!this.editing) textButton(act, z ? '返回' : 'Back', () => { this.source = undefined; this.draw(); }, 'qc-ghost');
-    textButton(act, z ? '取消' : 'Cancel', () => this.close());
-    textButton(act, this.editing ? (z ? '保存' : 'Save') : (z ? '添加' : 'Add'), () => {
-      const baseUrl = baseInput.value.trim() || s.baseUrl; const key = keyInput?.value.trim() ?? ''; const model = modelInput.value.trim();
-      if (!codex && !baseUrl) { err.setText(z ? '请填写接口地址（高级里）。' : 'Enter the base URL.'); adv.setAttribute('open', ''); return; }
-      if (!codex && !s.keyless && !key) { err.setText(z ? '请填写 API 密钥。' : 'Enter the API key.'); keyInput?.focus(); return; }
-      if (!codex && !model) { err.setText(z ? '请选择或填写模型。' : 'Choose or type a model.'); modelInput.focus(); return; }
-      const cfg = this.plugin.settings.ai;
-      if (this.kind === 'chat') saveChat(cfg, { ...chatSnapFrom(s as ChatSource, { key, baseUrl: codex ? '' : baseUrl, model, codexBin: binInput?.value.trim() ?? '' }), chatAlias: alias.value.trim() || undefined }, this.editing?.id);
-      else saveImage(cfg, { ...imageSnapFrom(s as ImageSource, { key, baseUrl: (s as ImageSource).engine === 'codex' ? '' : baseUrl, model }), imageAlias: alias.value.trim() || undefined, ...(snap && model === cur.model ? { imageFamily: (snap as ImageSnap).imageFamily } : {}) }, this.editing?.id);
-      cfg.enabled = true; void this.plugin.saveSettings().then(() => { this.close(); this.done(); }).catch(e => { err.setText(String(e)); });
-    }, 'qc-primary');
-    window.setTimeout(() => (keyInput ?? modelInput).focus(), 30);
+    const proceed = async (): Promise<void> => {
+      if (this.login) return;
+      if (!codex && !this.validBase(d.base)) { status.setText(z ? '请填写 HTTPS 接口地址；本机服务可用 HTTP。' : 'Use an HTTPS base URL, or HTTP for localhost.'); status.addClass('is-error'); adv.open = true; return; }
+      if (!codex && !s.keyless && !d.key) { status.setText(z ? '请先登录或填写 API Key。' : 'Sign in or enter an API key first.'); status.addClass('is-error'); keyInput?.focus(); return; }
+      next.disabled = true;
+      if (codex) {
+        try { const account = await codexAccount(d.bin); if (!account.signedIn) throw new Error('not-signed-in'); }
+        catch { if (this.current(generation)) { status.setText(z ? '请先安装并登录 Codex，再选择模型。' : 'Install and sign in to Codex before selecting models.'); status.addClass('is-error'); next.disabled = false; } return; }
+      }
+      if (!this.current(generation)) return;
+      this.step = 'models'; this.draw();
+    };
   }
-
-  /** Model ids from the service, best effort: OpenAI-style /models, Anthropic /v1/models, Gemini models, OpenRouter's public list. */
+  private validBase(base: string): boolean {
+    try { const u = new URL(base); return !u.username && !u.password && !u.search && !u.hash && (u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))); } catch { return false; }
+  }
+  private models(s: Source): void {
+    const el = this.contentEl; const d = this.draft(s); const z = this.z; const generation = this.generation;
+    this.brand(el.createDiv('qc-md-head'), s);
+    el.createDiv({ text: this.editing ? (z ? '选择一个模型，保存后替换当前配置。' : 'Choose one model to replace this configuration.') : (z ? '可一次勾选多个模型。第一个选中的模型设为默认，之后可在设置中切换。' : 'Select one or more models. The first selected becomes the default.'), cls: 'qc-hint' });
+    const tools = el.createDiv('qc-md-model-tools');
+    const search = tools.createEl('input', { type: 'search', attr: { placeholder: z ? '搜索模型名称或 ID' : 'Search model name or ID', 'aria-label': z ? '搜索模型' : 'Search models' } });
+    const refresh = textButton(tools, z ? '刷新列表' : 'Refresh', () => void load(), 'qc-btn-sm', 'refresh-cw');
+    const status = el.createDiv({ cls: 'qc-md-status', attr: { role: 'status', 'aria-live': 'polite' } });
+    const list = el.createDiv('qc-md-models qc-md-select-models');
+    const manual = el.createEl('details', { cls: 'qc-md-adv' }); manual.createEl('summary', { text: z ? '手动填写模型 ID' : 'Enter a model ID manually' });
+    const manualInput = this.field(manual, z ? '模型 ID' : 'Model ID', '', () => undefined);
+    textButton(manual, z ? '加入选择' : 'Select model', () => { const id = manualInput.value.trim(); if (!id) return; if (!d.all.some(m => m.id === id)) d.all.push({ id }); if (this.editing) d.models.clear(); d.models.add(id); manualInput.value = ''; render(); }, 'qc-btn-sm');
+    if (this.editing) this.field(el, z ? '显示名称（可选）' : 'Display name (optional)', d.alias, v => { d.alias = v.trim().slice(0, 80); });
+    const error = el.createDiv({ cls: 'qc-md-status is-error', attr: { role: 'alert' } });
+    const actions = el.createDiv('qc-md-actions');
+    const back = textButton(actions, z ? '返回' : 'Back', () => { this.step = 'connection'; this.draw(); }, 'qc-ghost');
+    const cancel = textButton(actions, z ? '取消' : 'Cancel', () => this.close());
+    const save = textButton(actions, z ? '添加模型' : 'Add models', () => void persist(), 'qc-primary');
+    const updateSave = (): void => {
+      save.disabled = !d.models.size || this.saving;
+      save.setText(this.editing ? (z ? '保存' : 'Save') : z ? `添加 ${d.models.size || ''} 个模型` : `Add ${d.models.size || ''} models`);
+    };
+    const render = (): void => {
+      list.empty(); const q = search.value.trim().toLowerCase(); const all = [...d.all];
+      if (s.id === 'codex') all.unshift({ id: '', name: z ? '使用 Codex 默认模型' : 'Use Codex default' });
+      for (const id of d.models) if (!all.some(m => m.id === id)) all.push({ id });
+      const visible = all.filter(m => `${m.name ?? ''} ${m.id}`.toLowerCase().includes(q)).slice(0, 150);
+      for (const m of visible) {
+        const row = list.createEl('label', { cls: 'qc-md-model-option' }); const check = row.createEl('input', { type: this.editing ? 'radio' : 'checkbox' });
+        check.name = `qc-model-selection-${generation}`; check.checked = d.models.has(m.id);
+        const text = row.createDiv(); text.createDiv({ text: m.name || m.id }); if (m.name && m.id) text.createDiv({ text: m.id, cls: 'qc-hint' });
+        check.addEventListener('change', () => { if (this.editing) d.models.clear(); if (check.checked) d.models.add(m.id); else d.models.delete(m.id); updateSave(); });
+      }
+      if (!visible.length) list.createDiv({ text: z ? '没有匹配项，可以手动填写模型 ID。' : 'No match. You can enter a model ID manually.', cls: 'qc-md-empty' });
+      updateSave();
+    };
+    search.addEventListener('input', render); render(); status.setText(d.note);
+    const load = async (): Promise<void> => {
+      refresh.disabled = true; status.setText(z ? '正在获取可用模型…' : 'Loading available models…');
+      try { const found = s.id === 'codex' ? await codexModels(d.bin) : await this.fetchModels(s, d.base.replace(/\/+$/, ''), d.key); if (!this.current(generation)) return;
+        d.loaded = true; d.all = found.length ? found : [...s.models]; d.note = found.length ? (z ? `已获取 ${found.length} 个模型；能否调用取决于账号权限与额度。` : `${found.length} models found; access depends on your account.`) : (z ? '服务未返回列表，以下为常用模型，尚未验证可调用。也可手动填写。' : 'No list returned. These suggestions are unverified; you can enter a model ID.');
+      } catch { if (!this.current(generation)) return; d.note = z ? '获取失败。请检查账号或返回修改连接；以下常用模型尚未验证，也可手动填写。' : 'Could not load models. Retry or go back to check your connection. Suggestions are unverified.'; }
+      finally { if (this.current(generation)) { refresh.disabled = false; status.setText(d.note); render(); } }
+    };
+    if (!d.loaded) void load();
+    const persist = async (): Promise<void> => {
+      if (this.saving || !d.models.size) return;
+      const old = this.plugin.settings.ai; const previous = structuredClone(old); const next = structuredClone(old); const ids: string[] = []; syncProfiles(next);
+      if ((this.kind === 'chat' ? next.chats.length : next.images.length) + (this.editing ? 0 : d.models.size) > 100) { error.setText(z ? '最多保存 100 个模型，请先移除不需要的模型。' : 'Up to 100 models. Remove unused models first.'); return; }
+      for (const model of d.models) {
+        if (this.kind === 'chat') {
+          const snap = chatSnapFrom(s as ChatSource, { key: d.key, baseUrl: s.id === 'codex' ? '' : d.base, model, codexBin: d.bin });
+          snap.chatAlias = d.alias || undefined;
+          const duplicate = next.chats.find(p => p.snap.preset === snap.preset && p.snap.baseUrl === snap.baseUrl && p.snap.model === snap.model && p.snap.codexModel === snap.codexModel && p.snap.apiKey === snap.apiKey);
+          ids.push(saveChat(next, snap, this.editing?.id ?? duplicate?.id));
+        } else {
+          const snap = imageSnapFrom(s as ImageSource, { key: d.key, baseUrl: s.id === 'codex' ? '' : d.base, model });
+          snap.imageAlias = d.alias || undefined;
+          if (this.editing) { const previous = this.editing.snap as ImageSnap; snap.imageSize = previous.imageSize; snap.imageOn = previous.imageOn; if (model === previous.imageModel) snap.imageFamily = previous.imageFamily; }
+          const duplicate = next.images.find(p => p.snap.imageEngine === snap.imageEngine && p.snap.imageBaseUrl === snap.imageBaseUrl && p.snap.imageModel === snap.imageModel && p.snap.imageKey === snap.imageKey);
+          ids.push(saveImage(next, snap, this.editing?.id ?? duplicate?.id));
+          if (s.id === 'codex') next.codexBin = d.bin;
+        }
+      }
+      if (!this.editing) { if (this.kind === 'chat') switchChat(next, ids[0]!); else switchImage(next, ids[0]!); }
+      next.enabled = true; this.saving = true; save.disabled = true; back.disabled = true; cancel.disabled = true;
+      Object.assign(old, next);
+      try { await this.plugin.saveSettings(); this.close(); this.done(); }
+      catch { if (this.plugin.settings.ai === old) Object.assign(old, previous); if (this.current(generation)) { error.setText(z ? '保存失败，输入已保留，请重试。' : 'Could not save. Your input is preserved; please retry.'); save.disabled = false; back.disabled = false; cancel.disabled = false; } }
+      finally { this.saving = false; }
+    };
+  }
   private async fetchModels(s: Source, base: string, key: string): Promise<PopularModel[]> {
     const imageOnly = this.kind === 'image';
-    if (s.id === 'openrouter') {
-      const res = await requestUrl({ url: 'https://openrouter.ai/api/v1/models' + (imageOnly ? '?output_modalities=image' : ''), throw: false }); if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
-      return ((res.json as { data?: { id: string; name?: string }[] }).data ?? []).map(m => ({ id: m.id, ...(m.name ? { name: m.name } : {}) }));
-    }
     if (s.id === 'gemini' && imageOnly) {
       const res = await requestUrl({ url: `${base}/models?pageSize=200`, headers: { 'x-goog-api-key': key }, throw: false }); if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
-      return ((res.json as { models?: { name: string; displayName?: string }[] }).models ?? []).filter(m => /image/i.test(m.name)).map(m => ({ id: m.name.replace(/^models\//, ''), ...(m.displayName ? { name: m.displayName } : {}) }));
+      return ((res.json as { models?: { name: string; displayName?: string }[] }).models ?? []).filter(m => /image/i.test(m.name)).map(m => ({ id: m.name.replace(/^models\//, ''), name: m.displayName }));
     }
-    if (imageOnly && (s.id === 'ark')) return [];
-    const anthropic = s.id === 'anthropic'; const url = anthropic ? `${base}/v1/models` : `${base}/models`;
+    if (imageOnly && s.id === 'ark') return [];
+    const anthropic = s.id === 'anthropic';
+    const url = `${base}${anthropic ? '/v1' : ''}/models${s.id === 'openrouter' && imageOnly ? '?output_modalities=image' : ''}`;
     const res = await requestUrl({ url, headers: anthropic ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' } : key ? { Authorization: `Bearer ${key}` } : {}, throw: false });
     if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
-    const payload = res.json as { code?: number; message?: string };
-    if (payload.code !== undefined && payload.code !== 0) throw new Error(payload.message?.slice(0, 240) || `Code ${payload.code}`);
-    const list = ((res.json as { data?: { id: string; display_name?: string }[] }).data ?? []).map(m => ({ id: m.id, ...(m.display_name ? { name: m.display_name } : {}) }));
-    if (imageOnly && list.length && !jimengModels(base, list).length) throw new Error(this.zh ? '服务返回了列表，但没有识别到图片模型' : 'The list contains no recognized image models');
-    return imageOnly ? jimengModels(base, list) : list;
+    const payload = res.json as { code?: number }; if (payload.code !== undefined && payload.code !== 0) throw new Error('models-request-failed');
+    const list = ((res.json as { data?: { id: string; name?: string; display_name?: string; architecture?: { output_modalities?: string[] } }[] }).data ?? []);
+    const filtered = s.id === 'openrouter' && imageOnly ? list.filter(m => m.architecture?.output_modalities?.includes('image')) : list;
+    const models = filtered.map(m => ({ id: m.id, name: m.name ?? m.display_name }));
+    return imageOnly && s.id !== 'openrouter' ? jimengModels(base, models) : models;
   }
 }

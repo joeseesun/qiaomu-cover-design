@@ -1,14 +1,13 @@
-import { App, Notice, PluginSettingTab, SecretComponent, setIcon } from 'obsidian';
+import { App, Notice, PluginSettingTab, SecretComponent, TextComponent, setIcon } from 'obsidian';
 import type CoverPlugin from './main';
 import { folderPath } from './model';
 import { GROUPS, PLATFORMS } from './platforms';
 import { FONT_SITES } from './fontbrowser';
-import { CodexInfo, detectCodex } from './codex';
 import { ModelDialog } from './modeldialog';
-import { chatLabel, imageLabel, removeChat, removeImage, switchChat, switchImage, pickChat, pickImage, aiReady, imageReady, type ChatSnap, type ImageSnap } from './aiparse';
+import { chatLabel, imageLabel, removeChat, removeImage, switchChat, switchImage, syncProfiles, imageConnection } from './aiparse';
 import { FONT_PACKS } from './fontlib';
 import { installPack, packMissing } from './fontpack';
-import { FontLibraryModal, ShortcutsModal } from './modals';
+import { FontLibraryModal, ShortcutsModal, PickFolder } from './modals';
 import { bytes, textButton, iconButton } from './ui';
 import { more, Row, section, statusBar } from './settingsui';
 
@@ -17,7 +16,7 @@ const TABS: { id: SettingsTab; icon: string }[] = [{ id: 'general', icon: 'slide
 import { chatSourceOf, imageSourceOf } from './catalog';
 
 export class CoverSettings extends PluginSettingTab {
-  tab: SettingsTab = 'general'; private off?: () => void; private codex?: CodexInfo | 'missing' | 'checking'; private testLine?: { tone: 'ok' | 'warn'; text: string };
+  tab: SettingsTab = 'general'; private off?: () => void; private testLine?: { tone: 'ok' | 'warn'; text: string };
   constructor(app: App, private plugin: CoverPlugin) { super(app, plugin); }
   hide(): void { this.off?.(); this.off = undefined; }
   private get t(): CoverPlugin['t'] { return this.plugin.t.bind(this.plugin); }
@@ -38,8 +37,17 @@ export class CoverSettings extends PluginSettingTab {
   }
 
   private folderRow(parent: HTMLElement, name: string, desc: string, get: () => string, set: (v: string) => void): void {
-    new Row(parent, name, desc).addText(text => text.setValue(get()).onChange(value => {
-      try { set(folderPath(value)); this.save(); text.inputEl.removeClass('qc-invalid'); } catch { text.inputEl.addClass('qc-invalid'); }
+    let input: TextComponent;
+    const row = new Row(parent, name, desc);
+    row.el.addClass('qcs-folder-row');
+    row.addText(text => {
+      input = text; text.inputEl.setAttribute('aria-label', name);
+      text.setValue(get()).onChange(value => {
+        try { set(folderPath(value)); this.save(); text.inputEl.removeClass('qc-invalid'); }
+        catch { text.inputEl.addClass('qc-invalid'); }
+      });
+    }).addButton(button => button.setButtonText(this.plugin.isZh() ? '浏览…' : 'Browse…').onClick(() => {
+      new PickFolder(this.app, path => { set(folderPath(path)); input.setValue(path); input.inputEl.removeClass('qc-invalid'); this.save(); }, this.t('folderPick'), false).open();
     }));
   }
 
@@ -55,10 +63,15 @@ export class CoverSettings extends PluginSettingTab {
     this.folderRow(basics, t('designFolder'), t('designFolderDesc'), () => s.designFolder, v => { s.designFolder = v; });
     const ui = section(body, zh ? '界面' : 'Interface');
     new Row(ui, zh ? '顶部插入工具' : 'Top insertion tools', zh ? '仅图标更简洁；悬停查看名称。图标和文字更适合初次使用。' : 'Icons keep the toolbar compact; hover for labels. Text labels help you learn the tools.').addDropdown(d => d.addOptions(zh ? { icons: '仅图标', labels: '图标和文字' } : { icons: 'Icons only', labels: 'Icons and text' }).setValue(s.toolbarLabels ? 'labels' : 'icons').onChange(value => { s.toolbarLabels = value === 'labels'; this.save(); for (const leaf of this.app.workspace.getLeavesOfType('qiaomu-cover-design')) (leaf.view as { refreshToolbar?: () => void }).refreshToolbar?.(); }));
-    const photos = section(body, zh ? '图库照片' : 'Gallery photos', zh ? '在图库的 Unsplash 页签浏览推荐照片或搜索。使用自己的免费 Access Key 或代理。' : 'Browse recommended photos or search in Gallery → Unsplash. Use your own free Access Key or proxy.');
-    const keyRow = new Row(photos, 'Unsplash Access Key', zh ? '在 unsplash.com/developers 免费申请；只保存在 Obsidian 密钥库中。' : 'Get one free at unsplash.com/developers; stored in Obsidian\'s secret storage.');
+    const photos = section(body, zh ? 'Unsplash 免费摄影图库' : 'Unsplash free photo library', zh ? '搜索风景、人物、建筑等高清照片，插入到设计中。Unsplash 免费照片可按其许可用于个人和商业创作；不是开源素材，也不包含 Unsplash+ 付费照片。' : 'Find high-resolution photos for your designs. Free Unsplash photos allow personal and commercial use under the Unsplash License; Unsplash+ paid photos are not included.');
+    const links = photos.createDiv('qcs-photo-links');
+    for (const [label, href] of [[zh ? '免费申请 Access Key' : 'Get a free Access Key', 'https://unsplash.com/oauth/applications'], [zh ? '查看图片许可' : 'Photo license', 'https://unsplash.com/license']]) links.createEl('a', { text: label, href, attr: { target: '_blank', rel: 'noopener noreferrer' } });
+    const steps = photos.createEl('ol', { cls: 'qcs-key-steps' });
+    for (const text of (zh ? ['登录 Unsplash，进入 Your applications，点击 New Application 创建应用。', '打开应用详情的 Keys 区域，复制 Access Key（AK）。', '点击下方“链接…”添加密钥，粘贴 Access Key。不要填 Application ID（App ID）或 Secret Key（SK）。'] : ['Sign in to Unsplash → Your applications → New Application.', 'Open your application → Keys → copy Access Key (AK).', 'Use “Link…” below to add it to secret storage. Do not use Application ID or Secret Key (SK).'])) steps.createEl('li', { text });
+    const keyRow = new Row(photos, 'Unsplash Access Key', zh ? '连接后可在图库的 Unsplash 页签搜索照片。密钥保存在 Obsidian 密钥库中。' : 'Search photos in the gallery’s Unsplash tab after connecting. Your key is kept in Obsidian secret storage.');
     try { new SecretComponent(this.app, keyRow.control).setValue(s.unsplashSecret).onChange(v => { s.unsplashSecret = v; this.save(); }); } catch { keyRow.setDesc(zh ? '当前 Obsidian 版本不支持密钥库（需要 1.11.4+）。' : 'Needs Obsidian 1.11.4 or newer.'); }
-    new Row(photos, zh ? 'Unsplash 代理地址（可选）' : 'Unsplash proxy (optional)', zh ? '填了就不需要密钥：由你部署的代理（见 server/unsplash-proxy.js）持有密钥，适合团队或公开分发。' : 'Set this instead of a key: your own proxy holds the key (see server/unsplash-proxy.js).').addText(x => x.setPlaceholder('https://…workers.dev').setValue(s.unsplashProxy).onChange(v => { const u = v.trim(); if (!u || /^https:\/\//.test(u)) { s.unsplashProxy = u; this.save(); x.inputEl.removeClass('qc-invalid'); } else x.inputEl.addClass('qc-invalid'); }));
+    const proxy = more(photos, zh ? '高级：使用代理（可选）' : 'Advanced: proxy (optional)');
+    new Row(proxy, zh ? 'Unsplash 代理地址' : 'Unsplash proxy', zh ? '通常留空即可。有团队管理员提供的代理地址时再填写；使用代理后无需在这里添加 Access Key，搜索词会发送给该代理。' : 'Leave empty for normal use. Use a proxy supplied by your team instead of an Access Key; searches are sent to that proxy.').addText(x => x.setPlaceholder('https://…workers.dev').setValue(s.unsplashProxy).onChange(v => { const u = v.trim(); if (!u || /^https:\/\//.test(u)) { s.unsplashProxy = u; this.save(); x.inputEl.removeClass('qc-invalid'); } else x.inputEl.addClass('qc-invalid'); }));
     const guides = section(body, t('guidesDefault'), t('s_guidesDesc'));
     new Row(guides, t('centerLines')).addToggle(x => x.setValue(s.guides.center).onChange(v => { s.guides.center = v; this.save(); }));
     new Row(guides, t('snap'), t('snapDesc')).addToggle(x => x.setValue(s.guides.snap).onChange(v => { s.guides.snap = v; this.save(); }));
@@ -114,68 +127,63 @@ export class CoverSettings extends PluginSettingTab {
   }
 
   /* ---------- AI designer ---------- */
-  private detect(): void {
-    if (this.codex === 'checking') return; this.codex = 'checking';
-    void detectCodex(this.plugin.settings.ai.codexBin).then(info => { this.codex = info; }, () => { this.codex = 'missing'; }).finally(() => { const el = this.containerEl.querySelector('.qcs-cli-status .qcs-desc'); if (el) { const info = this.codex, found = info && info !== 'missing' && info !== 'checking' ? info : undefined; el.setText(found ? this.t('aiS_codexFound', { version: found.version ?? '?', path: found.path }) : this.t('aiS_codexMissing')); } });
-  }
-
   private assistantTab(body: HTMLElement): void {
-    const t = this.t, ai = this.plugin.settings.ai, zh = this.plugin.isZh();
-    const toggle = new Row(body, zh ? '启用 AI 功能' : 'Enable AI', zh ? '管理排版和生图模型；关闭后保留所有配置。' : 'Manage layout and image models. Turning this off retains all configurations.');
-    toggle.addToggle(x => x.setValue(ai.enabled).onChange(value => { ai.enabled = value; this.save(); this.display(); }));
-    const bar = statusBar(body, !ai.enabled ? 'off' : this.plugin.ai.ready() ? 'ok' : 'warn', !ai.enabled ? t('aiS_off') : this.plugin.ai.ready() ? (zh ? '默认排版模型已配置' : 'Default layout model configured') : (zh ? '先添加一个排版模型' : 'Add a layout model to get started'), zh ? '配置完成不代表服务已连通；生图需选择已开通的模型。' : 'Configuration is not a connectivity check; image models must be activated by the provider.');
-    if (ai.enabled && this.plugin.ai.ready()) textButton(bar.action, t('aiTest'), () => this.runTest(bar.el), 'qc-btn-sm', 'plug-zap');
+    const t = this.t; const ai = this.plugin.settings.ai; const zh = this.plugin.isZh();
+    syncProfiles(ai);
+    const controls = section(body, zh ? 'AI 设计' : 'AI design');
+    new Row(controls, zh ? '启用 AI' : 'Enable AI', zh ? '排版和生图分别选择默认模型；实际使用时才会发送内容。' : 'Choose separate defaults for layout and images. Content is sent only when you use AI.').addToggle(x => x.setValue(ai.enabled).onChange(v => { ai.enabled = v; this.save(); this.display(); }));
+    const configured = this.plugin.ai.ready();
+    const bar = statusBar(controls, ai.enabled ? 'warn' : 'off', !ai.enabled ? t('aiS_off') : configured ? (zh ? '排版模型已配置' : 'Layout model configured') : (zh ? '添加一个排版模型即可开始' : 'Add a layout model to get started'), zh ? '配置不代表已连通。可测试排版连接；生图额度由所选服务提供。' : 'Configuration does not verify connectivity. Test layout below; image availability depends on your service.');
+    if (configured) textButton(bar.action, t('aiTest'), () => this.runTest(bar.el), 'qc-btn-sm', 'plug-zap');
     if (this.testLine) bar.el.createDiv({ text: this.testLine.text, cls: `qcs-status-test is-${this.testLine.tone}` });
-    this.modelList(section(body, zh ? '排版模型' : 'Layout models', zh ? '用于文案、版式和画布编辑。按服务分组，选择一个默认模型。' : 'For copy, layouts and canvas edits. Organized by service; select your default.'), 'chat');
-    const images = section(body, zh ? '生图模型' : 'Image models', zh ? '用于 AI 生图与图片修改，独立于排版模型。' : 'For image generation and editing, independent of layout models.');
-    this.modelList(images, 'image');
-    new Row(images, t('aiS_imageToggle'), zh ? '控制封面设计师的配图能力；直接“AI 生图”仍可选择已配置的模型。' : 'Controls pictures in the cover designer. Direct AI image generation can still use configured models.').addToggle(x => x.setValue(ai.imageOn).onChange(value => { ai.imageOn = value; this.save(); }));
-    if (ai.protocol === 'codex' || ai.images.some(x => x.snap.imageEngine === 'codex')) {
-      const local = more(body, zh ? '本机 Codex CLI' : 'Local Codex CLI');
-      if (this.codex === undefined) this.detect();
-      const info = this.codex, found = info && info !== 'missing' && info !== 'checking' ? info : undefined;
-      const cliRow = new Row(local, t('aiS_codexStatus'), found ? t('aiS_codexFound', { version: found.version ?? '?', path: found.path }) : info === 'checking' || info === undefined ? t('aiS_checking') : t('aiS_codexMissing')).addButton(b => b.setButtonText(t('aiS_recheck')).onClick(() => { this.codex = undefined; this.display(); })); cliRow.el.addClass('qcs-cli-status');
-      new Row(local, t('aiCodexBin'), t('aiCodexBinDesc')).addText(x => x.setPlaceholder('~/.local/bin/codex').setValue(ai.codexBin).onChange(value => { ai.codexBin = value.trim(); this.save(); }));
-    }
-    const foot = body.createDiv('qcs-foot'), privacy = more(foot, t('aiS_privacyTitle')); privacy.createDiv({ text: t('aiS_privacy'), cls: 'qcs-note' });
-    const dev = more(foot, t('assistantApi')); dev.createDiv({ text: t('assistantApiDesc'), cls: 'qcs-note' });
-    for (const provider of this.plugin.assistantList()) new Row(dev, provider.name, provider.id === 'offline' ? t('assistantOfflineDesc') : t('assistantExternalDesc'));
+    const changed = (): void => { this.testLine = undefined; if (this.containerEl.isConnected) this.display(); };
+    const layouts = section(body, zh ? '排版模型' : 'Layout models', zh ? '用于文案、排版和画布编辑。先选择服务，再登录并选择模型。' : 'For copy, layout and canvas edits. Choose a service, connect, then pick models.');
+    this.modelList(layouts, ai.chats.map(p => ({ id: p.id, label: chatLabel(p.snap), provider: chatSourceOf(p.snap).name, endpoint: p.snap.baseUrl })), ai.chatId,
+      id => { switchChat(ai, id); this.save(); changed(); },
+      () => new ModelDialog(this.plugin, 'chat', changed).open(),
+      id => { removeChat(ai, id); this.save(); changed(); },
+      id => { const p = ai.chats.find(p => p.id === id); if (p) new ModelDialog(this.plugin, 'chat', changed, p).open(); });
+    const images = section(body, zh ? '生图模型' : 'Image models', zh ? '用于顶部“AI 生图”和图片修改。添加模型不会自动生成图片。' : 'For AI images and image edits. Adding a model does not generate an image.');
+    this.modelList(images, ai.images.map(p => { const snap = imageConnection(ai, p.snap); return { id: p.id, label: imageLabel(snap), provider: imageSourceOf(snap).name, endpoint: snap.imageBaseUrl }; }), ai.imageId,
+      id => { switchImage(ai, id); this.save(); changed(); },
+      () => new ModelDialog(this.plugin, 'image', changed).open(),
+      id => { removeImage(ai, id); this.save(); changed(); },
+      id => { const p = ai.images.find(p => p.id === id); if (p) new ModelDialog(this.plugin, 'image', changed, p).open(); });
+    const foot = body.createDiv('qcs-foot');
+    const privacy = more(foot, t('aiS_privacyTitle'));
+    privacy.createDiv({ text: zh ? 'API 密钥与模型配置保存在此库的插件设置中；同步或备份插件设置时也可能一并复制。ChatGPT 登录由本机 Codex 管理。云服务按各自规则计费，账号登录不代表免费。' : 'API keys and model settings are stored in this vault’s plugin data and may be copied by sync or backups. Codex manages ChatGPT credentials. Account sign-in does not imply free usage.', cls: 'qcs-note' });
+    const dev = more(foot, t('assistantApi'));
+    dev.createDiv({ text: t('assistantApiDesc'), cls: 'qcs-note' });
+    for (const p of this.plugin.assistantList()) new Row(dev, p.name, p.id === 'offline' ? t('assistantOfflineDesc') : p.id === 'ai' ? (zh ? '内置，使用上面的设置。' : 'Built in, uses the settings above.') : t('assistantExternalDesc'));
   }
 
-  private modelList(parent: HTMLElement, kind: 'chat' | 'image'): void {
-    const ai = this.plugin.settings.ai, zh = this.plugin.isZh(), active = kind === 'chat' ? ai.chatId : ai.imageId;
-    const add = (): void => new ModelDialog(this.plugin, kind, () => { this.codex = undefined; this.display(); }).open();
-    const tools = parent.createDiv('qcs-model-toolbar'), search = tools.createEl('input', { cls: 'qcs-model-search', attr: { type: 'search', placeholder: zh ? '查找名称或模型 ID…' : 'Find a name or model ID…' } });
-    textButton(tools, zh ? '添加模型' : 'Add model', add, 'qc-btn-sm', 'plus');
+  private modelList(parent: HTMLElement, items: { id: string; label: string; provider: string; endpoint: string }[], active: string, pick: (id: string) => void, add: () => void, remove: (id: string) => void, edit: (id: string) => void): void {
+    const zh = this.plugin.isZh(); const toolbar = parent.createDiv('qcs-model-toolbar');
+    const search = toolbar.createEl('input', { type: 'search', attr: { placeholder: zh ? '搜索服务或模型' : 'Search services or models', 'aria-label': zh ? '搜索模型' : 'Search models' } });
+    search.hidden = items.length === 0;
+    textButton(toolbar, zh ? '添加模型' : 'Add models', add, 'qc-btn-sm', 'plus');
     const list = parent.createDiv('qcs-model-list');
-    const profiles = kind === 'chat' ? ai.chats : ai.images;
-    const items = profiles.map(profile => {
-      const snap = kind === 'chat' ? profile.id === ai.chatId ? pickChat(ai) : profile.snap as ChatSnap : profile.id === ai.imageId ? pickImage(ai) : profile.snap as ImageSnap;
-      const source = kind === 'chat' ? chatSourceOf(snap as ChatSnap) : imageSourceOf(snap as ImageSnap), local = source.id === 'codex';
-      const base = kind === 'chat' ? (snap as ChatSnap).baseUrl : (snap as ImageSnap).imageBaseUrl || (source.id === 'custom' ? ai.baseUrl : source.baseUrl);
-      let host = ''; try { host = new URL(base).host; } catch { /* incomplete configuration */ }
-      const model = kind === 'chat' ? local ? (snap as ChatSnap).codexModel : (snap as ChatSnap).model : local ? ai.codexModel : (snap as ImageSnap).imageModel;
-      const ready = kind === 'chat' ? aiReady({ ...ai, ...snap as ChatSnap, enabled: true }) : imageReady({ ...ai, ...snap as ImageSnap, imageOn: true, enabled: true });
-      return { id: profile.id, snap, label: kind === 'chat' ? chatLabel(snap as ChatSnap) : imageLabel(snap as ImageSnap), model, service: source.name, host, local, key: `${source.id}|${base}`, ready };
-    }).sort((a, b) => Number(b.id === active) - Number(a.id === active));
     const draw = (): void => {
-      list.empty(); const q = search.value.trim().toLowerCase(), groups = new Map<string, typeof items>();
-      for (const item of items) if (!q || `${item.label} ${item.model} ${item.service} ${item.host}`.toLowerCase().includes(q)) { const group = groups.get(item.key) ?? []; group.push(item); groups.set(item.key, group); }
-      if (!groups.size) list.createDiv({ text: zh ? '没有匹配的模型。' : 'No matching models.', cls: 'qc-empty-note' });
-      for (const group of groups.values()) {
-        const section = list.createDiv('qcs-model-service'), header = section.createDiv('qcs-model-service-head'), first = group[0]!;
-        setIcon(header.createSpan(), first.local ? 'terminal' : 'cloud'); header.createSpan({ text: first.service }); if (first.host) header.createSpan({ text: first.host, cls: 'qc-hint' });
-        for (const item of group) {
-          const row = section.createDiv({ cls: `qcs-model-row${item.id === active ? ' is-active' : ''}`, attr: { 'data-profile': item.id } }), info = row.createDiv('qcs-model-info');
-          const title = info.createDiv('qcs-model-title'); title.createSpan({ text: item.label }); if (item.id === active) title.createSpan({ text: zh ? '默认' : 'Default', cls: 'qcs-model-default' });
-          info.createDiv({ text: `${item.model || (zh ? '默认模型' : 'Default model')} · ${item.ready ? zh ? '已配置' : 'Configured' : zh ? '待配置' : 'Needs setup'}`, cls: 'qcs-model-meta' });
-          const actions = row.createDiv('qcs-model-actions');
-          if (item.id !== active) textButton(actions, zh ? '设为默认' : 'Set default', () => { if (kind === 'chat') switchChat(ai, item.id); else switchImage(ai, item.id); this.testLine = undefined; this.codex = undefined; this.save(); this.display(); }, 'qc-btn-sm');
-          iconButton(actions, 'pencil', zh ? '编辑模型' : 'Edit model', () => new ModelDialog(this.plugin, kind, () => { this.codex = undefined; this.display(); }, { id: item.id, snap: item.snap }).open());
-          if (profiles.length > 1) iconButton(actions, 'trash-2', zh ? '删除模型' : 'Delete model', () => { if (kind === 'chat') removeChat(ai, item.id); else removeImage(ai, item.id); this.save(); this.display(); });
+      list.empty(); const q = search.value.trim().toLowerCase();
+      const filtered = items.filter(p => `${p.provider} ${p.label}`.toLowerCase().includes(q));
+      if (!filtered.length) { list.createDiv({ text: items.length ? (zh ? '没有匹配的模型，试试其他关键词。' : 'No match. Try another search.') : (zh ? '还没有模型，点击“添加模型”选择服务。' : 'No models yet. Choose a service with Add models.'), cls: 'qcs-model-empty' }); return; }
+      for (const key of new Set(filtered.map(p => `${p.provider}|${p.endpoint}`))) {
+        const group = filtered.filter(p => `${p.provider}|${p.endpoint}` === key); const first = group[0]!;
+        const head = list.createDiv({ text: first.provider, cls: 'qcs-model-provider' });
+        try { if (first.endpoint) head.createSpan({ text: new URL(first.endpoint).host, cls: 'qc-hint' }); } catch { /* Unconfigured legacy endpoint. */ }
+        for (const p of group) {
+          const row = list.createDiv('qcs-model-row');
+          const choice = row.createEl('button', { cls: 'qcs-model-choice', attr: { type: 'button', 'aria-pressed': String(p.id === active) } });
+          setIcon(choice.createSpan({ cls: 'qcs-model-mark', attr: { 'aria-hidden': 'true' } }), p.id === active ? 'circle-check' : 'circle');
+          choice.createSpan({ text: p.label, cls: 'qcs-model-name' });
+          if (p.id === active) choice.createSpan({ text: zh ? '默认' : 'Default', cls: 'qc-hint' });
+          choice.addEventListener('click', () => pick(p.id));
+          textButton(row, zh ? '编辑' : 'Edit', () => edit(p.id), 'qc-btn-sm qc-ghost');
+          textButton(row, zh ? '移除' : 'Remove', () => remove(p.id), 'qc-btn-sm qc-ghost');
         }
       }
-    }; search.addEventListener('input', draw); draw();
+    };
+    search.addEventListener('input', draw); draw();
   }
 
   private runTest(bar: HTMLElement): void {

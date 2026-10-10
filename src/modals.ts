@@ -16,8 +16,8 @@ export class PickFile extends FuzzySuggestModal<TFile> {
   onChooseItem(file: TFile): void { this.pick(file); }
 }
 export class PickFolder extends FuzzySuggestModal<TFolder> {
-  constructor(app: App, private pick: (path: string) => void, label: string) { super(app); this.setPlaceholder(label); }
-  getItems(): TFolder[] { return this.app.vault.getAllFolders(true); }
+  constructor(app: App, private pick: (path: string) => void, label: string, private includeRoot = true) { super(app); this.setPlaceholder(label); }
+  getItems(): TFolder[] { return this.app.vault.getAllFolders(this.includeRoot); }
   getItemText(f: TFolder): string { return f.isRoot() ? '/' : f.path; }
   onChooseItem(f: TFolder): void { this.pick(f.isRoot() ? '' : f.path); }
 }
