@@ -8,7 +8,7 @@ Optional AI tools compose copy and layouts, generate images, or edit selected im
 
 **Desktop only; Obsidian 1.11.4 or newer.** Offline editing needs no account. Cloud AI requires your own provider account and may incur charges. Unsplash requires your own Access Key or proxy. The plugin is free; optional donations do not unlock features. Opening About loads the author’s follow/donation QR images from radio.qiaomu.ai. No client telemetry is collected. Network requests occur for the default font library (GitHub/jsDelivr), configured AI providers (prompts and selected reference images), and Unsplash (search, photos and required download tracking). Custom endpoints/proxies are user supplied. Codex CLI runs a local process using your configured account. Local-folder browsing, system export and CLI work may access files outside the vault; folder browsing is shallow, ignores symlinks and never deletes originals.
 
-Install from the [GitHub release](https://github.com/joeseesun/qiaomu-cover-design/releases/tag/0.2.1), or use the official directory once its review and listing are available. For manual installation, extract the complete ZIP into `.obsidian/plugins/`; preserve `data.json`, `gallery/`, `image-jobs/`, custom fonts and caches when upgrading. The official installer needs only the three root plugin assets; stickers/icons are embedded in `main.js`, and fonts are fetched with SHA-256 verification on first use.
+Install from the [GitHub release](https://github.com/joeseesun/qiaomu-cover-design/releases/tag/0.2.2), or open the [official directory listing](https://community.obsidian.md/plugins/qiaomu-cover-design). Directory indexing and client search availability are separate from webpage publication. For manual installation, extract the complete ZIP into `.obsidian/plugins/`; preserve `data.json`, `gallery/`, `image-jobs/`, custom fonts and caches when upgrading. The official installer needs only the three root plugin assets; stickers/icons are embedded in `main.js`, and fonts are fetched with SHA-256 verification on first use.
 
 在 Obsidian 中，把笔记标题和选文做成封面。离线编辑，设计文件与导出图片都保存在你的库内。
 
@@ -23,6 +23,7 @@ Install from the [GitHub release](https://github.com/joeseesun/qiaomu-cover-desi
 - **多种模板**，套用时保留你的标题与副标题；文字预设（荧光笔、描边、投影、标签）、形状、本地 / 库内 / 粘贴 / 拖入图片（超大图自动压缩）。
 - 文字：字重、斜体、行高、字距、描边、阴影、底色；图片圆角、翻转、铺满；纯色与渐变背景；吸附参考线、对齐、图层拖拽排序、锁定、复制粘贴、右键菜单。
 - **导出**：PNG / JPEG / WebP，1–3 倍，超出平台限制（如 YouTube 2MB）自动压缩；位置可选库内文件夹、笔记所在文件夹或系统文件夹；文件名模板；导出后可插入笔记、写入 `cover` 属性、复制到剪贴板。
+- **独立对话**：「新对话」保留当前画布并清空旧聊天上下文；点击对话标题切换历史、重命名或删除，草稿随对话保存。本次编辑中已应用的消息可复制为独立方案；从空白开始也会创建单独画布。仅携带当前对话最近的成功轮次及当前画布。
 - **对话面板**：所有操作已抽象为指令协议，当前提供离线中文 / 英文指令；其他插件可通过 `registerAssistant` 接入模型。
 - `.qcover` 自动保存；撤销 / 重做；冲突不覆盖；乔木 Home 集成；中文 / English。
 

@@ -240,6 +240,19 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-popover-head { position: absolute; top: 6px; right: 6px; display: none; }
 
 /* chat */
+.qc-root .qc-conversation-bar { display: flex; align-items: center; gap: 12px; flex: none; min-width: 0; padding: 0 8px; }
+.qc-root button.qc-conversation-title { display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px; min-width: 0; flex: 1; height: 30px; padding: 4px 0; color: var(--qc-muted); background: transparent; box-shadow: none; text-align: left; }
+.qc-conversation-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.qc-conversation-chevron { display: flex; flex: none; } .qc-conversation-chevron svg { width: 12px; height: 12px; }
+.qc-root button.qc-conversation-new { flex: none; height: 28px; min-height: 28px; padding: 4px 8px; gap: 4px; font-size: 12px; background: var(--qc-surface); color: var(--qc-ink); box-shadow: none; }
+.qc-root .qc-conversation-new svg { width: 14px; height: 14px; }
+.qc-root .qc-conversation-title:hover, .qc-root .qc-conversation-new:hover { background: var(--qc-hover); color: var(--qc-ink); }
+.qc-root .qc-msg-controls { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.qc-root .qc-msg-controls .qc-msg-restore, .qc-root .qc-msg-controls .qc-msg-more { margin: 0; width: 24px; height: 24px; min-height: 24px; padding: 0; color: var(--qc-muted); }
+.qc-root .qc-chat-scope { margin: 2px 2px 8px; padding: 0; gap: 6px; min-height: 24px; background: transparent; box-shadow: none; border-radius: 0; color: var(--qc-muted); }
+.qc-root .qc-chat-scope svg { color: var(--qc-muted); }
+.qc-chat-scope-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.qc-root .qc-chat-scope .qc-chat-scope-clear { flex: none; width: 22px; height: 22px; min-height: 22px; padding: 0; }
 .qc-chat-head { display: flex; gap: 8px; } .qc-select { max-width: 100%; }
 .qc-chat-messages { flex: 1; min-height: 160px; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
 .qc-chat-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 2px; }

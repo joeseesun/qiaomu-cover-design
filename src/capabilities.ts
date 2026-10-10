@@ -275,6 +275,12 @@ export const CAPABILITIES: AnyCapability[] = [
  * the canvas menus call must be covered by a capability's `ui` list (tests/capabilities.test.ts).
  */
 export const UI_ONLY: Record<string, string> = {
+  newChat: 'Only the user starts a clean conversation; a model cannot reset its context.',
+  switchConversation: 'Conversation history is selected explicitly by the user.',
+  renameConversation: 'Conversation management is not a canvas operation.',
+  deleteConversation: 'Deleting history requires the user confirmation dialog.',
+  branchConversation: 'Creating an independent canvas direction is an explicit user action.',
+  blankConversation: 'Starting an empty artwork must never happen from model output.',
   setDrawing: 'Pointer brush mode is controlled by the user, not an assistant operation.',
   beginColorEdit: 'Coalesce a live color picker session into one undo step.',
   endColorEdit: 'Finish the live color picker undo transaction.',

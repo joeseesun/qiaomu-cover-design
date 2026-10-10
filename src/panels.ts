@@ -170,6 +170,18 @@ function fontNudge(view: CoverView, body: HTMLElement): void {
 }
 function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const plugin = view.plugin; const providers = plugin.assistantList(); const ai = plugin.ai;
+  const conversations = body.createDiv('qc-conversation-bar');
+  const historyButton = conversations.createEl('button', { cls: 'qc-conversation-title', attr: { type: 'button', 'aria-haspopup': 'menu' } });
+  const title = historyButton.createSpan('qc-conversation-name'); setIcon(historyButton.createSpan('qc-conversation-chevron'), 'chevron-down'); quietName(historyButton, view.t('chatHistory'));
+  historyButton.addEventListener('click', event => {
+    if (view.busy) return; const menu = new Menu().setUseNativeMenu(false).setParentElement(body);
+    for (const session of view.conversations) menu.addItem(i => i.setTitle(session.title || view.t('chatUntitled')).setChecked(session.id === view.activeConversation?.id).onClick(() => void view.action(() => view.switchConversation(session.id))));
+    menu.addSeparator(); menu.addItem(i => i.setTitle(view.t('chatRename')).setIcon('pencil').onClick(() => conversationDialog(view, false)));
+    menu.addItem(i => i.setTitle(view.t('chatDelete')).setIcon('trash-2').onClick(() => conversationDialog(view, true)));
+    menu.addSeparator(); menu.addItem(i => i.setTitle(view.t('chatCopyDirection')).setIcon('copy-plus').onClick(() => void view.action(() => view.branchConversation())));
+    menu.addItem(i => i.setTitle(view.t('chatBlank')).setIcon('file-plus-2').onClick(() => void view.action(() => view.blankConversation()))); menu.showAtMouseEvent(event);
+  });
+  const newButton = textButton(conversations, view.t('chatNew'), () => void view.action(() => view.newChat()), 'qc-conversation-new', 'plus');
   const head = body.createDiv('qc-chat-head');
   const sel = head.createEl('select', { cls: 'qc-select' });
   for (const p of providers) sel.createEl('option', { text: p.name, value: p.id });
@@ -191,11 +203,12 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const compose = body.createDiv('qc-chat-compose'); const trayEl = compose.createDiv('qc-tray qc-hidden');
   const book = playbookFor(view.platform()?.id); const current = templateById(view.design?.template ?? '');
   // The current canvas pick shows above the box, so "make it bigger / change its colour" has a visible referent.
-  const selChip = compose.createDiv({ cls: 'qc-sel-chip qc-hidden' });
+  const selChip = compose.createDiv({ cls: 'qc-sel-chip qc-chat-scope' });
   const updateSelChip = (): void => {
     const label = view.selectionLabel();
-    selChip.toggleClass('qc-hidden', !label); selChip.empty();
-    if (label) { setIcon(selChip.createSpan({ cls: 'qc-sel-chip-icon' }), 'text-cursor-input'); selChip.createSpan({ text: view.t('selChip', { what: label }) }); }
+    selChip.empty(); selChip.classList.toggle('is-selection', !!label);
+    setIcon(selChip.createSpan({ cls: 'qc-sel-chip-icon' }), label ? 'mouse-pointer-2' : 'panel-top'); selChip.createSpan({ text: label ? view.t('selChip', { what: label }) : view.t('chatCanvasScope'), cls: 'qc-chat-scope-name' });
+    if (label) { const clear = iconButton(selChip, 'x', view.t('chatClearSelection'), () => { if (view.busy) return; view.canvas?.discardActiveObject(); view.canvas?.requestRenderAll(); view.refreshInspector(true); updateSelChip(); }, 'qc-chat-scope-clear'); clear.removeAttribute('aria-label'); quietName(clear, view.t('chatClearSelection')); clear.disabled = view.busy; }
   };
   view.onSelection = updateSelChip; updateSelChip();
   const input = compose.createEl('textarea', { cls: 'qc-chat-input', attr: { rows: '2', placeholder: current ? view.t('chatPlaceholderPattern', { name: view.zh ? current.zh : current.en }) : view.t(sel.value === 'ai' ? 'chatPlaceholderAi' : 'chatPlaceholder') } });
@@ -222,6 +235,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
 
   const syncInput = (): void => {
     if (!input.isConnected) return;
+    title.setText(view.activeConversation?.title || view.t('chatUntitled')); historyButton.disabled = view.busy; newButton.disabled = view.busy; updateSelChip();
     view.chatDraft = input.value;
     input.style.removeProperty('height');
     input.style.height = `${Math.min(180, input.scrollHeight)}px`;
@@ -236,6 +250,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
 
   const starters = (): void => {
     const empty = messages.createDiv('qc-chat-empty');
+    if (view.conversations.length > 1) { empty.createEl('h3', { text: view.t('chatFreshTitle') }); empty.createEl('p', { text: view.t('chatFreshHint'), cls: 'qc-hint' }); input.placeholder = view.t('chatFreshPlaceholder'); return; }
     if (sel.value !== 'ai') {
       setIcon(empty.createDiv('qc-empty-icon'), 'sparkles'); empty.createEl('h3', { text: view.t('chatTitle') }); empty.createEl('p', { text: view.t('chatIntro') });
       for (const prompt of [view.t('chatEx1'), view.t('chatEx2'), view.t('chatEx3'), view.t('chatEx4')]) {
@@ -274,9 +289,13 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       for (const w of m.warn ?? []) { const li = bubble.createDiv('qc-msg-applied qc-msg-warn'); setIcon(li.createSpan(), 'alert-triangle'); li.createSpan({ text: w }); }
       // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
       if (m.role === 'assistant' && m.snapshot) {
-        const restore = bubble.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button', 'aria-label': view.t('msgRestore') } });
+        const controls = bubble.createDiv('qc-msg-controls');
+        const restore = controls.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button' } }); quietName(restore, view.t('msgRestore'));
         setIcon(restore, 'history');
+        restore.disabled = view.busy;
         restore.addEventListener('click', () => void view.action(() => view.restoreSnapshot(m.snapshot!)));
+        const more = iconButton(controls, 'more-horizontal', view.t('chatMessageMore'), event => { if (view.busy) return; const menu = new Menu().setUseNativeMenu(false).setParentElement(body); menu.addItem(i => i.setTitle(view.t('chatBranch')).setIcon('git-branch').onClick(() => void view.action(() => view.branchConversation(index)))); menu.showAtMouseEvent(event); }, 'qc-msg-more');
+        more.removeAttribute('aria-label'); quietName(more, view.t('chatMessageMore')); more.disabled = view.busy;
       }
       // Variant strips stay visible (and clickable) on older messages, so going back to an earlier
       // candidate is always possible; tweaks and retry act on the current state, so they stay on the last message.
@@ -370,7 +389,20 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     });
   };
   onEnter(input, e => { e.preventDefault(); submit(); });
+  input.addEventListener('input', () => view.persistChat());
   draw();
+}
+
+function conversationDialog(view: CoverView, deleting: boolean): void {
+  const modal = new Modal(view.app); modal.onOpen = () => {
+    modal.titleEl.setText(view.t(deleting ? 'chatDelete' : 'chatRename')); modal.contentEl.addClass('qc-modal');
+    const input = deleting ? undefined : modal.contentEl.createEl('input', { type: 'text', cls: 'qc-input', attr: { maxlength: '80' } });
+    if (input) { input.value = view.activeConversation?.title || ''; quietName(input, view.t('chatRename')); }
+    else modal.contentEl.createEl('p', { text: view.t('chatDeleteHint'), cls: 'qc-hint' });
+    const footer = modal.contentEl.createDiv('qc-modal-footer'); textButton(footer, view.t('cancel'), () => modal.close());
+    const confirm = textButton(footer, view.t(deleting ? 'remove' : 'save'), () => { if (!deleting && !input?.value.trim()) return; confirm.disabled = true; void (deleting ? view.deleteConversation() : view.renameConversation(input!.value)).then(() => modal.close()).catch(e => { confirm.disabled = false; view.plugin.report(e); }); }, 'qc-primary');
+    if (input) { onEnter(input, event => { event.preventDefault(); confirm.click(); }); view.win.requestAnimationFrame(() => { input.focus(); input.select(); }); }
+  }; modal.open();
 }
 
 /* ---------- inspector ---------- */
