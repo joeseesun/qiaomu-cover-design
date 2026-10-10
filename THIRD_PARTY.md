@@ -19,3 +19,31 @@
 ## 生图交互参考
 
 [Poster Studio](https://github.com/joeseesun/poster-studio) commit `a5e991ccabf30edf50d5e7ce8a8a4f47728b1d1d` — MIT — Copyright (c) 2026 向阳乔木。参考其快捷提示词管理与图片改写工作流，插件使用独立实现和重新编写的中英提示词，不打包 React / Next.js 或网页服务端代码。
+
+## 平滑笔迹
+
+perfect-freehand 1.2.3 — https://github.com/steveruizok/perfect-freehand — MIT. 用于自由绘制的平滑轮廓与压感；随生产 bundle 打包，完整许可如下。
+
+```text
+MIT License
+
+Copyright (c) 2021 Stephen Ruiz Ltd
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

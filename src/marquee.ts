@@ -11,7 +11,7 @@ export function bindMarquee(stage:HTMLElement,c:Canvas,width:number,height:numbe
   let cleanup:()=>void=()=>{};
   const background=(o:FabricObject)=>{const b=o.getBoundingRect();return b.left<=2 && b.top<=2 && b.left+b.width>=width-2 && b.top+b.height>=height-2;};
   stage.addEventListener('mousedown',e=>{
-    if(e.button!==0 || !stage.isConnected)return;
+    if(e.button!==0 || !stage.isConnected || c.isDrawingMode)return;
     const inCanvas=c.wrapperEl.contains(e.target as Node),target=inCanvas?c.findTarget(e).target:undefined;
     if(target && !background(target))return;
     // Do not intercept active transform handles or editing a text box.

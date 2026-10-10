@@ -1,15 +1,20 @@
-import type { GeneratedPicture, ImageResult } from './seedream';
+import type { GeneratedPicture, ImageResult, SeedreamOptions } from './seedream';
 export type ImageJobState = 'queued' | 'running' | 'ready' | 'failed' | 'interrupted';
 export interface ImageSelection { objects: {id:string;hash:string}[]; box: {left:number;top:number;width:number;height:number} }
 export interface ImageJob {
   id: string; created: number; prompt: string; model: string; path: string; layers: boolean;
   target?: { id: string; hash: string }; selection?: ImageSelection; state: ImageJobState; error?: string;
-  pictures?: Omit<GeneratedPicture, 'data'>[]; warnings?: string[]; usage?: ImageResult['usage'];
+  name?: string; taskDeleted?: boolean; request?: { modelId: string; width: number; height: number; options: SeedreamOptions };
+  pictures?: (Omit<GeneratedPicture, 'data'> & { storageIndex?: number })[]; warnings?: string[]; usage?: ImageResult['usage'];
 }
 export interface ImageJobStore {
   list(): Promise<ImageJob[]>;
   write(job: ImageJob, output?: ImageResult): Promise<void>;
   result(job: ImageJob): Promise<ImageResult>;
+  picture?(job: ImageJob, index: number): Promise<GeneratedPicture>;
+  recipe?(job: ImageJob): Promise<ImageJob>;
+  forgetRecord?(job: ImageJob): Promise<void>;
+  removeBinary?(job: ImageJob, index: number): Promise<void>;
 }
 /** Plugin-owned jobs do not depend on a modal or live canvas. A paid request is never retried automatically. */
 export class ImageJobs {
@@ -41,6 +46,29 @@ export class ImageJobs {
     finally{this.active--;this.emit();if(!this.disposed)this.notify(job);this.pump();}
   }
   result(job:ImageJob):Promise<ImageResult>{return this.store.result(job);}
+  async rename(job:ImageJob,name:string):Promise<void>{
+    if(job.state==='running'||job.state==='queued')throw Error('Wait for this task to finish');
+    const copy={...job,name:name.trim().slice(0,150)};await this.store.write(copy);Object.assign(job,copy);this.emit();
+  }
+  async removeRecord(job:ImageJob):Promise<void>{
+    if(job.state==='running')throw Error('Wait for this task to finish');
+    const pending=this.queue.find(q=>q.job===job);this.queue=this.queue.filter(q=>q.job!==job);
+    try{const copy={...job,taskDeleted:true,request:undefined,name:undefined,prompt:'',pictures:job.pictures?.map(p=>({...p,name:p.name||job.name||job.prompt.slice(0,45)})),state:job.state==='queued'?'interrupted' as const:job.state};await this.store.write(copy);Object.assign(job,copy);this.emit();await this.store.forgetRecord?.(job);}
+    catch(e){if(pending&&!job.taskDeleted)this.queue.push(pending);this.pump();throw e;}
+  }
+  async renamePicture(job:ImageJob,index:number,name:string):Promise<void>{
+    if(job.state!=='ready'||!job.pictures?.[index]||!name.trim())throw Error('Image unavailable');
+    const copy={...job,pictures:job.pictures.map((p,i)=>i===index?{...p,name:name.trim().slice(0,150)}:p)};
+    await this.store.write(copy);Object.assign(job,copy);this.emit();
+  }
+  async removePicture(job:ImageJob,index:number):Promise<void>{
+    const meta=job.pictures?.[index];if(job.state!=='ready'||!meta||!this.store.removeBinary)throw Error('Image unavailable');
+    const storageIndex=meta.storageIndex??index;
+    const copy={...job,pictures:job.pictures!.map((p,i)=>({...p,storageIndex:p.storageIndex??i})).filter((_,i)=>i!==index)};
+    await this.store.write(copy);Object.assign(job,copy);this.emit();await this.store.removeBinary(job,storageIndex);
+  }
+  recipe(job:ImageJob):Promise<ImageJob>{return this.store.recipe?this.store.recipe(job):Promise.resolve(structuredClone(job));}
+  picture(job:ImageJob,index:number):Promise<GeneratedPicture>{return this.store.picture?this.store.picture(job,index):this.result(job).then(r=>r.pictures[index]!);}
   dispose():void{this.disposed=true;this.listeners.clear();this.queue=[];}
 }
 export async function imageHash(source:string):Promise<string>{

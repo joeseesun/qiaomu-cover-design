@@ -1,6 +1,9 @@
+import { COVER_ICON, registerCoverIcon } from './cover-icon';
+import { GalleryStore } from './gallery-store';
+import { GalleryDialog, type GalleryTab } from './gallery';
 import { ImageJobs } from './imagejobs';
 import { VaultImageJobStore } from './imagejobstore';
-import { ImageJobsDialog, ImageResultsDialog } from './imagejobdialog';
+import { ImageResultsDialog } from './imagejobdialog';
 import { App, getLanguage, MarkdownView, Notice, Platform, Plugin, TFile, normalizePath, setIcon } from 'obsidian';
 import { Design, folderPath, safeName } from './model';
 import { Key, translate } from './i18n';
@@ -19,7 +22,7 @@ import { builtPalette, templateById } from './templates';
 import { SerialWriter } from './model';
 
 export default class CoverPlugin extends Plugin {
-  qiaomuHome?: HomeProvider; imageJobs!: ImageJobs;
+  qiaomuHome?: HomeProvider; imageJobs!: ImageJobs; gallery!: GalleryStore; private galleryDialog?: GalleryDialog;
   settings: Settings = structuredClone(DEFAULTS); fonts!: FontService; ai = new AiService(() => this.settings.ai);
   /** Text a new cover should be designed from once its view has loaded, keyed by file path. */
   private briefs = new Map<string, string>();
@@ -49,14 +52,17 @@ export default class CoverPlugin extends Plugin {
     if (!this.ai.ready()) { new Notice(this.t('aiNotReady')); this.openSettings('assistant'); return; }
     await this.createDesign(name, 'minimal', note, name, undefined, text);
   }
-  openImageTasks(): void { new ImageJobsDialog(this).open(); }
+  openGallery(tab:GalleryTab='images',view?:CoverView):void{this.galleryDialog?.close();this.galleryDialog=new GalleryDialog(this,tab,view);this.galleryDialog.open();}
+  openImageTasks(): void { this.openGallery('tasks'); }
   activeCover(): CoverView | undefined { return this.app.workspace.getActiveViewOfType(CoverView) ?? undefined; }
 
   /** After fonts are installed: re-pair the fonts of every open cover. */
   /** Deferred tabs (not opened since launch) hold a placeholder view, so only real cover views are touched. */
   repairOpenCovers(): void { for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) if (leaf.view instanceof CoverView) leaf.view.repairFonts(); }
   async onload(): Promise<void> {
+    registerCoverIcon();
     this.settings = mergeSettings(await this.loadData());
+    this.gallery = new GalleryStore(this.app.vault.adapter, `${this.manifest.dir}/gallery`);
     this.imageJobs = new ImageJobs(new VaultImageJobStore(this.app.vault.adapter, `${this.manifest.dir}/image-jobs`), job => {
       const doc = activeDocument; const fragment = doc.createDocumentFragment();
       const row = doc.createElement('div'); row.className = 'qc-image-notice'; fragment.appendChild(row);
@@ -67,6 +73,7 @@ export default class CoverPlugin extends Plugin {
       const notice = new Notice(fragment, 12000); button.addEventListener('click', () => { notice.hide(); if (job.state === 'ready') new ImageResultsDialog(this, job).open(); else this.openImageTasks(); });
     });
     await this.imageJobs.refresh();
+    this.addCommand({ id:'image-library',name:this.isZh()?'打开图库':'Open image library',callback:()=>this.openGallery() });
     this.addCommand({ id: 'image-tasks', name: this.t('imageTasks'), callback: () => this.openImageTasks() });
     this.fonts = new FontService(this.app, () => this.settings.fontFolder, () => this.manifest.dir ?? '');
     this.registerView(VIEW, leaf => new CoverView(leaf, this));
@@ -121,7 +128,7 @@ export default class CoverPlugin extends Plugin {
       if (!checking) { const s = view.saveSeries(); if (s) new Notice(this.t('seriesSaved', { name: s.name })); view.refreshDrawer(); }
       return true;
     } });
-    this.addRibbonIcon('image', this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
+    this.addRibbonIcon(COVER_ICON, this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
     this.settingsTab = new CoverSettings(this.app, this); this.addSettingTab(this.settingsTab);
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (file instanceof TFile && file.extension === 'md') menu.addItem(item => item.setTitle(this.t('fromNote')).setIcon('image').onClick(() => new NewCoverModal(this, file, file.basename).open()));
@@ -136,7 +143,7 @@ export default class CoverPlugin extends Plugin {
     // Hide the host status bar only while a cover tab is in front.
     this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => { document.body.toggleClass('qc-cover-active', leaf?.view.getViewType() === VIEW); }));
   }
-  onunload(): void { this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
+  onunload(): void { this.galleryDialog?.close(); this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
 
   /** Covers opened with one click and not yet touched. They vanish again if closed untouched, so trying the designer leaves no clutter. */
   scratch = new Set<string>();

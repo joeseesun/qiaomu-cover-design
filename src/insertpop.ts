@@ -6,22 +6,18 @@ import { PATH_SHAPES } from './shapes';
 import type { CoverView } from './view';
 import { ASSET_CATS, AssetCat, AssetItem, assetSvg, assetThumb, loadAssets, searchAssets } from './assets';
 import { DECOR, drawDecor } from './decor';
-import { downloadPhoto, hasSource, Photo, searchPhotos, Source, unsplashKey } from './unsplash';
-import { emptyState, iconButton, quietName, textButton } from './ui';
+import { emptyState, iconButton, quietName } from './ui';
 
-type Tab = 'asset' | 'text' | 'shape' | 'image' | 'photo';
-export type InsertCategory = 'text' | 'asset' | 'shape' | 'other';
-let lastOther: Tab = 'image';
+export type InsertCategory = 'text' | 'asset' | 'shape';
 const STICKER_TAGS = ['火', '爱心', '火箭', '灯泡', '星', '皇冠', '奖杯', '礼物', '对勾', '警告', '钱', '书', '眼睛', '大脑', '笑'];
 const LINE_TAGS = ['箭头', '对勾', '星星', '爱心', '火', '灯泡', '书', '电脑', '时间', '搜索', '设置', '用户', '位置', '链接'];
 const PAGE = 90;
 
-export function openInsertPopover(view: CoverView, anchor: HTMLElement, category: InsertCategory = 'other'): void {
+export function openInsertPopover(view: CoverView, anchor: HTMLElement, category: InsertCategory = 'shape'): void {
   const doc = view.doc; const open = doc.querySelector('.qc-popover.qc-insert'); if (open) { const same = open.getAttribute('data-category') === category; open.dispatchEvent(new view.win.Event('qc-close')); if (same) return; }
   doc.querySelectorAll('.qc-popover').forEach(el => el.dispatchEvent(new view.win.Event('qc-close')));
   const zh = view.zh; const pop = doc.body.createDiv('qc-popover qc-insert qc-root-scope'); const r = anchor.getBoundingClientRect(); const width = Math.min(400, view.win.innerWidth - 16); const top = Math.max(8, Math.min(r.bottom + 6, view.win.innerHeight - 180));
-  pop.dataset.category = category; pop.setAttribute('role', 'dialog'); const panelName = category === 'other' ? (zh ? '插入其他' : 'More inserts') : ({ text: zh ? '文字' : 'Text', asset: zh ? '素材' : 'Assets', shape: zh ? '形状' : 'Shapes' }[category]); quietName(pop, panelName);
-  let tab: Tab = category === 'other' ? lastOther : category;
+  pop.dataset.category = category; pop.setAttribute('role', 'dialog'); const panelName = ({ text: zh ? '文字' : 'Text', asset: zh ? '素材' : 'Assets', shape: zh ? '形状' : 'Shapes' }[category]); quietName(pop, panelName);
   pop.style.width = `${width}px`; pop.style.left = `${Math.max(8, Math.min(r.left, view.win.innerWidth - width - 8))}px`; pop.style.top = `${top}px`; pop.style.height = `${Math.max(0, Math.min(600, view.win.innerHeight - top - 8))}px`;
   const close = (): void => { pop.remove(); doc.removeEventListener('pointerdown', outside, true); doc.removeEventListener('keydown', esc, true); };
   const outside = (e: Event): void => { if (!pop.contains(e.target as Node) && !anchor.contains(e.target as Node)) close(); };
@@ -29,19 +25,11 @@ export function openInsertPopover(view: CoverView, anchor: HTMLElement, category
   doc.addEventListener('pointerdown', outside, true); doc.addEventListener('keydown', esc, true); pop.addEventListener('qc-close', close);
 
   const tabsEl = pop.createDiv('qc-insert-tabs'); const body = pop.createDiv('qc-insert-body qc-assets');
-  const TABS: [Tab, string, string, string][] = [['shape', 'shapes', '形状', 'Shapes'], ['image', 'image-plus', '图片', 'Image'], ['photo', 'camera', '背景图', 'Photos']];
   const draw = (): void => {
-    tabsEl.empty();
-    if (category !== 'other') tabsEl.createEl('strong', { cls: 'qc-insert-title', text: panelName });
-    for (const [id, icon, zhName, enName] of category === 'other' ? TABS : []) {
-      const b = tabsEl.createEl('button', { cls: 'qc-insert-tab', attr: { type: 'button' } });
-      setIcon(b.createSpan({ cls: 'qc-insert-tab-icon' }), icon); b.createSpan({ text: zh ? zhName : enName }); b.classList.toggle('is-active', tab === id);
-      b.addEventListener('click', () => { tab = lastOther = id; draw(); });
-    }
+    tabsEl.empty(); tabsEl.createEl('strong', { cls: 'qc-insert-title', text: panelName });
     iconButton(tabsEl, 'x', view.t('close'), close, 'qc-insert-x');
     body.empty();
-    if (tab === 'asset') assetsTab(view, body, close); else if (tab === 'text') textTab(view, body, close); else if (tab === 'shape') shapeTab(view, body, close);
-    else if (tab === 'image') imageTab(view, body, close); else photoTab(view, body, draw);
+    if (category === 'asset') assetsTab(view, body, close); else if (category === 'text') textTab(view, body, close); else if (category === 'shape') shapeTab(view, body, close);
   };
   draw();
 }
@@ -135,53 +123,4 @@ function shapeTab(view: CoverView, body: HTMLElement, close: () => void): void {
     const b = deco.createEl('button', { cls: 'qc-shape-card', attr: { type: 'button', 'aria-description': k.use } }); b.createEl('img', { attr: { src: `data:image/svg+xml;utf8,${encodeURIComponent(art.svg)}`, alt: k.zh } }); b.createSpan({ text: k.zh });
     b.addEventListener('click', e => { void view.addDecor([{ kind: k.id, at: 'canvas', x: 0.35, y: 0.3, w: 0.3 }]); done(e, close); });
   }
-}
-function imageTab(view: CoverView, body: HTMLElement, close: () => void): void {
-  const col = body.createDiv('qc-col');
-  textButton(col, view.t('imageUpload'), () => { close(); view.pickImage(); }, '', 'image-plus');
-  textButton(col, view.t('imageVault'), () => { close(); view.pickVaultImage(); }, '', 'folder-open');
-  body.createDiv({ text: view.t('imageHint'), cls: 'qc-hint' });
-}
-
-/* ---------- Unsplash photos ---------- */
-function photoTab(view: CoverView, body: HTMLElement, redraw: () => void): void {
-  const zh = view.zh; const plugin = view.plugin; const src: Source = { key: unsplashKey(view.app, plugin.settings.unsplashSecret), proxy: plugin.settings.unsplashProxy };
-  if (!hasSource(src)) {
-    const card = body.createDiv('qc-photo-setup'); card.createEl('strong', { text: zh ? '用 Unsplash 的免费摄影做背景' : 'Use free Unsplash photos as backgrounds' });
-    card.createDiv({ text: zh ? '需要一个免费的 Access Key（unsplash.com/developers 申请，1 分钟）。密钥只保存在 Obsidian 的密钥库里。' : 'Needs a free Access Key from unsplash.com/developers. It is kept in Obsidian\'s secret storage.', cls: 'qc-hint' });
-    const row = card.createDiv('qc-col');
-    textButton(row, zh ? '去设置里填写密钥' : 'Enter the key in settings', () => plugin.openSettings('general'), 'qc-primary', 'key-round');
-    const homeId = homeSecret(view); if (homeId) textButton(row, zh ? '使用乔木 Home 里已配置的密钥' : 'Use the key from Qiaomu Home', () => { plugin.settings.unsplashSecret = homeId; void plugin.saveSettings(); redraw(); }, '', 'link');
-    return;
-  }
-  let query = ''; let seq = 0;
-  searchBox(body, zh ? '搜索摄影：山、海、咖啡、极简…（英文效果更好）' : 'Search photos: mountain, ocean, minimal…', q => { query = q.trim(); void run(); });
-  const status = body.createDiv('qc-hint'); const grid = body.createDiv('qc-photo-grid'); body.createDiv({ text: zh ? '照片来自 Unsplash，署名会写在图层名里。' : 'Photos by Unsplash; credit is kept in the layer.', cls: 'qc-hint qc-assets-foot' });
-  const run = async (): Promise<void> => {
-    const my = ++seq; grid.empty(); status.setText(zh ? '搜索中…' : 'Searching…');
-    try {
-      const photos = await searchPhotos(src, query); if (my !== seq) return; status.setText('');
-      if (!photos.length) emptyState(grid, { icon: 'image-off', title: zh ? `没有找到“${query}”的照片` : 'No photos found', hint: zh ? 'Unsplash 的搜索用英文效果更好，试试 mountain、ocean、minimal。' : 'English keywords work best.', actions: [{ label: zh ? '看热门照片' : 'Popular photos', run: () => { query = ''; void run(); }, primary: true }] });
-      for (const p of photos) {
-        const b = grid.createEl('button', { cls: 'qc-photo', attr: { type: 'button', 'aria-label': p.author } }); b.style.background = p.color; b.createEl('img', { attr: { src: p.thumb, alt: p.author, loading: 'lazy' } });
-        b.addEventListener('click', () => void use(p, b));
-      }
-    } catch (e) {
-      if (my !== seq) return; const m = e instanceof Error ? e.message : String(e); status.setText('');
-      emptyState(grid, { icon: m === 'key' ? 'key-round' : m === 'limit' ? 'timer' : 'wifi-off', title: m === 'key' ? (zh ? '密钥无效' : 'Invalid key') : m === 'limit' ? (zh ? '请求次数用完了' : 'Rate limit reached') : (zh ? '连不上 Unsplash' : 'Cannot reach Unsplash'), hint: m === 'key' ? (zh ? '到设置里重新填写 Access Key。' : 'Re-enter the key in settings.') : m === 'limit' ? (zh ? '免费密钥每小时 50 次，稍后再试，或申请正式资格。' : '50 requests per hour on a free key.') : (zh ? `网络不可用（${m}）。检查网络后重试。` : m),
-        actions: [{ label: zh ? '重试' : 'Retry', run: () => void run(), primary: true }, ...(m === 'key' ? [{ label: zh ? '打开设置' : 'Settings', run: () => plugin.openSettings('general') }] : [])] });
-    }
-  };
-  const use = async (p: Photo, el: HTMLElement): Promise<void> => {
-    el.addClass('is-busy');
-    try { const blob = await downloadPhoto(src, p); await view.addBackgroundPhoto(blob, `Unsplash · ${p.author}`); } catch (e) { new Notice(zh ? `图片下载失败：${e instanceof Error ? e.message : String(e)}` : 'Download failed.'); } finally { el.removeClass('is-busy'); }
-  };
-  void run();
-}
-/** The secret id Qiaomu Home uses for its Unsplash key, if that plugin has one that still resolves. */
-function homeSecret(view: CoverView): string {
-  try {
-    const home = (view.app as unknown as { plugins?: { plugins?: Record<string, { settings?: { wallpaper?: { unsplashSecret?: string } } }> } }).plugins?.plugins?.['qiaomu-home'];
-    const id = home?.settings?.wallpaper?.unsplashSecret ?? ''; return id && unsplashKey(view.app, id) ? id : '';
-  } catch { return ''; }
 }
