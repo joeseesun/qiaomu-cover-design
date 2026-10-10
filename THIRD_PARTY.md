@@ -15,3 +15,7 @@
 《通用规范汉字表》字表（`scripts/charset-8105.txt`）为教育部、国家语委 2013 年发布的规范汉字列表。
 
 不打包上游素材、云上传 SDK、Next.js 或 React。
+
+## 生图交互参考
+
+[Poster Studio](https://github.com/joeseesun/poster-studio) commit `a5e991ccabf30edf50d5e7ce8a8a4f47728b1d1d` — MIT — Copyright (c) 2026 向阳乔木。参考其快捷提示词管理与图片改写工作流，插件使用独立实现和重新编写的中英提示词，不打包 React / Next.js 或网页服务端代码。

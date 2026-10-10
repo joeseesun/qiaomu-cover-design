@@ -1,10 +1,10 @@
 import { usePairing, type Resolved } from './typeset';
-import { Menu } from 'obsidian';
+import { Menu, Modal } from 'obsidian';
 import { ModelDialog } from './modeldialog';
 import { chatLabel, imageLabel, switchChat, switchImage } from './aiparse';
 import { installPack, packMissing } from './fontpack';
 import { Notice, setIcon } from 'obsidian';
-import { Circle, FabricImage, FabricObject, Group, Line, Polygon, Rect, StaticCanvas, Textbox, Triangle } from 'fabric';
+import { ActiveSelection, Circle, FabricImage, FabricObject, Group, Line, Polygon, Rect, StaticCanvas, Textbox, Triangle } from 'fabric';
 import type { CoverView, QObject } from './view';
 import { SHADOWS } from './view';
 import { DrawerTab } from './config';
@@ -12,9 +12,9 @@ import { decorById } from './decor';
 import type { Key } from './i18n';
 import { GROUPS, PLATFORMS, platformFor } from './platforms';
 import { Palette, Template, gradient, templateById, templatesFor } from './templates';
-import { colorControl, emptyState, field, group, iconButton, numberBox, onEnter, segmented, slider, textButton } from './ui';
+import { colorControl, quietName, emptyState, field, group, iconButton, numberBox, onEnter, segmented, slider, textButton } from './ui';
 import { openFontPopover } from './fontbrowser';
-import { IMAGE_STYLES, startersFor } from './prompts';
+import { startersFor } from './prompts';
 import { playbookFor } from './playbook';
 import { MESH_PRESETS, meshCss } from './mesh';
 import { Background } from './model';
@@ -88,7 +88,7 @@ function drawerSeries(view: CoverView, body: HTMLElement): void {
   const grid = box.createDiv('qc-template-grid'); const copy = view.copyText(); const d = view.design!;
   list.forEach((s, k) => {
     const t = templateById(s.template); if (!t) return;
-    const card = grid.createDiv({ cls: 'qc-template qc-series-card', attr: { role: 'button', tabindex: '0', title: s.name } });
+    const card = grid.createDiv({ cls: 'qc-template qc-series-card', attr: { role: 'button', tabindex: '0' } });
     const thumb = card.createDiv('qc-template-thumb'); thumb.style.aspectRatio = `${d.width} / ${d.height}`;
     const label = card.createSpan({ text: s.name, cls: 'qc-template-name' }); if (k === 0) label.createSpan({ text: ` · ${view.t('seriesDefault')}`, cls: 'qc-template-rec' });
     const del = card.createEl('button', { cls: 'qc-series-del clickable-icon', attr: { type: 'button', 'aria-label': view.t('seriesRemove') } }); setIcon(del, 'x');
@@ -105,14 +105,12 @@ function selectPlaceholder(input: HTMLTextAreaElement): void {
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.focus(); if (open >= 0 && close > open) input.setSelectionRange(open + 1, close);
 }
-const STYLE_SW: Record<string, [string, string]> = { auto: ['#e5e7eb', '#cbd5e1'], none: ['#ffffff', '#f1f5f9'], '3d': ['#fde68a', '#fca5a5'], flat: ['#93c5fd', '#f9a8d4'], photo: ['#374151', '#9ca3af'], neon: ['#0f172a', '#a855f7'], minimal: ['#f3f4f6', '#d1d5db'], watercolor: ['#bfdbfe', '#fecdd3'], memphis: ['#fde047', '#34d399'], guofeng: ['#fecaca', '#d6c7a1'], isometric: ['#a5b4fc', '#67e8f9'], collage: ['#e7d9c0', '#fda4af'] };
-
-type TrayTab = 'template' | 'prompt' | 'picture';
+type TrayTab = 'template' | 'prompt';
 let trayTab: TrayTab | undefined = 'template'; let trayScroll = 0;
-interface TrayCtx { input: HTMLTextAreaElement; picOn: boolean; templates: Template[]; groups: ReturnType<typeof startersFor>; chips: Record<TrayTab, HTMLElement> }
+interface TrayCtx { input: HTMLTextAreaElement; templates: Template[]; groups: ReturnType<typeof startersFor>; chips: Record<TrayTab, HTMLElement> }
 /**
  * What you can pick from opens inside the composer card, above the text box, and is driven by the chips under it. Templates are visual
- * (a strip of thumbnails that stays open so you can try several); prompts are text rows; picture looks are small pills.
+ * (a strip of thumbnails that stays open so you can try several); prompts are text rows.
  * A prompt closes the tray after you pick it, because the next thing you do is write.
  */
 function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: (tab: TrayTab) => void } {
@@ -148,19 +146,7 @@ function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: 
         const row = list.createEl('button', { cls: 'qc-tray-row', attr: { type: 'button' } }); row.createSpan({ text: zh ? spx.zh : spx.en, cls: 'qc-tray-row-name' }); row.createSpan({ text: text.replace(/\s+/g, ' '), cls: 'qc-tray-row-text' });
         row.addEventListener('click', () => { ctx.input.value = text; trayTab = undefined; render(); selectPlaceholder(ctx.input); });
       }
-    } else {
-      const wrap = host.createDiv('qc-tray-pills');
-      const opt = wrap.createEl('button', { text: view.t('pictureThisTime'), cls: 'qc-tray-pill', attr: { type: 'button', 'aria-pressed': String(view.pictureRequested) } });
-      opt.disabled = !ctx.picOn; opt.classList.toggle('is-active', view.pictureRequested);
-      opt.addEventListener('click', () => { view.pictureRequested = !view.pictureRequested; if (view.pictureRequested && plugin.settings.imageStyle === 'none') { plugin.settings.imageStyle = 'auto'; void plugin.saveSettings(); } opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); ctx.chips.picture.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle'); });
-      if (!ctx.picOn) { wrap.createSpan({ text: view.t('pictureOffDesc'), cls: 'qc-hint' }); textButton(wrap, view.t('pictureEnable'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm'); }
-      else for (const st of IMAGE_STYLES) {
-        const [c1, c2] = STYLE_SW[st.id] ?? ['#e5e7eb', '#cbd5e1'];
-        const b = wrap.createEl('button', { cls: 'qc-tray-pill', attr: { type: 'button' } }); b.classList.toggle('is-active', plugin.settings.imageStyle === st.id);
-        const dot = b.createSpan({ cls: 'qc-tray-dot' }); dot.style.background = st.id === 'none' ? 'repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 3px,#f8fafc 3px,#f8fafc 6px)' : `linear-gradient(135deg, ${c1}, ${c2})`;
-        b.createSpan({ text: zh ? st.zh : st.en });
-        b.addEventListener('click', () => { plugin.settings.imageStyle = st.id; if (st.id === 'none') view.pictureRequested = false; void plugin.saveSettings(); view.refreshDrawer(); });
-      }
+
     }
   };
   render();
@@ -200,7 +186,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     textButton(card, view.t('aiConnect'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm');
   }
   const cfg = plugin.settings.ai;
-  const messages = body.createDiv({ cls: 'qc-chat-messages', attr: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': view.t('tabAssistant') } });
+  const messages = body.createDiv({ cls: 'qc-chat-messages', attr: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' } });
+  quietName(messages, view.t('tabAssistant'), head);
   const compose = body.createDiv('qc-chat-compose'); const trayEl = compose.createDiv('qc-tray qc-hidden');
   const book = playbookFor(view.platform()?.id); const current = templateById(view.design?.template ?? '');
   // The current canvas pick shows above the box, so "make it bigger / change its colour" has a visible referent.
@@ -216,19 +203,15 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const bar = compose.createDiv('qc-compose-bar');
   const templateBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(templateBtn.createSpan({ cls: 'qc-chip-icon' }), 'layout-template'); templateBtn.createSpan({ text: current ? (view.zh ? current.zh : current.en) : view.t('templateChip'), cls: 'qc-chip-label' });
   const promptBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(promptBtn.createSpan({ cls: 'qc-chip-icon' }), 'message-square-text'); promptBtn.createSpan({ text: view.zh ? '提示词' : 'Prompts', cls: 'qc-sr-only' }); promptBtn.addClass('is-icon');
-  const picOn = sel.value === 'ai' && ai.imageReady();
-  // The picture chip only exists when a picture model is actually configured; before that it is noise ("配图可选" meant nothing).
-  const picBtn = bar.createEl('button', { cls: `qc-chip-btn${picOn ? '' : ' qc-hidden'}`, attr: { type: 'button' } }); setIcon(picBtn.createSpan({ cls: 'qc-chip-icon' }), 'image');
-  picBtn.createSpan({ text: view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle'), cls: 'qc-chip-label' });
   bar.createDiv({ cls: 'qc-compose-spacer' });
   // Models are set once and rarely changed, so they live behind one small button instead of taking a row of their own.
   if (sel.value === 'ai') {
     const modelBtn = iconButton(bar, 'settings', view.t('aiSettings'), e => {
       const m = new Menu(); m.addItem(i => i.setTitle(view.zh ? '排版模型' : 'Layout model').setIsLabel(true));
-      for (const x of cfg.chats) m.addItem(i => i.setTitle(chatLabel(x.id === cfg.chatId ? { preset: cfg.preset, protocol: cfg.protocol, baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, codexBin: cfg.codexBin, codexModel: cfg.codexModel } : x.snap)).setChecked(x.id === cfg.chatId).onClick(() => { switchChat(cfg, x.id); void plugin.saveSettings(); view.refreshDrawer(); }));
+      for (const x of cfg.chats) m.addItem(i => i.setTitle(chatLabel(x.id === cfg.chatId ? { chatAlias: cfg.chatAlias, preset: cfg.preset, protocol: cfg.protocol, baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, codexBin: cfg.codexBin, codexModel: cfg.codexModel } : x.snap)).setChecked(x.id === cfg.chatId).onClick(() => { switchChat(cfg, x.id); void plugin.saveSettings(); view.refreshDrawer(); }));
       m.addItem(i => i.setTitle(view.zh ? '添加排版模型…' : 'Add layout model…').setIcon('plus').onClick(() => new ModelDialog(plugin, 'chat', () => view.refreshDrawer()).open()));
       m.addSeparator(); m.addItem(i => i.setTitle(view.zh ? '生图模型' : 'Picture model').setIsLabel(true));
-      for (const x of cfg.images) m.addItem(i => i.setTitle(imageLabel(x.id === cfg.imageId ? { imageOn: cfg.imageOn, imageEngine: cfg.imageEngine, imageBaseUrl: cfg.imageBaseUrl, imageKey: cfg.imageKey, imageModel: cfg.imageModel, imageSize: cfg.imageSize } : x.snap)).setChecked(x.id === cfg.imageId && cfg.imageOn).onClick(() => { switchImage(cfg, x.id); void plugin.saveSettings(); view.refreshDrawer(); }));
+      for (const x of cfg.images) m.addItem(i => i.setTitle(imageLabel(x.id === cfg.imageId ? { imageAlias: cfg.imageAlias, imageOn: cfg.imageOn, imageEngine: cfg.imageEngine, imageBaseUrl: cfg.imageBaseUrl, imageKey: cfg.imageKey, imageModel: cfg.imageModel, imageSize: cfg.imageSize } : x.snap)).setChecked(x.id === cfg.imageId && cfg.imageOn).onClick(() => { switchImage(cfg, x.id); void plugin.saveSettings(); view.refreshDrawer(); }));
       m.addItem(i => i.setTitle(view.zh ? '这次不生图' : 'No pictures').setChecked(!cfg.imageOn).onClick(() => { cfg.imageOn = false; void plugin.saveSettings(); view.refreshDrawer(); }));
       m.addItem(i => i.setTitle(view.zh ? '添加生图模型…' : 'Add picture model…').setIcon('plus').onClick(() => new ModelDialog(plugin, 'image', () => view.refreshDrawer()).open()));
       m.addSeparator(); m.addItem(i => i.setTitle(view.zh ? '管理模型…' : 'Manage…').setIcon('settings').onClick(() => plugin.openSettings('assistant'))); m.showAtMouseEvent(e);
@@ -248,8 +231,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   view.win.requestAnimationFrame(syncInput);
 
   // The chips under the input are the tabs of a tray that opens inside the same card, so choosing and writing feel like one gesture.
-  const tray = buildTray(view, trayEl, { input, picOn, templates: templatesFor(view.platform()?.id), groups: startersFor(view.platform()?.id), chips: { template: templateBtn, prompt: promptBtn, picture: picBtn } });
-  templateBtn.addEventListener('click', () => tray.toggle('template')); promptBtn.addEventListener('click', () => tray.toggle('prompt')); picBtn.addEventListener('click', () => tray.toggle('picture'));
+  const tray = buildTray(view, trayEl, { input, templates: templatesFor(view.platform()?.id), groups: startersFor(view.platform()?.id), chips: { template: templateBtn, prompt: promptBtn } });
+  templateBtn.addEventListener('click', () => tray.toggle('template')); promptBtn.addEventListener('click', () => tray.toggle('prompt'));
 
   const starters = (): void => {
     const empty = messages.createDiv('qc-chat-empty');
@@ -291,7 +274,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       for (const w of m.warn ?? []) { const li = bubble.createDiv('qc-msg-applied qc-msg-warn'); setIcon(li.createSpan(), 'alert-triangle'); li.createSpan({ text: w }); }
       // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
       if (m.role === 'assistant' && m.snapshot) {
-        const restore = bubble.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button', title: view.t('msgRestore'), 'aria-label': view.t('msgRestore') } });
+        const restore = bubble.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button', 'aria-label': view.t('msgRestore') } });
         setIcon(restore, 'history');
         restore.addEventListener('click', () => void view.action(() => view.restoreSnapshot(m.snapshot!)));
       }
@@ -299,7 +282,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       // candidate is always possible; tweaks and retry act on the current state, so they stay on the last message.
       if (m.variants?.length) {
         if (!m.variants.some(v => v.spec)) bubble.createDiv({ text: view.t('variantsTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-variants');
-        strip.setAttribute('aria-label', view.t('variantsTitle'));
+        quietName(strip, view.t('variantsTitle'));
         strip.addEventListener('scroll', () => { m.variantScroll = strip.scrollLeft; });
         strip.addEventListener('keydown', e => {
           if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -321,7 +304,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
         strip.addEventListener('click', e => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
         view.win.requestAnimationFrame(() => { strip.scrollLeft = m.variantScroll ?? 0; });
         for (const v of m.variants) {
-          const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button', title: v.label } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
+          const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button' } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
           image.addEventListener('load', () => { if (image.naturalWidth > image.naturalHeight) card.style.flexBasis = '176px'; }); card.createSpan({ text: v.label });
           card.classList.toggle('is-active', !!v.selected); card.setAttribute('aria-pressed', String(!!v.selected)); card.disabled = view.busy;
           card.addEventListener('click', () => void view.chooseVariant(m, v));
@@ -333,7 +316,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
         void loadAssets(view.app, plugin.manifest.dir ?? '').then(data => {
           for (const it of [pick.chosen, ...pick.items.map(x => `${x.cat}:${x.id}`)]) {
             const [cat, id] = it.split(':') as [AssetCat, string]; const item = (cat === 'line' ? data.lines : data.stickers).find(a => a.id === id); if (!item) continue;
-            const b = strip.createEl('button', { cls: 'qc-pick', attr: { type: 'button', title: cat === 'sticker' ? item.zh : item.id, 'aria-pressed': String(it === pick.chosen) } });
+            const b = strip.createEl('button', { cls: 'qc-pick', attr: { type: 'button', 'aria-label': cat === 'sticker' ? item.zh : item.id, 'aria-pressed': String(it === pick.chosen) } });
             b.createEl('img', { attr: { src: assetThumb(item), alt: item.zh, draggable: 'false' } }); b.classList.toggle('is-active', it === pick.chosen);
             b.disabled = view.busy; b.addEventListener('click', () => { if (it === pick.chosen || view.busy) return; void view.action(async () => { await view.swapAsset(pick.target, cat, id); pick.chosen = it; view.persistChat(); draw(); }); });
           }
@@ -371,8 +354,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       messages.scrollTop = (messages.children[anchor] as HTMLElement).offsetTop - messages.offsetTop - anchorOffset;
     } else messages.scrollTop = oldTop;
     previousCount = view.chat.length; followNext = false;
-    picBtn.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle');
-    const opt = trayEl.querySelector<HTMLButtonElement>('.qc-tray-pill[aria-pressed]'); if (opt) { opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); }
+
   };
   view.onChat = draw;
   const submit = (): void => {
@@ -413,6 +395,7 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
   iconButton(actions, first.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', t('locked'), () => view.toggleLock(), first.lockMovementX ? 'is-active' : '');
   iconButton(actions, 'copy-plus', t('duplicate'), () => void view.action(() => view.cloneSelection()));
   iconButton(actions, 'trash-2', t('remove'), () => view.removeSelection());
+  const create = el.createDiv('qc-selection-create'); textButton(create, t('imageCreateSelection'), () => void view.action(() => view.openSelectionImageGenerator()), 'qc-btn-sm', 'image-pen');
 
   if (single && ((first.qcRole === 'subject' || first.qcRole === 'image') && first.qcPrompt !== undefined || first.qcRole === 'subject')) {
     const g = group(el, t('aiRedraw')); g.createDiv({ text: t('aiRedrawHint'), cls: 'qc-hint' });
@@ -451,11 +434,11 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
     segmented<'left' | 'center' | 'right'>(g, [{ value: 'left', icon: 'align-left', label: t('left') }, { value: 'center', icon: 'align-center', label: t('center') }, { value: 'right', icon: 'align-right', label: t('right') }], (f.textAlign as 'left') ?? 'left', v => view.update({ textAlign: v }, o => o instanceof Textbox), 'qc-seg-icons');
     slider(g, t('lineHeight'), Math.round(f.lineHeight * 100) / 100, 0.8, 2.4, 0.05, v => view.update({ lineHeight: v }, o => o instanceof Textbox), v => v.toFixed(2));
     slider(g, t('letterSpacing'), f.charSpacing, -100, 800, 10, v => view.update({ charSpacing: v }, o => o instanceof Textbox), v => `${Math.round(v / 10) / 100}em`);
-    colorControl(g, t('color'), typeof f.fill === 'string' ? f.fill : '#171717', c => view.update({ fill: c }, o => o instanceof Textbox), { recent, onCommit: commit });
+    colorControl(g, t('color'), typeof f.fill === 'string' ? f.fill : '#171717', c => view.update({ fill: c }, o => o instanceof Textbox), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
 
     const fx = group(el, t('effects'), { open: !!(f.textBackgroundColor || (f.stroke && f.strokeWidth) || f.shadow) });
-    colorControl(fx, t('highlight'), f.textBackgroundColor || '', c => view.update({ textBackgroundColor: c }, o => o instanceof Textbox), { recent, none: true, onCommit: commit });
-    colorControl(fx, t('stroke'), (f.strokeWidth && typeof f.stroke === 'string' ? f.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(f.strokeWidth || 0, 4) : 0, paintFirst: 'stroke' }, o => o instanceof Textbox), { recent, none: true, onCommit: commit });
+    colorControl(fx, t('highlight'), f.textBackgroundColor || '', c => view.update({ textBackgroundColor: c }, o => o instanceof Textbox), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
+    colorControl(fx, t('stroke'), (f.strokeWidth && typeof f.stroke === 'string' ? f.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(f.strokeWidth || 0, 4) : 0, paintFirst: 'stroke' }, o => o instanceof Textbox), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
     if (f.stroke) slider(fx, t('strokeWidth'), f.strokeWidth || 0, 0, 40, 1, v => view.update({ strokeWidth: v, paintFirst: 'stroke' }, o => o instanceof Textbox));
     shadowControl(view, fx, first);
   } else if (sel.every(o => o instanceof FabricImage)) {
@@ -475,8 +458,8 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
   } else if (sel.every(o => !(o instanceof Textbox) && !(o instanceof FabricImage))) {
     const g = group(el, t('shape'));
     const isLine = first instanceof Line;
-    if (!isLine) colorControl(g, t('fill'), typeof first.fill === 'string' && first.fill !== 'rgba(0,0,0,0)' ? first.fill : '', c => view.update({ fill: c || 'rgba(0,0,0,0)' }), { recent, none: true, onCommit: commit });
-    colorControl(g, t('stroke'), (first.strokeWidth && typeof first.stroke === 'string' ? first.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(first.strokeWidth || 0, 6) : 0 }), { recent, none: true, onCommit: commit });
+    if (!isLine) colorControl(g, t('fill'), typeof first.fill === 'string' && first.fill !== 'rgba(0,0,0,0)' ? first.fill : '', c => view.update({ fill: c || 'rgba(0,0,0,0)' }), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
+    colorControl(g, t('stroke'), (first.strokeWidth && typeof first.stroke === 'string' ? first.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(first.strokeWidth || 0, 6) : 0 }), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
     if (first.stroke) slider(g, t('strokeWidth'), first.strokeWidth || 0, 0, 80, 1, v => view.update({ strokeWidth: v }));
     if (first instanceof Rect) slider(g, t('cornerRadius'), Math.round(first.rx || 0), 0, Math.round(Math.min(first.width, first.height) / 2), 1, v => view.update({ rx: v, ry: v }, o => o instanceof Rect));
     const fx = group(el, t('effects'), { open: !!first.shadow }); shadowControl(view, fx, first);
@@ -522,16 +505,18 @@ function pickReplacement(view: CoverView, img: FabricImage): void {
   input.addEventListener('change', () => { const f = input.files?.[0]; if (f) void view.action(() => view.replaceImage(img, f)); }, { once: true }); input.click();
 }
 export function layerName(view: CoverView, o: FabricObject): string {
+  const named = (o as QObject).qcName; if (named) return named;
   const role = (o as QObject).qcRole;
   if (role === 'subject') return view.t('layerSubject');
   if (role === 'decor') { const k = decorById((o as QObject).qcKind ?? ''); return k ? `${view.t('layerDecor')} · ${k.zh}` : view.t('layerDecor'); }
   if (o instanceof Textbox) return o.text.replace(/\s+/g, ' ').slice(0, 30) || view.t('text');
   if (o instanceof FabricImage) return (o as QObject & { qcCredit?: string }).qcCredit ?? view.t('image');
   if (o instanceof Circle) return view.t('circle'); if (o instanceof Triangle) return view.t('triangle'); if (o instanceof Line) return view.t('line'); if (o instanceof Polygon) return view.t('star');
-  if (o instanceof Group) return view.zh ? '素材' : 'Asset';
+  if (o instanceof Group) return (o as QObject).qcLayerGroup ? view.t('layerGroup') : view.zh ? '素材' : 'Asset';
   return view.t('rectangle');
 }
 function layerIcon(o: FabricObject): string {
+  if ((o as QObject).qcLayerGroup) return 'folder';
   if (o instanceof Textbox) return 'type'; if (o instanceof FabricImage) return 'image'; if (o instanceof Circle) return 'circle'; if (o instanceof Triangle) return 'triangle';
   if (o instanceof Line) return 'minus'; if (o instanceof Polygon) return 'star'; return 'square';
 }
@@ -573,15 +558,14 @@ function renderCanvasPanel(view: CoverView, el: HTMLElement): void {
   if (mode === 'mesh') {
     const grid = bg.createDiv('qc-mesh-grid');
     for (const m of MESH_PRESETS) {
-      const b = grid.createEl('button', { cls: 'qc-mesh', attr: { type: 'button', title: view.zh ? m.zh : m.en } }); b.style.background = meshCss(m); b.createSpan({ text: view.zh ? m.zh : m.en, cls: m.dark ? 'qc-mesh-name is-dark' : 'qc-mesh-name' });
+      const b = grid.createEl('button', { cls: 'qc-mesh', attr: { type: 'button' } }); b.style.background = meshCss(m); b.createSpan({ text: view.zh ? m.zh : m.en, cls: m.dark ? 'qc-mesh-name is-dark' : 'qc-mesh-name' });
       b.addEventListener('click', () => view.applyMesh(m));
     }
-    bg.createDiv({ text: t('bgMeshHint'), cls: 'qc-hint' });
   } else {
-    if (spec.kind === 'solid') colorControl(bg, t('color'), spec.color, c => view.applyBackground({ kind: 'solid', color: c }), { recent, onCommit: c => view.plugin.rememberColor(c) });
+    if (spec.kind === 'solid') colorControl(bg, t('color'), spec.color, c => view.applyBackground({ kind: 'solid', color: c }), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: c => view.plugin.rememberColor(c) });
     else {
-      colorControl(bg, t('gradientFrom'), spec.from, c => view.applyBackground({ ...spec, from: c }), { recent, onCommit: c => view.plugin.rememberColor(c) });
-      colorControl(bg, t('gradientTo'), spec.to, c => view.applyBackground({ ...spec, to: c }), { recent, onCommit: c => view.plugin.rememberColor(c) });
+      colorControl(bg, t('gradientFrom'), spec.from, c => view.applyBackground({ ...spec, from: c }), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: c => view.plugin.rememberColor(c) });
+      colorControl(bg, t('gradientTo'), spec.to, c => view.applyBackground({ ...spec, to: c }), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: c => view.plugin.rememberColor(c) });
       slider(bg, t('angle'), spec.angle, 0, 360, 5, v => view.applyBackground({ ...spec, angle: v }), v => `${v}°`);
     }
     const presets = bg.createDiv('qc-gradient-grid');
@@ -605,24 +589,53 @@ function renderCanvasPanel(view: CoverView, el: HTMLElement): void {
 }
 
 /* ---------- layers ---------- */
+export function renameLayersDialog(view: CoverView, objects: FabricObject[]): void {
+  if (!objects.length) return;
+  const modal = new Modal(view.app); modal.titleEl.setText(view.t('renameLayers')); modal.contentEl.addClass('qc-modal'); const id = crypto.randomUUID();
+  modal.contentEl.createEl('label', { text: view.t('layerName'), attr: { for: id } }); const input = modal.contentEl.createEl('input', { attr: { id, type: 'text', maxlength: '100' } }); input.value = objects.length === 1 ? layerName(view, objects[0]!) : '';
+  if (objects.length > 1) modal.contentEl.createDiv({ text: view.t('layerBatchName'), cls: 'qc-hint' });
+  const generation = view.imageGuard(), apply = (): void => { if (generation() && input.value.trim()) { view.renameLayers(objects, input.value); modal.close(); } };
+  const footer = modal.contentEl.createDiv('qc-modal-footer'); textButton(footer, view.t('cancel'), () => modal.close()); textButton(footer, view.t('save'), apply, 'qc-primary'); input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) apply(); }); modal.open(); view.win.requestAnimationFrame(() => { input.focus(); input.select(); });
+}
 export function renderLayers(view: CoverView, el: HTMLElement): void {
   const top = el.scrollTop; el.empty(); const c = view.canvas; if (!c) return;
-  const objects = c.getObjects(); const active = c.getActiveObjects();
-  if (!objects.length) { emptyState(el, { icon: 'layers', title: view.zh ? '还没有元素' : 'Nothing here yet', hint: view.zh ? '画布是空的。点顶部的“插入”加文字、形状或素材，或让 AI 设计师出一版。' : 'Use Insert to add text, shapes or stickers.' }); return; }
+  const objects = c.getObjects(), active = c.getActiveObjects(), t = view.t.bind(view);
+  const toolbar = el.createDiv('qc-layer-bar'); toolbar.createSpan({ text: active.length ? t('selected', { n: active.length }) : t('layers'), cls: 'qc-hint' });
+  const groupButton = iconButton(toolbar, 'group', t('groupLayers'), () => view.groupLayers()); groupButton.disabled = active.length < 2 || active.some(o => o.group && !(o.group instanceof ActiveSelection) || o.lockMovementX || o.lockMovementY);
+  const ungroup = iconButton(toolbar, 'ungroup', t('ungroupLayers'), () => view.ungroupLayers()); ungroup.disabled = active.length !== 1 || !(active[0] as QObject)?.qcLayerGroup;
+  const rename = iconButton(toolbar, 'pencil', t('renameLayers'), () => renameLayersDialog(view, active)); rename.disabled = !active.length;
+  const search = el.createEl('input', { cls: 'qc-layer-search', attr: { type: 'search', placeholder: t('layerSearch') } }); search.value = view.layerQuery;
+  if (!objects.length) { emptyState(el, { icon: 'layers', title: view.zh ? '还没有元素' : 'Nothing here yet', hint: view.zh ? '点顶部“插入”添加元素。' : 'Use Insert to add elements.' }); return; }
   const list = el.createDiv('qc-layers'); let dragging: FabricObject | undefined;
-  for (const o of [...objects].reverse()) {
-    const row = list.createDiv({ cls: 'qc-layer', attr: { draggable: 'true' } }); row.classList.toggle('is-selected', active.includes(o)); row.classList.toggle('is-hidden', !o.visible);
-    setIcon(row.createSpan({ cls: 'qc-layer-icon' }), layerIcon(o));
-    row.createSpan({ text: layerName(view, o), cls: 'qc-layer-name' });
-    const tools = row.createDiv('qc-layer-tools');
-    iconButton(tools, o.visible ? 'eye' : 'eye-off', view.t('visible'), e => { e.stopPropagation(); o.set({ visible: !o.visible }); if (!o.visible) c.discardActiveObject(); c.requestRenderAll(); view.changed(); renderLayers(view, el); });
-    iconButton(tools, o.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', view.t('locked'), e => { e.stopPropagation(); c.setActiveObject(o); view.toggleLock(); renderLayers(view, el); }, o.lockMovementX ? 'is-active' : '');
-    row.addEventListener('click', () => { if (!o.visible) return; c.setActiveObject(o); c.requestRenderAll(); renderLayers(view, el); });
-    row.addEventListener('dragstart', e => { dragging = o; e.dataTransfer?.setData('text/plain', 'layer'); row.addClass('is-dragging'); });
-    row.addEventListener('dragend', () => { dragging = undefined; row.removeClass('is-dragging'); });
-    row.addEventListener('dragover', e => { if (dragging) { e.preventDefault(); row.addClass('is-over'); } });
-    row.addEventListener('dragleave', () => row.removeClass('is-over'));
-    row.addEventListener('drop', e => { e.preventDefault(); row.removeClass('is-over'); if (dragging && dragging !== o) { c.moveObjectTo(dragging, c.getObjects().indexOf(o)); c.requestRenderAll(); view.changed(); renderLayers(view, el); } });
-  }
-  el.scrollTop = top;
+  const matches = (o: FabricObject): boolean => !view.layerQuery || layerName(view, o).toLowerCase().includes(view.layerQuery.toLowerCase()) || ((o as QObject).qcLayerGroup && (o as Group).getObjects().some(matches)) === true;
+  const draw = (): void => {
+    list.empty(); const rows: { object: FabricObject; parent?: Group; depth: number }[] = [];
+    const visit = (o: FabricObject, depth: number, parent?: Group): void => { if (!matches(o)) return; rows.push({ object: o, depth, parent }); if ((o as QObject).qcLayerGroup && (!view.layerFolded.has(o) || view.layerQuery)) for (const child of [...(o as Group).getObjects()].reverse()) visit(child, depth + 1, o as Group); };
+    for (const o of [...c.getObjects()].reverse()) visit(o, 0);
+    if (!rows.length) { list.createDiv({ text: t('layerNoMatch'), cls: 'qc-hint' }); return; }
+    for (const { object: o, depth, parent } of rows) {
+      const row = list.createDiv({ cls: 'qc-layer', attr: { draggable: 'true', role: 'option', 'aria-selected': String(c.getActiveObjects().includes(o)), tabindex: '0' } }); row.style.paddingLeft = `${8 + depth * 16}px`; row.classList.toggle('is-selected', c.getActiveObjects().includes(o)); row.classList.toggle('is-hidden', !o.visible);
+      if ((o as QObject).qcLayerGroup) iconButton(row, view.layerFolded.has(o) ? 'chevron-right' : 'chevron-down', t('layerExpand'), e => { e.stopPropagation(); if (view.layerFolded.has(o)) view.layerFolded.delete(o); else view.layerFolded.add(o); draw(); }, 'qc-layer-fold');
+      else row.createSpan({ cls: 'qc-layer-fold-spacer' });
+      setIcon(row.createSpan({ cls: 'qc-layer-icon' }), layerIcon(o)); const name = row.createSpan({ text: layerName(view, o), cls: 'qc-layer-name' }); name.addEventListener('dblclick', e => { e.stopPropagation(); renameLayersDialog(view, [o]); });
+      const tools = row.createDiv('qc-layer-tools');
+      iconButton(tools, 'pencil', t('renameLayers'), e => { e.stopPropagation(); renameLayersDialog(view, [o]); });
+      iconButton(tools, o.visible ? 'eye' : 'eye-off', t('visible'), e => { e.stopPropagation(); o.set({ visible: !o.visible }); if (!o.visible && c.getActiveObjects().includes(o)) c.discardActiveObject(); c.requestRenderAll(); view.changed(); draw(); });
+      iconButton(tools, o.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', t('locked'), e => { e.stopPropagation(); c.discardActiveObject(); c.setActiveObject(o); view.toggleLock(); }, o.lockMovementX ? 'is-active' : '');
+      const pick = (event: MouseEvent | KeyboardEvent): void => {
+        if (!o.visible) return;
+        const siblings = rows.filter(r => r.parent === parent).map(r => r.object); let chosen: FabricObject[] = [o];
+        if (event.shiftKey && view.layerAnchor && siblings.includes(view.layerAnchor)) { const a = siblings.indexOf(view.layerAnchor), b = siblings.indexOf(o); chosen = siblings.slice(Math.min(a, b), Math.max(a, b) + 1).filter(o => o.visible); }
+        else if (event.metaKey || event.ctrlKey) { chosen = c.getActiveObjects().filter(x => siblings.includes(x)); if (chosen.includes(o)) chosen = chosen.filter(x => x !== o); else chosen.push(o); }
+        else view.layerAnchor = o;
+        c.discardActiveObject(); if (chosen.length === 1) c.setActiveObject(chosen[0]!); else if (chosen.length) c.setActiveObject(new ActiveSelection(chosen, { canvas: c })); c.requestRenderAll(); renderLayers(view, el);
+      };
+      row.addEventListener('click', pick); row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } if (e.key === 'F2') { e.preventDefault(); renameLayersDialog(view, [o]); } });
+      row.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); const menu = new Menu(); menu.addItem(i => i.setTitle(t('renameLayers')).setIcon('pencil').onClick(() => renameLayersDialog(view, [o]))); menu.showAtMouseEvent(e); });
+      row.addEventListener('dragstart', e => { dragging = o; e.dataTransfer?.setData('text/plain', 'layer'); row.addClass('is-dragging'); }); row.addEventListener('dragend', () => { dragging = undefined; row.removeClass('is-dragging'); });
+      row.addEventListener('dragover', e => { if (dragging && dragging.group === o.group) { e.preventDefault(); row.addClass('is-over'); } }); row.addEventListener('dragleave', () => row.removeClass('is-over'));
+      row.addEventListener('drop', e => { e.preventDefault(); row.removeClass('is-over'); if (dragging && dragging !== o && dragging.group === o.group) { if (parent) parent.moveObjectTo(dragging, parent.getObjects().indexOf(o)); else c.moveObjectTo(dragging, c.getObjects().indexOf(o)); c.requestRenderAll(); view.changed(); draw(); } });
+    }
+  };
+  search.addEventListener('input', () => { view.layerQuery = search.value; draw(); }); draw(); el.scrollTop = top;
 }

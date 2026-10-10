@@ -1,6 +1,10 @@
+import { jimengProtocol } from './jimeng';
+import { jimengGenerate } from './jimengservice';
+import { seedreamGenerate } from './seedreamservice';
+import type { SeedreamOptions, ImageResult } from './seedream';
 import { codexImage, codexText, findCodex, warmCodex } from './codex';
 import { requestUrl, RequestUrlParam } from 'obsidian';
-import { AiConfig, aiReady, imageReady, pickArkSize, pickAspect, pickImageSize, trimBase } from './aiparse';
+import { AiConfig, aiReady, imageReady, pickAspect, pickImageSize, trimBase } from './aiparse';
 import { AssistantInput, AssistantResult } from './ops';
 import { IMAGE_RULES, SUBJECT_RULES } from './prompts';
 import { planTurn } from './planner';
@@ -70,9 +74,23 @@ export class AiService {
   /** One-line round trip used by the settings "test" button. */
   async ping(): Promise<string> { return (await this.complete('Reply with the single word OK.', [], 'ping')).trim().slice(0, 60); }
 
+  async images(prompt: string, width: number, height: number, options: SeedreamOptions = {}): Promise<ImageResult> {
+    const c = this.cfg();
+    if (!imageReady(c)) throw new Error('image model not ready');
+    if (jimengProtocol(c)) return jimengGenerate(c, prompt, width, height, options);
+    if (c.imageEngine === 'ark') return seedreamGenerate(c, prompt, width, height, options);
+    if (options.references?.length) {
+      if (c.imageEngine !== 'codex') throw new Error('image editing requires Seedream or Codex CLI');
+      const pic = await codexImage({ bin: findCodex(c.codexBin), model: c.codexModel.trim() || undefined }, prompt, options.references.map(r => r.url));
+      return { pictures: [pic], warnings: [] };
+    }
+    return { pictures: [await this.image(prompt, width, height, '', false, 'direct')], warnings: [] };
+  }
+
   async image(prompt: string, width: number, height: number, style = '', subject = false, mode: 'cover' | 'direct' = 'cover'): Promise<{ data: ArrayBuffer; type: string }> {
     const c = this.cfg();
     const text = mode === 'direct' ? prompt.trim() : [prompt.trim(), style, subject ? SUBJECT_RULES : IMAGE_RULES].filter(Boolean).join('. ');
+    if (jimengProtocol(c)) return (await jimengGenerate(c, text, width, height)).pictures[0]!;
     if (c.imageEngine === 'codex') {
       const ratio = `${width}x${height} pixels (aspect ratio ${(width / height).toFixed(2)}:1)`;
       const instructions = mode === 'direct' ? `${text}\nRequested image size: ${ratio}` : [prompt.trim(), style, subject ? SUBJECT_RULES : `Compose for a ${ratio} canvas`, subject ? '' : IMAGE_RULES].filter(Boolean).join('. ');
@@ -104,9 +122,7 @@ export class AiService {
       const url = (json as { choices?: { message?: { images?: { image_url?: { url?: string } }[] } }[] } | undefined)?.choices?.[0]?.message?.images?.[0]?.image_url?.url; if (!url) throw new Error('empty-image'); return await fromUrl(url);
     }
     if (c.imageEngine === 'ark') {
-      const base = trimBase(c.imageBaseUrl || 'https://ark.cn-beijing.volces.com/api/v3');
-      const { json } = await send({ url: `${base}/images/generations`, method: 'POST', contentType: 'application/json', headers: { Authorization: `Bearer ${key0}` }, body: JSON.stringify({ model: c.imageModel, prompt: text, size: pickArkSize(width, height), response_format: 'url', watermark: false, n: 1 }) });
-      const item = (json as { data?: { url?: string; b64_json?: string }[] } | undefined)?.data?.[0]; if (item?.b64_json) return fromB64(item.b64_json); if (item?.url) return await fromUrl(item.url); throw new Error('empty-image');
+      return (await seedreamGenerate(c, text, width, height)).pictures[0]!;
     }
     const own = !!c.imageBaseUrl.trim();
     const base = trimBase(own ? c.imageBaseUrl : c.baseUrl); const key = (own ? c.imageKey : c.imageKey || c.apiKey).trim();

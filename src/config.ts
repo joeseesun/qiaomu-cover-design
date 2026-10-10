@@ -1,3 +1,4 @@
+import type { ImagePrompt } from './imageprompts';
 import { ExportPrefs } from './model';
 import { DEFAULT_PLATFORM } from './platforms';
 import { AI_DEFAULTS, AiConfig, mergeAi } from './aiparse';
@@ -7,6 +8,8 @@ export type DrawerTab = 'templates' | 'add' | 'fonts' | 'assistant';
 /** A chat turn saved with the design; rich payloads (variants, options, snapshots) are recomputable, so only the words persist. */
 export interface SavedChat { role: 'user' | 'assistant'; text: string; applied?: string[] }
 export interface Settings {
+  imagePrompts?: ImagePrompt[];
+  toolbarLabels: boolean;
   designFolder: string; exportFolder: string; fontFolder: string; language: string; defaultPlatform: string;
   export: Partial<ExportPrefs>;
   guides: { safe: boolean; center: boolean; grid: boolean; snap: boolean };
@@ -17,7 +20,7 @@ export interface Settings {
 }
 export const DEFAULTS: Settings = {
   designFolder: 'Cover designs', exportFolder: 'Cover designs/Exports', fontFolder: 'Cover designs/Fonts', language: 'auto', defaultPlatform: DEFAULT_PLATFORM,
-  export: {}, guides: { safe: false, center: true, grid: false, snap: true },
+  toolbarLabels: false, export: {}, guides: { safe: false, center: true, grid: false, snap: true },
   defaultFont: 'sans-serif', recentColors: [], recentFonts: [], favFonts: [], drawer: 'assistant', assistant: 'ai', ai: { ...AI_DEFAULTS }, imageStyle: 'auto', fontNudgeOff: false, unsplashSecret: '', unsplashProxy: '', series: [], chats: {},
 };
 /** Keeps at most 30 turns per cover and 20 covers, so data.json stays small. */
@@ -37,6 +40,7 @@ export function mergeSettings(raw: unknown): Settings {
   const base: Settings = structuredClone(DEFAULTS);
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Record<string, unknown>;
+  if (typeof r.toolbarLabels === 'boolean') base.toolbarLabels = r.toolbarLabels;
   for (const key of ['designFolder', 'exportFolder', 'fontFolder', 'language', 'defaultPlatform', 'defaultFont', 'assistant', 'imageStyle'] as const) if (typeof r[key] === 'string' && r[key]) base[key] = r[key] as string;
   for (const key of ['recentColors', 'recentFonts', 'favFonts'] as const) if (Array.isArray(r[key])) base[key] = (r[key] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 60);
   if (r.export && typeof r.export === 'object') base.export = r.export as Partial<ExportPrefs>;
@@ -47,6 +51,7 @@ export function mergeSettings(raw: unknown): Settings {
   if (typeof r.unsplashSecret === 'string') base.unsplashSecret = r.unsplashSecret;
   if (typeof r.unsplashProxy === 'string' && /^https:\/\//.test(r.unsplashProxy)) base.unsplashProxy = r.unsplashProxy.trim();
   if (typeof r.fontNudgeOff === 'boolean') base.fontNudgeOff = r.fontNudgeOff;
+  if (Array.isArray(r.imagePrompts)) base.imagePrompts = r.imagePrompts.filter((x): x is ImagePrompt => !!x && typeof x === 'object' && typeof x.id === 'string' && typeof x.name === 'string' && typeof x.text === 'string' && (x.mode === 'create' || x.mode === 'edit')).slice(0, 100).map(x => ({ id: x.id.slice(0, 100), name: x.name.slice(0, 100), text: x.text.slice(0, 10000), mode: x.mode }));
   base.ai = mergeAi(r.ai); base.series = mergeSeries(r.series); base.chats = mergeChats(r.chats);
   if (r.drawer === '' || r.drawer === 'templates' || r.drawer === 'add' || r.drawer === 'fonts' || r.drawer === 'assistant') base.drawer = r.drawer;
   return base;

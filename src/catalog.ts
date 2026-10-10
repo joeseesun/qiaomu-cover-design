@@ -1,3 +1,4 @@
+import { SEEDREAM_MODELS } from './seedream';
 /** Where models come from: the cards in the "add model" dialog. Names and ids are starting points; the dialog always lets you type your own. */
 import type { ChatSnap, ImageEngine, ImageSnap } from './aiparse';
 
@@ -23,7 +24,7 @@ export const CHAT_SOURCES: ChatSource[] = [
 ];
 export const IMAGE_SOURCES: ImageSource[] = [
   { id: 'codex', name: 'Codex CLI', group: 'account', sub: 'ChatGPT 账号，免密钥', engine: 'codex', baseUrl: '', keyless: true, models: [] },
-  { id: 'ark', name: '豆包 Seedream', group: 'provider', sub: '火山方舟 · ark.cn-beijing.volces.com', engine: 'ark', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', keyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey', models: [{ id: 'doubao-seedream-4-0-250828', name: 'Seedream 4.0' }] },
+  { id: 'ark', name: '豆包 Seedream', group: 'provider', sub: '火山方舟 · ark.cn-beijing.volces.com', engine: 'ark', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', keyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey', models: SEEDREAM_MODELS },
   { id: 'gemini', name: 'Google Gemini 生图', group: 'provider', sub: 'Nano Banana · generativelanguage.googleapis.com', engine: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', keyUrl: 'https://aistudio.google.com/apikey', models: [{ id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image' }] },
   { id: 'openrouter', name: 'OpenRouter', group: 'provider', sub: 'openrouter.ai · 中转', engine: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', keyUrl: 'https://openrouter.ai/keys', models: [{ id: 'google/gemini-2.5-flash-image' }, { id: 'bytedance-seed/seedream-4.5' }] },
   { id: 'openai', name: 'OpenAI', group: 'provider', sub: 'api.openai.com', engine: 'api', baseUrl: 'https://api.openai.com/v1', keyUrl: 'https://platform.openai.com/api-keys', models: [{ id: 'gpt-image-1' }] },

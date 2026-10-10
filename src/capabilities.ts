@@ -5,7 +5,7 @@
  */
 import { DESIGN_PREVIEW_LIMIT } from './designflow';
 import { ADJUSTS, MOOD_PALETTES, TONES, type Tone } from './color';
-import { MESH_PRESETS } from './mesh';
+import { MESH_LIBRARY, MESH_PRESETS } from './mesh';
 import { PATH_SHAPES, SHAPE_IDS, BASIC_SHAPES } from './shapes';
 import { TEXT_GROUPS, TEXT_PRESETS } from './textstyles';
 import { DECOR_IDS } from './decor';
@@ -98,7 +98,7 @@ export const CAPABILITIES: AnyCapability[] = [
     card: `{"op":"background","color":"#rrggbb"} 纯色；{"from","to","angle"} 渐变（仅用户点名要渐变时）；{"mesh":"id"} 弥散光：${MESH_PRESETS.map(m => `${m.id} ${m.zh}${m.dark ? '(深)' : '(浅)'}`).join(' / ')}。只换底色；要整套配色一起换用 palette。`,
     examples: [['背景换成深一点的', '{"op":"background","mesh":"graphite"}']],
     sanitize: o => {
-      const mesh = str(o.mesh, 24); if (mesh && MESH_PRESETS.some(m => m.id === mesh)) return { op: 'background', mesh };
+      const mesh = str(o.mesh, 24); if (mesh && MESH_LIBRARY.some(m => m.id === mesh)) return { op: 'background', mesh };
       const color = hex(o.color), from = hex(o.from), to = hex(o.to); const angle = num(o.angle, 0, 360);
       if (color) return { op: 'background', color }; if (from && to) return { op: 'background', from, to, ...(angle !== undefined ? { angle } : {}) }; return undefined;
     },
@@ -275,6 +275,15 @@ export const CAPABILITIES: AnyCapability[] = [
  * the canvas menus call must be covered by a capability's `ui` list (tests/capabilities.test.ts).
  */
 export const UI_ONLY: Record<string, string> = {
+  beginColorEdit: 'Coalesce a live color picker session into one undo step.',
+  endColorEdit: 'Finish the live color picker undo transaction.',
+  groupLayers: 'Explicit multi-selection grouping keeps editable children; not an assistant scene operation.',
+  ungroupLayers: 'Explicit group selection restores child transforms and stacking order.',
+  renameLayers: 'User-managed layer names support organization and search without changing assistant ids.',
+  imageGuard: 'Internal canvas identity guard used by asynchronous dialogs.',
+  openImageGenerator: 'Explicit image generation/edit modal; references are sent only after user submission.',
+  downloadSelection: 'Explicit local PNG download of the selected elements, without modifying the canvas or invoking AI.',
+  openSelectionImageGenerator: 'Explicit selected-element image editing; rasterizes only the selected elements after the user opens the dialog.',
   action: 'wrapper', ask: 'the assistant itself', changed: 'housekeeping', persistChat: 'housekeeping', flush: 'housekeeping', refreshDrawer: 'view', refreshInspector: 'view', renderGuides: 'view',
   applyZoom: 'view zoom', setZoom: 'view zoom', zoomBy: 'view zoom', toggleDrawer: 'panel layout', t: 'i18n',
   selection: 'read-only', selectionLabel: 'read-only', texts: 'read-only', copyText: 'read-only', fontsInUse: 'read-only', hasMesh: 'read-only', pairing: 'read-only', platform: 'read-only', thumbIssues: 'read-only', exportPrefs: 'read-only', encode: 'export internals',
