@@ -15,7 +15,7 @@ export const FONT_SITES: [string, string, string][] = [
 
 type Script = 'zh' | 'en' | 'all';
 type Look = 'all' | 'sans' | 'serif' | 'brush' | 'display';
-interface Row { family: string; source: FontEntry['source'] | 'library' | 'google'; gf?: GFont; zh?: string; script: 'zh' | 'en' | 'both'; look: Look; hint?: string; lib?: LibFont }
+interface Row { family: string; source: FontEntry['source'] | 'library' | 'google'; gf?: GFont; zh?: string; script: 'zh' | 'en' | 'both'; look: Look; hint?: string; lib?: LibFont; /** A library face still downloading. */ pending?: boolean }
 const LOOK_ZH: Record<Look, string> = { all: '全部', sans: '黑体', serif: '宋体 / 衬线', brush: '手写 / 书法', display: '展示' };
 const LOOK_EN: Record<Look, string> = { all: 'All', sans: 'Sans', serif: 'Serif', brush: 'Script', display: 'Display' };
 const hasHan = (s: string): boolean => /[㐀-鿿]/.test(s);
@@ -55,12 +55,12 @@ export function renderFontBrowser(view: CoverView, host: HTMLElement, o: FontBro
   /** Everything the user could pick, once, with script and look worked out. */
   function collect(): Row[] {
     const rows: Row[] = []; const have = new Set<string>();
-    for (const e of fonts.all()) {
+    for (const e of fonts.catalog()) {
       const lib = FONT_LIBRARY.find(l => l.family === e.family); have.add(e.family);
       const mood = e.mood ?? lib?.mood; const sc = e.source === 'generic' ? 'both' : scriptOf(e.family, mood, e.cjk ?? (lib ? lib.mood !== 'latin' : undefined));
-      rows.push({ family: e.family, source: e.source, ...(e.zh ? { zh: e.zh } : lib ? { zh: lib.family } : {}), script: sc, look: e.source === 'generic' ? (e.family === 'serif' ? 'serif' : 'sans') : lookOf(e.family, mood), ...(e.hint ?? lib?.hint ? { hint: e.hint ?? lib?.hint } : {}) });
+      rows.push({ family: e.family, source: e.source, ...(e.source === 'bundled' && !fonts.hasBundled(e.family) ? { pending: true } : {}), ...(e.zh ? { zh: e.zh } : lib ? { zh: lib.family } : {}), script: sc, look: e.source === 'generic' ? (e.family === 'serif' ? 'serif' : 'sans') : lookOf(e.family, mood), ...(e.hint ?? lib?.hint ? { hint: e.hint ?? lib?.hint } : {}) });
     }
-    for (const l of FONT_LIBRARY) if (!have.has(l.family) && !fonts.hasFont(l.family)) rows.push({ family: l.family, source: 'library', zh: l.family, script: l.mood === 'latin' ? 'en' : 'zh', look: lookOf(l.family, l.mood), hint: l.hint, lib: l });
+    for (const l of FONT_LIBRARY) if (!have.has(l.family) && !fonts.hasFont(l.family) && !fonts.isLibraryFamily(l.family)) rows.push({ family: l.family, source: 'library', zh: l.family, script: l.mood === 'latin' ? 'en' : 'zh', look: lookOf(l.family, l.mood), hint: l.hint, lib: l });
     return rows;
   }
   const label = (r: Row): { name: string; sub: string } => { const g = fonts.find(r.family); const zhName = r.zh ?? g?.zh; return zhName && zhName !== r.family && zh ? { name: zhName, sub: r.family } : { name: r.family, sub: r.hint ?? '' }; };
@@ -71,11 +71,12 @@ export function renderFontBrowser(view: CoverView, host: HTMLElement, o: FontBro
     const el = parent.createDiv({ cls: 'qcf-row', attr: { role: 'button', tabindex: '0' } }); el.classList.toggle('is-active', o.current === r.family); el.dataset.family = r.family;
     const sample = el.createSpan({ cls: 'qcf-sample', text: r.script === 'en' || (script === 'en') ? 'Aa Cover' : r.script === 'both' ? 'Aa 封面' : '封面设计' });
     if (r.source === 'google') { sample.style.fontFamily = `"__gf_${r.gf!.id}", sans-serif`; if (!previewed.has(r.gf!.id)) { previewed.add(r.gf!.id); void previewGoogle(r.gf!).then(() => { sample.style.fontFamily = `"__gf_${r.gf!.id}", sans-serif`; }); } }
-    else if (r.source === 'library') sample.addClass('is-off'); else { sample.style.fontFamily = `"${r.family.replace(/"/g, '')}", sans-serif`; if (r.source === 'bundled') obs.observe(el); }
+    else if (r.source === 'library') sample.addClass('is-off'); else if (r.pending) sample.addClass('is-off'); else { sample.style.fontFamily = `"${r.family.replace(/"/g, '')}", sans-serif`; if (r.source === 'bundled') obs.observe(el); }
     const meta = el.createDiv('qcf-meta'); const l = label(r); meta.createSpan({ text: l.name, cls: 'qcf-name' }); if (l.sub) meta.createSpan({ text: l.sub, cls: 'qcf-sub' });
     const end = el.createDiv('qcf-end');
     if (r.source === 'google') { const b = end.createEl('button', { cls: 'qcf-dl', attr: { type: 'button' } }); setIcon(b.createSpan(), busy.has(r.family) ? 'loader-circle' : 'download'); b.createSpan({ text: busy.has(r.family) ? (zh ? '安装中…' : 'Installing…') : (zh ? '安装' : 'Install') }); }
     else if (r.source === 'library') { const b = end.createEl('button', { cls: 'qcf-dl', attr: { type: 'button' } }); setIcon(b.createSpan(), busy.has(r.family) ? 'loader-circle' : 'download'); b.createSpan({ text: busy.has(r.family) ? (zh ? '安装中…' : 'Installing…') : `${r.lib!.mb < 1 ? Math.round(r.lib!.mb * 1000) + ' KB' : r.lib!.mb + ' MB'}` }); }
+    else if (r.pending) end.createSpan({ cls: 'qcf-sub', text: zh ? '准备中' : 'Getting ready' });
     else {
       if (o.current === r.family) setIcon(end.createSpan({ cls: 'qcf-check' }), 'check');
       const star = end.createEl('button', { cls: 'qcf-star', attr: { type: 'button', 'aria-label': zh ? '收藏' : 'Favourite' } }); setIcon(star, 'star'); star.classList.toggle('is-on', fav.has(r.family));
@@ -105,6 +106,10 @@ export function renderFontBrowser(view: CoverView, host: HTMLElement, o: FontBro
     list.empty(); const q = query.toLowerCase(); const fav = new Set(plugin.settings.favFonts);
     const ok = (r: Row): boolean => inScript(r) && (look === 'all' || r.look === look) && (!q || r.family.toLowerCase().includes(q) || (r.zh ?? '').includes(query) || (r.hint ?? '').includes(query));
     const pool = rows.filter(ok); let shown = 0;
+    // The default library downloads silently on first run; say so quietly, and offer a retry for anything that failed.
+    const lib = fonts.libraryState();
+    if (lib.running) list.createDiv({ cls: 'qcf-more', text: zh ? `正在后台准备默认字库 ${lib.ready}/${lib.total}，不影响使用；用到的字体会优先下载。` : `Preparing the font library in the background (${lib.ready}/${lib.total}).` });
+    else if (lib.failed.length) { const n = list.createDiv('qcf-more'); n.createSpan({ text: zh ? `${lib.failed.length} 款默认字体没下载成功（${lib.failed.slice(0, 3).join('、')}${lib.failed.length > 3 ? '…' : ''}）。` : `${lib.failed.length} library fonts did not download. ` }); const b = n.createEl('a', { text: zh ? '重试' : 'Retry', href: '#' }); b.addEventListener('click', ev => { ev.preventDefault(); void fonts.syncLibrary(() => plugin.repairOpenCovers()); }); }
     const section = (id: string, items: Row[], limit = 80): void => { if (!items.length) return; shown += items.length; const [a, b] = SECTION[id]!; const h = list.createDiv({ cls: 'qcf-head', text: `${zh ? a : b}` }); h.createSpan({ text: String(items.length), cls: 'qcf-count' }); const body = list.createDiv('qcf-group'); for (const r of items.slice(0, limit)) row(body, r, fav); if (items.length > limit) body.createDiv({ text: zh ? `还有 ${items.length - limit} 款，用搜索缩小范围` : `${items.length - limit} more; search to narrow`, cls: 'qcf-more' }); };
     if (q || look !== 'all') {
       section('bundled', pool.filter(r => r.source === 'bundled')); section('vault', pool.filter(r => r.source === 'vault')); section('library', pool.filter(r => r.source === 'library')); section('system', pool.filter(r => r.source === 'system' || r.source === 'generic'));

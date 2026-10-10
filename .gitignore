@@ -7,3 +7,5 @@ scripts/template-gallery/bundle.js
 scripts/template-gallery/review.js
 .claude/
 design-previews/
+.font-cache/
+assets/fonts/

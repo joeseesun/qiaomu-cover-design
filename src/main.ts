@@ -49,13 +49,15 @@ export default class CoverPlugin extends Plugin {
   activeCover(): CoverView | undefined { return this.app.workspace.getActiveViewOfType(CoverView) ?? undefined; }
 
   /** After fonts are installed: re-pair the fonts of every open cover. */
-  repairOpenCovers(): void { for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) (leaf.view as CoverView).repairFonts(); }
+  /** Deferred tabs (not opened since launch) hold a placeholder view, so only real cover views are touched. */
+  repairOpenCovers(): void { for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) if (leaf.view instanceof CoverView) leaf.view.repairFonts(); }
   async onload(): Promise<void> {
     this.settings = mergeSettings(await this.loadData());
     this.fonts = new FontService(this.app, () => this.settings.fontFolder, () => this.manifest.dir ?? '');
     this.registerView(VIEW, leaf => new CoverView(leaf, this));
     this.registerExtensions(['qcover'], VIEW);
-    this.app.workspace.onLayoutReady(() => { void this.fonts.loadBundledIndex(); void this.fonts.loadVault(activeDocument); });
+    // The default font library arrives silently on first run (store installs ship no font files); open covers re-pair as it lands.
+    this.app.workspace.onLayoutReady(() => { void this.fonts.loadBundledIndex().then(() => this.fonts.syncLibrary(() => this.repairOpenCovers())); void this.fonts.loadVault(activeDocument); });
     const touchFonts = (file: unknown): void => {
       if (!(file instanceof TFile) || !file.path.startsWith(`${normalizePath(this.settings.fontFolder)}/`)) return;
       window.clearTimeout(this.fontTimer); this.fontTimer = window.setTimeout(() => void this.fonts.loadVault(activeDocument), 400);

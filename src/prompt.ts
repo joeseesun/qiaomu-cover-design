@@ -15,6 +15,7 @@ import { seriesPrompt } from './series';
 import { capabilityCards, DOMAINS, type Domain } from './capabilities';
 import { describeScene } from './scene';
 import { scriptOf } from './fontcheck';
+import { pairingGuide } from './pairings';
 
 /** Shared by every prompt: who the model is, the one output shape, and the rules that keep edits precise. */
 function coreRules(input: AssistantInput): string {
@@ -91,9 +92,9 @@ function fontGuide(input: AssistantInput): string {
   const titles = cjk.filter(f => !isBody(f)); const bodies = cjk.filter(isBody);
   if (titles.length) rows.push(`中文标题字体（按主题气质选）：\n${titles.map(line).join('\n')}`);
   if (bodies.length) rows.push(`中文正文字体（副标题、说明文字；也可做稳重的标题）：\n${bodies.map(line).join('\n')}`);
-  if (latin.length) rows.push(`仅英文字体（没有中文字形！只用于英文标题、数字、“No. 01”这类角标；任何含中文的文字都不能用）：\n${latin.map(line).join('\n')}`);
+  if (latin.length) rows.push(`仅英文字体（没有中文字形！只用于英文标题、数字、“No. 01”这类角标；任何含中文的文字都不能用。用户要“手写感 / 书法 / 圆润 / 复古”等风格时，含中文的文字只能在上面的中文字体里找对应气质，例如手写感用霞鹜文楷或志莽行书）：\n${latin.map(line).join('\n')}`);
   if (system.length) rows.push(`系统字体（中规中矩，只在用户点名时用）：${system.map(f => f.zh ? `${f.family}（${f.zh}）` : f.family).join('、')}`);
-  return `字体：以下字体都随插件打包或已安装，直接可用，用户不需要另外安装。titleFont 指定标题字体、bodyFont 指定副标题字体；局部修改用 style 的 font。\n${rows.join('\n')}\n${rules}`;
+  return `字体搭配（优先用这个）：design 写 "typeset":"搭配 id"，标题、正文、英文数字的字体一次定好，插件会把纯英文 / 数字的文字（期号、No. 01、英文角标）自动换成搭配里的英文字体。按内容气质选一套；只有搭配都不合适时才单独写 titleFont / bodyFont（会覆盖搭配里对应的角色）。\n${pairingGuide()}\n\n单款字体：以下字体都随插件打包，直接可用，用户不需要另外安装。titleFont 指定标题字体、bodyFont 指定副标题字体；局部修改用 style 的 font。\n${rows.join('\n')}\n${rules}`;
 }
 /** The current look in one block, so relative asks ("更暗一点", "换个更活泼的字体") have a known baseline. */
 function stateBlock(state: AssistantInput['state']): string {
@@ -116,12 +117,12 @@ function designPrompt(input: AssistantInput, imageOn: boolean): string {
 
 ${input.chooseDesigns ? `# 候选方案
 用户要从文案和版式中选择。若需要 design，输出 {"reply":"选一个喜欢的方向","ops":[],"designs":[三个完整 design 字段对象，不含 op]}。
-三个方案各自提炼真实、不同角度的标题和副标题，使用不同构图模板和适合的字体；不只是换颜色。每个对象必须有 template/title/subtitle，平台一致。
+三个方案各自提炼真实、不同角度的标题和副标题，使用不同构图模板，并各写一个 typeset 字体搭配，三个方案的 typeset 两两不同；不只是换颜色。每个对象必须有 template/title/subtitle，平台一致。
 数字、收益、案例只能来自用户材料，不编造。优先完整的纯文字构图，不为未生成的图片留空位。候选不得写 imagePrompt/subjectPrompt/decor/pattern。微调已有画布（换配色、换字体、换装饰、更简洁、更大胆、标题改短等）时只输出 ops，绝不输出 designs；保持不变的字段（template/title/subtitle/palette）省略不写，省略即保留当前值。
 ` : ''}
 # 指令
 1. design（整页自动排版；用户给了一段话、主题或说“做封面”时用它，生成候选时用这些字段放进 designs 数组，只有用户已选中方案或要求局部调整时执行 ops）
-   {"op":"design","platform":"xhs","template":"number","title":"…","subtitle":"…","badge":"7","points":["…","…"],"palette":{"bg":"#fff7e6","ink":"#1a1a1a","accent":"#ef4444"}${imageOn ? ',"subjectPrompt":"…","subjectAt":"right"' : ''},"titleFont":"…","bodyFont":"…","pattern":"…","decor":[…]}
+   {"op":"design","platform":"xhs","template":"number","title":"…","subtitle":"…","badge":"7","points":["…","…"],"palette":{"bg":"#fff7e6","ink":"#1a1a1a","accent":"#ef4444"}${imageOn ? ',"subjectPrompt":"…","subjectAt":"right"' : ''},"typeset":"editorial","titleFont":"…","bodyFont":"…","pattern":"…","decor":[…]}
    · 所有字段可省略，省略则保持当前值。palette 可选键：bg bg2 ink sub accent accentInk（必须 #rrggbb；不写就用模板默认配色）。默认不写 bg2：bg2 ≠ bg 会变成渐变底，渐变在信息流里显得廉价、压低文字反差。
    · title 是钩子不是摘要：中文最好 8~10 字、最多 14 字（能自然断成 2 行），英文 ≤6 词；标题文字约占画面 30%~40%，手机上一眼能读完。subtitle 补一个具体收益、数字或出处，≤24 字。badge 是 2~4 字标签或一个数字，如“必看”“干货”“7”“03”。
    · points 只给 notes / bento（3~4 条，每条 ≤10 字）和 compare（恰好 2 项：左 / 右）使用。

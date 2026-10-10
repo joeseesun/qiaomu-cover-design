@@ -5,6 +5,7 @@
  */
 import type { DesignSpec, Op } from '../../src/ops';
 import { fontProblem, type BookFont } from '../../src/fontcheck';
+import { pairingById } from '../../src/pairings';
 import { resolveTarget, type Target } from '../../src/scene';
 import { META, NODES } from '../fixtures/scene';
 
@@ -66,9 +67,15 @@ export const CASES: Case[] = [
   { id: 'font-handwriting', domain: 'font', prompt: '副标题换成手写感的字体', check: all(noDesign, c => find(c, 'style').some(o => hits(o.target, c, 't2') && !!o.font && !fontProblem(o.font, NODES.find(n => n.id === 't2')!.text!, c.fontBook, true)) ? true : `副标题字体不存在或显示不了中文（得到 ${JSON.stringify(find(c, 'style').map(o => o.font))}）`) },
   { id: 'font-redesign', domain: 'font', prompt: '重新排版，字体要更有个性', check: c => {
     if (!c.designs && !c.ops.some(o => o.op === 'design')) return '没有重新排版';
-    const specs = [...c.specs, ...find(c, 'design')]; const bad = specs.flatMap(s => [s.titleFont && fontProblem(s.titleFont, s.title ?? '普通人如何用 AI 做副业', c.fontBook, true), s.bodyFont && fontProblem(s.bodyFont, s.subtitle ?? '从 0 到月入 3000', c.fontBook, true)]).filter(Boolean);
+    const specs = [...c.specs, ...find(c, 'design')].map(s => { const p = pairingById(s.typeset); return { ...s, titleFont: s.titleFont ?? p?.title, bodyFont: s.bodyFont ?? p?.body }; }); const bad = specs.flatMap(s => [s.titleFont && fontProblem(s.titleFont, s.title ?? '普通人如何用 AI 做副业', c.fontBook, true), s.bodyFont && fontProblem(s.bodyFont, s.subtitle ?? '从 0 到月入 3000', c.fontBook, true)]).filter(Boolean);
     if (bad.length) return String(bad[0]);
     return new Set(specs.map(s => s.titleFont).filter(Boolean)).size >= 2 || specs.length < 2 ? true : '三个方案的标题字体没有区分';
+  } },
+  { id: 'typeset-tech', domain: 'font', prompt: '做一张封面：AI 编程助手实测，三个月写了十万行代码', check: c => {
+    const specs = [...c.specs, ...find(c, 'design')]; if (!specs.length) return '没有给出方案';
+    const sets = specs.map(s => s.typeset).filter(Boolean); if (sets.length < specs.length) return `有方案没写字体搭配（${JSON.stringify(specs.map(s => s.typeset ?? s.titleFont))}）`;
+    if (specs.length > 1 && new Set(sets).size < specs.length) return '候选方案的字体搭配重复';
+    return sets.some(t => t === 'tech' || t === 'trend' || t === 'punch') ? true : `科技话题没选科技 / 潮流 / 干货类搭配（${sets.join(',')}）`;
   } },
   // the current selection
   { id: 'sel-bigger', domain: 'selection', prompt: '这个大一点', selection: ['i1'], check: all(noDesign, some('resize', (o, c) => hits(o.target ?? 'selection', c, 'i1') && (o.scale ?? 0) > 1, '选中的星星没放大')) },

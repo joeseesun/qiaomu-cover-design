@@ -4,6 +4,7 @@
  */
 import { DECOR_IDS, TONES } from './decor';
 import { PATTERN_IDS } from './playbook';
+import { pairingById } from './pairings';
 import type { DecorSpec, DesignSpec } from './ops';
 
 export interface Catalog { platforms: string[]; templates: string[] }
@@ -35,6 +36,7 @@ export function sanitizeDesign(o: Record<string, unknown>, c: Catalog): DesignSp
   const pattern = str(o.pattern, 32); if (pattern && PATTERN_IDS.includes(pattern)) spec.pattern = pattern;
   const titleFont = str(o.titleFont, 60); if (titleFont) spec.titleFont = titleFont;
   const bodyFont = str(o.bodyFont, 60); if (bodyFont) spec.bodyFont = bodyFont;
+  const typeset = str(o.typeset, 24); if (typeset && pairingById(typeset)) spec.typeset = typeset;
   const decor = sanitizeDecor(o.decor); if (decor) spec.decor = decor;
   return spec;
 }
