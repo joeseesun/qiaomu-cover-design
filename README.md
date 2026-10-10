@@ -20,6 +20,12 @@ Create editable covers and posters from your notes, ideas and images—inside Ob
 
 [安装](#quick-start) · [AI 排版](#ai-layout) · [平台模板](#platforms) · [画布图层](#canvas) · [字体素材](#fonts) · [图库](#gallery) · [AI 生图](#image-ai) · [模型配置](#models) · [导出](#export) · [快捷键](#shortcuts) · [备份隐私](#storage)
 
+## Installation and usage
+
+Qiaomu Design creates editable covers and posters inside Obsidian, with optional AI layout, image generation, an image gallery and freehand drawing. See the [complete English guide](README.en.md).
+
+Install the complete ZIP from [GitHub Releases](https://github.com/joeseesun/qiaomu-cover-design/releases/latest) into your vault configuration folder under `plugins/qiaomu-cover-design/`, then enable Qiaomu Design in Community plugins. Desktop Obsidian 1.11.4+ is required. Preserve plugin settings, Gallery, image jobs, fonts and caches when upgrading. Open the designer from the command palette, choose a platform, add/edit elements and export PNG/JPEG/WebP. AI is optional and uses your own configured provider.
+
 ## 为什么在笔记里做设计
 
 一篇文章写好后，你不必把标题、正文、配图反复搬进另一个设计工具。乔木设计把画布放进 Obsidian：从当前笔记起稿，选模板或让 AI 提出排版方案，调整文字、图片与图层，导出后再放回笔记。
