@@ -89,6 +89,8 @@ export class SnapshotCodec {
 export class History {
   private entries: string[] = []; private index = -1;
   reset(value: string): void { this.entries = [value]; this.index = 0; }
+  /** Font metrics can normalize a restored snapshot without creating a new edit or losing redo. */
+  replaceCurrent(value: string): void { if (this.index >= 0) this.entries[this.index] = value; }
   push(value: string): void {
     if (value === this.entries[this.index]) return;
     this.entries = this.entries.slice(0,this.index + 1); this.entries.push(value);

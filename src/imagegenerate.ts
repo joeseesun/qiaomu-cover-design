@@ -60,7 +60,7 @@ export class ImageGenerateDialog extends Modal {
       model.toggleClass('qc-hidden', !model.options.length); modelChanged();
     };
     const add = textButton(modelRow, t('imageAddModel'), () => new ModelDialog(v.plugin, 'image', () => { if (!this.closed) { v.imageModelId = v.plugin.settings.ai.imageId; populate(); } }).open(), 'qc-btn-sm qc-image-add-model', 'plus');
-    add.title = t('imageAddModel');
+    add.setAttribute('aria-label', t('imageAddModel'));
     const ratio = select(controls, t('directImageRatio'), 'ratio'); ratio.addClass('qc-image-ratio');
     for (const id of ['canvas', '1:1', '3:4', '4:3', '16:9', '9:16', '3:2', '2:3', '21:9']) ratio.createEl('option', { value: id, text: id === 'canvas' ? t(editing ? 'imageOriginalRatio' : 'imageCanvasRatio') : id });
     const referenceRow = field(el, t(editing ? 'imageReferences' : 'imageReferenceOptional'), 'refs');

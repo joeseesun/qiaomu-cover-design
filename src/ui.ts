@@ -1,9 +1,16 @@
 import { setIcon } from 'obsidian';
+import { hexToHsv, hsvToHex } from './color-picker-math';
 
 type Opts = DomElementInfo | string;
-/** Icon-only controls carry a visually hidden label instead of aria-label, which Obsidian renders as a tooltip. */
+let nameId = 0;
+/** Accessible naming without a hover tooltip, for already explained fields and regions. */
+export function quietName(el: HTMLElement, label: string, parent = el): void {
+  const name = parent.createSpan({ text: label, cls: 'qc-sr-only', attr: { id: `qc-name-${++nameId}` } });
+  el.setAttribute('aria-labelledby', name.id);
+}
+/** Icon-only actions use the host tooltip through aria-label; never add a second native title. */
 export function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (event: MouseEvent) => void, cls = ''): HTMLButtonElement {
-  const b = parent.createEl('button', { cls: `qc-icon-btn ${cls}`.trim(), attr: { type: 'button', 'aria-label': label, title: label } });
+  const b = parent.createEl('button', { cls: `qc-icon-btn ${cls}`.trim(), attr: { type: 'button', 'aria-label': label } });
   setIcon(b, icon); b.createSpan({ text: label, cls: 'qc-sr-only' });
   b.addEventListener('click', onClick); return b;
 }
@@ -65,30 +72,57 @@ export function numberBox(parent: HTMLElement, label: string, value: number, onC
   return input;
 }
 export const PALETTE = ['#111111', '#ffffff', '#737373', '#e11d2e', '#f97316', '#ffe04b', '#16a34a', '#14b8a6', '#2563eb', '#7c3aed', '#fb7185', '#f4efe4'];
-export interface ColorOptions { recent?: string[]; none?: boolean; onCommit?: (color: string) => void; doc?: Document }
-/** Swatch + hex + palette. `none` adds a transparent choice (value ''). */
+export interface ColorOptions { recent?: string[]; none?: boolean; zh?: boolean; onCommit?: (color: string) => void; onStart?: () => void; onEnd?: () => void; doc?: Document }
+/** A square swatch opens the full picker; sampling is an action inside it. */
 export function colorControl(parent: HTMLElement, label: string, value: string, onChange: (color: string) => void, o: ColorOptions = {}): HTMLElement {
+  const doc = o.doc ?? parent.ownerDocument, win = doc.defaultView! as Window & typeof globalThis;
+  const words = o.zh ? { picker: '打开色盘', sample: '吸取屏幕颜色', none: '无颜色', close: '关闭色盘', area: '饱和度与亮度，左右键调饱和度，上下键调亮度', hue: '色相' } : { picker: 'Open color picker', sample: 'Sample screen color', none: 'No color', close: 'Close color picker', area: 'Saturation and brightness. Left/right adjusts saturation; up/down adjusts brightness.', hue: 'Hue' };
   const { wrap, body } = field(parent, label, 'qc-color');
   const top = body.createDiv('qc-color-top');
-  const hex = /^#[\da-f]{6}$/i.test(value) ? value.toLowerCase() : '';
-  const picker = top.createEl('input', { type: 'color', cls: 'qc-swatch-input' }); picker.value = hex || '#171717';
-  const text = top.createEl('input', { type: 'text', cls: 'qc-hex', attr: { maxlength: '9', spellcheck: 'false', placeholder: o.none ? '—' : '#000000' } }); text.value = hex;
-  const apply = (c: string, commit: boolean): void => { onChange(c); if (commit) o.onCommit?.(c); };
-  picker.addEventListener('input', () => { text.value = picker.value; apply(picker.value, false); });
-  picker.addEventListener('change', () => apply(picker.value, true));
-  text.addEventListener('input', () => { const v = text.value.trim(); const full = /^#?[\da-f]{6}$/i.test(v) ? (v.startsWith('#') ? v : `#${v}`) : ''; if (full) { picker.value = full; apply(full.toLowerCase(), true); } });
-  const win = (o.doc ?? parent.ownerDocument).defaultView as (Window & { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }) | null;
-  if (win?.EyeDropper) {
-    const Eye = win.EyeDropper;
-    iconButton(top, 'pipette', '', () => { void new Eye().open().then(r => { picker.value = r.sRGBHex; text.value = r.sRGBHex; apply(r.sRGBHex, true); }).catch(() => undefined); }, 'qc-eyedrop');
-  }
+  let current = /^#[\da-f]{6}$/i.test(value) ? value.toLowerCase() : '';
+  const trigger = top.createEl('button', { cls: 'qc-swatch qc-color-trigger', attr: { type: 'button', 'aria-label': `${label}: ${words.picker}`, 'aria-haspopup': 'dialog', 'aria-expanded': 'false' } });
+  const text = top.createEl('input', { type: 'text', cls: 'qc-hex', attr: { maxlength: '7', spellcheck: 'false', placeholder: o.none ? '—' : '#000000' } }); text.value = current; quietName(text, `${label} HEX`, wrap);
+  const colors = [...new Set([...(o.recent ?? []).slice(0, 6), ...PALETTE].filter(c => /^#[\da-f]{6}$/i.test(c)).map(c => c.toLowerCase()))];
   const swatches = body.createDiv('qc-swatches');
-  if (o.none) { const n = swatches.createEl('button', { cls: 'qc-swatch is-none', attr: { type: 'button' } }); n.createSpan({ text: '', cls: 'qc-sr-only' }); n.addEventListener('click', () => { text.value = ''; apply('', true); }); }
-  for (const c of [...(o.recent ?? []).slice(0, 6), ...PALETTE]) {
-    const s = swatches.createEl('button', { cls: 'qc-swatch', attr: { type: 'button' } }); s.style.setProperty('--c', c);
-    s.createSpan({ text: c, cls: 'qc-sr-only' });
-    s.addEventListener('click', () => { picker.value = c; text.value = c; apply(c, true); });
-  }
+  let syncPopup: (() => void) | undefined;
+  const sync = (): void => { trigger.style.setProperty('--c', current); trigger.classList.toggle('is-none', !current); for (const s of Array.from(swatches.children)) s.setAttribute('aria-pressed', String(s.getAttribute('data-color') === current)); syncPopup?.(); };
+  const apply = (c: string, commit = true): void => { current = c.toLowerCase(); text.value = current; sync(); onChange(current); if (commit) o.onCommit?.(current); };
+  const addSwatch = (c: string): void => { const s = swatches.createEl('button', { cls: `qc-swatch${c ? '' : ' is-none'}`, attr: { type: 'button', 'data-color': c } }); s.createSpan({ text: c || words.none, cls: 'qc-sr-only' }); s.style.setProperty('--c', c); s.addEventListener('click', () => apply(c)); };
+  if (o.none) addSwatch(''); colors.forEach(addSwatch); sync();
+  text.addEventListener('input', () => { const v = text.value.trim(); if (/^#?[\da-f]{6}$/i.test(v)) apply(v.startsWith('#') ? v : `#${v}`); });
+  trigger.addEventListener('click', () => {
+    const existing = doc.querySelector('.qc-color-popover');
+    const own = trigger.getAttribute('aria-expanded') === 'true'; existing?.dispatchEvent(new win.Event('qc-close')); if (own) return;
+    const pop = doc.body.createDiv({ cls: 'qc-popover qc-color-popover', attr: { role: 'dialog' } }); quietName(pop, `${label}: ${words.picker}`);
+    trigger.setAttribute('aria-expanded', 'true'); o.onStart?.();
+    let closed = false, sampling = false, pointer: number | undefined, [h, s, v] = hexToHsv(current || '#2563eb');
+    const heading = pop.createDiv('qc-color-heading'); heading.createSpan({ text: label });
+    const close = (focus = false): void => { if (closed) return; closed = true; observer.disconnect(); doc.removeEventListener('pointerdown', outside, true); doc.removeEventListener('keydown', key); win.removeEventListener('resize', position); doc.removeEventListener('scroll', position, true); syncPopup = undefined; pop.remove(); trigger.setAttribute('aria-expanded', 'false'); o.onEnd?.(); if (focus && trigger.isConnected) trigger.focus(); };
+    iconButton(heading, 'x', words.close, () => close(true));
+    const area = pop.createDiv({ cls: 'qc-color-area', attr: { tabindex: '0', role: 'slider', 'aria-valuemin': '0', 'aria-valuemax': '100' } }); quietName(area, words.area);
+    const marker = area.createSpan('qc-color-marker');
+    const hue = pop.createEl('input', { type: 'range', cls: 'qc-color-hue', attr: { min: '0', max: '359', step: '1' } }); quietName(hue, words.hue, pop);
+    const row = pop.createDiv('qc-color-value-row'); row.createSpan({ text: 'HEX', cls: 'qc-label' });
+    const hex = row.createEl('input', { type: 'text', cls: 'qc-hex', attr: { maxlength: '7', spellcheck: 'false' } }); quietName(hex, 'HEX', pop);
+    const refresh = (): void => { area.style.setProperty('--hue', `hsl(${h} 100% 50%)`); marker.style.left = `${s * 100}%`; marker.style.top = `${(1 - v) * 100}%`; hue.value = String(Math.round(h)); hex.value = current; area.setAttribute('aria-valuenow', String(Math.round(v * 100))); area.setAttribute('aria-valuetext', `${Math.round(s * 100)}% / ${Math.round(v * 100)}% ${current}`); };
+    syncPopup = () => { if (current) { const next = hexToHsv(current); if (next[1] && next[2]) h = next[0]; s = next[1]; v = next[2]; } refresh(); }; refresh();
+    const point = (e: PointerEvent): void => { const r = area.getBoundingClientRect(); s = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); v = 1 - Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)); apply(hsvToHex(h, s, v), false); };
+    area.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); area.focus(); pointer = e.pointerId; try { area.setPointerCapture(pointer); } catch { /* Synthetic fixture has no active pointer. */ } point(e); });
+    area.addEventListener('pointermove', e => { if (pointer === e.pointerId) point(e); });
+    const finish = (): void => { if (pointer !== undefined) { pointer = undefined; o.onCommit?.(current); } };
+    area.addEventListener('pointerup', finish); area.addEventListener('pointercancel', finish); area.addEventListener('lostpointercapture', finish);
+    area.addEventListener('keydown', e => { if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return; e.preventDefault(); const step = e.shiftKey ? 0.1 : 0.01; s = Math.max(0, Math.min(1, s + (e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0))); v = Math.max(0, Math.min(1, v + (e.key === 'ArrowUp' ? step : e.key === 'ArrowDown' ? -step : 0))); apply(hsvToHex(h, s, v)); });
+    hue.addEventListener('input', () => { h = Number(hue.value); apply(hsvToHex(h, s, v), false); }); hue.addEventListener('change', () => o.onCommit?.(current));
+    hex.addEventListener('input', () => { const c = hex.value.trim(); if (/^#?[\da-f]{6}$/i.test(c)) apply(c.startsWith('#') ? c : `#${c}`); });
+    const Eye = (win as Window & { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper;
+    if (Eye) iconButton(row, 'pipette', words.sample, () => { sampling = true; pop.style.visibility = 'hidden'; void new Eye().open().then(r => { if (!closed && wrap.isConnected) apply(r.sRGBHex); }).catch(() => undefined).finally(() => { sampling = false; if (!closed) { pop.style.visibility = ''; hex.focus(); } }); });
+    if (o.none) textButton(pop, words.none, () => apply(''), 'qc-color-none qc-btn-sm', 'ban');
+    const position = (): void => { if (!wrap.isConnected) { close(); return; } const r = trigger.getBoundingClientRect(), size = pop.getBoundingClientRect(); pop.style.left = `${Math.max(8, Math.min(r.left, win.innerWidth - size.width - 8))}px`; pop.style.top = `${Math.max(8, Math.min(r.bottom + 8, win.innerHeight - size.height - 8))}px`; };
+    const outside = (e: PointerEvent): void => { if (!sampling && !pop.contains(e.target as Node) && !wrap.contains(e.target as Node)) close(); };
+    const key = (e: KeyboardEvent): void => { if (e.key === 'Escape' && !sampling) { e.preventDefault(); e.stopPropagation(); close(true); } };
+    const observer = new win.MutationObserver(() => { if (!wrap.isConnected) close(); }); observer.observe(doc.body, { childList: true, subtree: true });
+    pop.addEventListener('qc-close', () => close()); doc.addEventListener('pointerdown', outside, true); doc.addEventListener('keydown', key); win.addEventListener('resize', position); doc.addEventListener('scroll', position, true); position(); hex.focus();
+  });
   return wrap;
 }
 export function div(parent: HTMLElement, cls: Opts): HTMLDivElement { return parent.createDiv(cls); }

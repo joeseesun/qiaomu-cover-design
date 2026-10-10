@@ -1,6 +1,6 @@
 /** One table keeps zh and en in lockstep; the test suite checks placeholders match. */
 const T = {
-  imageCreateSelection: ['AI 创作', 'AI create'], imageReplaceSelection: ['替换所选元素', 'Replace selected elements'], imageContinueCreate: ['继续创作', 'Continue creating'],
+  imageCreateSelection: ['用 AI 编辑', 'Edit with AI'], imageEditSelection: ['AI 编辑', 'AI edit'], downloadSelection: ['下载选中内容（PNG）', 'Download selection (PNG)'], imageReplaceSelection: ['替换所选元素', 'Replace selected elements'], imageContinueCreate: ['继续创作', 'Continue creating'],
   imagePreviousRound: ['上一轮要求', 'Previous request'],
   imageMoveBackground: ['放到后台', 'Move to background'], imageWaitElapsed: ['已等待 {seconds} 秒', 'Waiting for {seconds} seconds'], imageWaitHint: ['结果会在这里出现。也可以放到后台，继续编辑画布；关闭弹窗不会取消任务。', 'Results will appear here. Move to the background to keep editing; closing this dialog does not cancel the task.'],
   imageSelectionHint: ['已将 {count} 个元素合成参考图。替换后变为一张图片，撤销可恢复原图层。', '{count} elements captured as a reference. Replacing turns them into one image; undo restores the original layers.'],
@@ -34,7 +34,7 @@ const T = {
   imageTaskInterrupted: ['连接已中断', 'Connection interrupted'],
   imageTaskQueued: ['等待生成', 'Queued'],
   imageTaskRestartHint: ['插件重载中断了连接，没有自动重发。可重新填写提示词，手动提交新任务。', 'Plugin reload interrupted the connection. No automatic retry was sent. Submit a new task manually if needed.'],
-  imageTaskComplete: ['图片已生成，查看结果后选择插入。', 'Images are ready. Review and choose what to insert.'],
+  imageTaskComplete: ['图片已生成', 'Images are ready'], imageTaskReviewHint: ['选择结果后插入画布', 'Choose results to insert'],
   imageTaskFileMissing: ['来源画布已删除，请先恢复画布文件。', 'The source canvas was deleted. Restore it first.'],
   imageOriginalChanged: ['原图已被修改或删除，不能替换。仍可插入副本。', 'The original was changed or removed. You can still insert a copy.'],
   imageStartBackground: ['开始后台生成', 'Generate in background'],

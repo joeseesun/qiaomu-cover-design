@@ -1,7 +1,7 @@
 import { ImageJobs } from './imagejobs';
 import { VaultImageJobStore } from './imagejobstore';
 import { ImageJobsDialog, ImageResultsDialog } from './imagejobdialog';
-import { App, getLanguage, MarkdownView, Notice, Platform, Plugin, TFile, normalizePath } from 'obsidian';
+import { App, getLanguage, MarkdownView, Notice, Platform, Plugin, TFile, normalizePath, setIcon } from 'obsidian';
 import { Design, folderPath, safeName } from './model';
 import { Key, translate } from './i18n';
 import { homeProvider, HomeProvider, notifyHomeChanged } from './integrations/qiaomu-home';
@@ -58,9 +58,13 @@ export default class CoverPlugin extends Plugin {
   async onload(): Promise<void> {
     this.settings = mergeSettings(await this.loadData());
     this.imageJobs = new ImageJobs(new VaultImageJobStore(this.app.vault.adapter, `${this.manifest.dir}/image-jobs`), job => {
-      const fragment = document.createDocumentFragment(); const label = document.createElement('div'); label.textContent = this.t(job.state === 'ready' ? 'imageTaskComplete' : 'imageTaskFailed'); fragment.appendChild(label);
-      const button = document.createElement('button'); button.textContent = this.t(job.state === 'ready' ? 'imageViewResults' : 'imageTasks'); fragment.appendChild(button);
-      const notice = new Notice(fragment, 15000); button.addEventListener('click', () => { notice.hide(); if (job.state === 'ready') new ImageResultsDialog(this, job).open(); else this.openImageTasks(); });
+      const doc = activeDocument; const fragment = doc.createDocumentFragment();
+      const row = doc.createElement('div'); row.className = 'qc-image-notice'; fragment.appendChild(row);
+      const icon = row.createSpan('qc-image-notice-icon'); setIcon(icon, job.state === 'ready' ? 'circle-check' : 'circle-alert');
+      const copy = row.createDiv('qc-image-notice-copy'); copy.createEl('strong', { text: this.t(job.state === 'ready' ? 'imageTaskComplete' : 'imageTaskFailed') });
+      if (job.state === 'ready') copy.createSpan({ cls: 'qc-image-notice-hint', text: this.t('imageTaskReviewHint') });
+      const button = row.createEl('button', { cls: 'qc-image-notice-action', text: this.t(job.state === 'ready' ? 'imageViewResults' : 'imageTasks'), attr: { type: 'button' } });
+      const notice = new Notice(fragment, 12000); button.addEventListener('click', () => { notice.hide(); if (job.state === 'ready') new ImageResultsDialog(this, job).open(); else this.openImageTasks(); });
     });
     await this.imageJobs.refresh();
     this.addCommand({ id: 'image-tasks', name: this.t('imageTasks'), callback: () => this.openImageTasks() });
@@ -216,6 +220,16 @@ export default class CoverPlugin extends Plugin {
     while (fs.existsSync(full)) full = path.join(target, `${base} ${i++}${ext}`);
     await fs.promises.writeFile(full, Buffer.from(data));
     return full;
+  }
+  /** Explicit save dialog for a selected-element PNG; cancellation never writes a file. */
+  async saveSystemPng(filename: string, data: ArrayBuffer): Promise<string | undefined> {
+    const req = (window as unknown as { require?: (id: string) => unknown }).require;
+    if (!Platform.isDesktopApp || !req) throw new Error(this.t('destSystemDesktop'));
+    const remote = req('@electron/remote') as { dialog: { showSaveDialog(options: { defaultPath: string; filters: {name: string; extensions: string[]}[] }): Promise<{ canceled: boolean; filePath?: string }> } };
+    const result = await remote.dialog.showSaveDialog({ defaultPath: filename, filters: [{ name: 'PNG image', extensions: ['png'] }] });
+    if (result.canceled || !result.filePath) return undefined;
+    const fs = req('fs') as typeof import('fs'); await fs.promises.writeFile(result.filePath, Buffer.from(data));
+    return result.filePath;
   }
   /** Lets the user pick a system folder through the browser directory picker and recovers its absolute path. */
   chooseSystemFolder(doc: Document): Promise<string | undefined> {

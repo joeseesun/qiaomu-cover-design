@@ -12,9 +12,9 @@ import { decorById } from './decor';
 import type { Key } from './i18n';
 import { GROUPS, PLATFORMS, platformFor } from './platforms';
 import { Palette, Template, gradient, templateById, templatesFor } from './templates';
-import { colorControl, emptyState, field, group, iconButton, numberBox, onEnter, segmented, slider, textButton } from './ui';
+import { colorControl, quietName, emptyState, field, group, iconButton, numberBox, onEnter, segmented, slider, textButton } from './ui';
 import { openFontPopover } from './fontbrowser';
-import { IMAGE_STYLES, startersFor } from './prompts';
+import { startersFor } from './prompts';
 import { playbookFor } from './playbook';
 import { MESH_PRESETS, meshCss } from './mesh';
 import { Background } from './model';
@@ -88,7 +88,7 @@ function drawerSeries(view: CoverView, body: HTMLElement): void {
   const grid = box.createDiv('qc-template-grid'); const copy = view.copyText(); const d = view.design!;
   list.forEach((s, k) => {
     const t = templateById(s.template); if (!t) return;
-    const card = grid.createDiv({ cls: 'qc-template qc-series-card', attr: { role: 'button', tabindex: '0', title: s.name } });
+    const card = grid.createDiv({ cls: 'qc-template qc-series-card', attr: { role: 'button', tabindex: '0' } });
     const thumb = card.createDiv('qc-template-thumb'); thumb.style.aspectRatio = `${d.width} / ${d.height}`;
     const label = card.createSpan({ text: s.name, cls: 'qc-template-name' }); if (k === 0) label.createSpan({ text: ` · ${view.t('seriesDefault')}`, cls: 'qc-template-rec' });
     const del = card.createEl('button', { cls: 'qc-series-del clickable-icon', attr: { type: 'button', 'aria-label': view.t('seriesRemove') } }); setIcon(del, 'x');
@@ -105,14 +105,12 @@ function selectPlaceholder(input: HTMLTextAreaElement): void {
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.focus(); if (open >= 0 && close > open) input.setSelectionRange(open + 1, close);
 }
-const STYLE_SW: Record<string, [string, string]> = { auto: ['#e5e7eb', '#cbd5e1'], none: ['#ffffff', '#f1f5f9'], '3d': ['#fde68a', '#fca5a5'], flat: ['#93c5fd', '#f9a8d4'], photo: ['#374151', '#9ca3af'], neon: ['#0f172a', '#a855f7'], minimal: ['#f3f4f6', '#d1d5db'], watercolor: ['#bfdbfe', '#fecdd3'], memphis: ['#fde047', '#34d399'], guofeng: ['#fecaca', '#d6c7a1'], isometric: ['#a5b4fc', '#67e8f9'], collage: ['#e7d9c0', '#fda4af'] };
-
-type TrayTab = 'template' | 'prompt' | 'picture';
+type TrayTab = 'template' | 'prompt';
 let trayTab: TrayTab | undefined = 'template'; let trayScroll = 0;
-interface TrayCtx { input: HTMLTextAreaElement; picOn: boolean; templates: Template[]; groups: ReturnType<typeof startersFor>; chips: Record<TrayTab, HTMLElement> }
+interface TrayCtx { input: HTMLTextAreaElement; templates: Template[]; groups: ReturnType<typeof startersFor>; chips: Record<TrayTab, HTMLElement> }
 /**
  * What you can pick from opens inside the composer card, above the text box, and is driven by the chips under it. Templates are visual
- * (a strip of thumbnails that stays open so you can try several); prompts are text rows; picture looks are small pills.
+ * (a strip of thumbnails that stays open so you can try several); prompts are text rows.
  * A prompt closes the tray after you pick it, because the next thing you do is write.
  */
 function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: (tab: TrayTab) => void } {
@@ -148,19 +146,7 @@ function buildTray(view: CoverView, host: HTMLElement, ctx: TrayCtx): { toggle: 
         const row = list.createEl('button', { cls: 'qc-tray-row', attr: { type: 'button' } }); row.createSpan({ text: zh ? spx.zh : spx.en, cls: 'qc-tray-row-name' }); row.createSpan({ text: text.replace(/\s+/g, ' '), cls: 'qc-tray-row-text' });
         row.addEventListener('click', () => { ctx.input.value = text; trayTab = undefined; render(); selectPlaceholder(ctx.input); });
       }
-    } else {
-      const wrap = host.createDiv('qc-tray-pills');
-      const opt = wrap.createEl('button', { text: view.t('pictureThisTime'), cls: 'qc-tray-pill', attr: { type: 'button', 'aria-pressed': String(view.pictureRequested) } });
-      opt.disabled = !ctx.picOn; opt.classList.toggle('is-active', view.pictureRequested);
-      opt.addEventListener('click', () => { view.pictureRequested = !view.pictureRequested; if (view.pictureRequested && plugin.settings.imageStyle === 'none') { plugin.settings.imageStyle = 'auto'; void plugin.saveSettings(); } opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); ctx.chips.picture.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle'); });
-      if (!ctx.picOn) { wrap.createSpan({ text: view.t('pictureOffDesc'), cls: 'qc-hint' }); textButton(wrap, view.t('pictureEnable'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm'); }
-      else for (const st of IMAGE_STYLES) {
-        const [c1, c2] = STYLE_SW[st.id] ?? ['#e5e7eb', '#cbd5e1'];
-        const b = wrap.createEl('button', { cls: 'qc-tray-pill', attr: { type: 'button' } }); b.classList.toggle('is-active', plugin.settings.imageStyle === st.id);
-        const dot = b.createSpan({ cls: 'qc-tray-dot' }); dot.style.background = st.id === 'none' ? 'repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 3px,#f8fafc 3px,#f8fafc 6px)' : `linear-gradient(135deg, ${c1}, ${c2})`;
-        b.createSpan({ text: zh ? st.zh : st.en });
-        b.addEventListener('click', () => { plugin.settings.imageStyle = st.id; if (st.id === 'none') view.pictureRequested = false; void plugin.saveSettings(); view.refreshDrawer(); });
-      }
+
     }
   };
   render();
@@ -200,7 +186,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     textButton(card, view.t('aiConnect'), () => plugin.openSettings('assistant'), 'qc-primary qc-btn-sm');
   }
   const cfg = plugin.settings.ai;
-  const messages = body.createDiv({ cls: 'qc-chat-messages', attr: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': view.t('tabAssistant') } });
+  const messages = body.createDiv({ cls: 'qc-chat-messages', attr: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' } });
+  quietName(messages, view.t('tabAssistant'), head);
   const compose = body.createDiv('qc-chat-compose'); const trayEl = compose.createDiv('qc-tray qc-hidden');
   const book = playbookFor(view.platform()?.id); const current = templateById(view.design?.template ?? '');
   // The current canvas pick shows above the box, so "make it bigger / change its colour" has a visible referent.
@@ -216,10 +203,6 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const bar = compose.createDiv('qc-compose-bar');
   const templateBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(templateBtn.createSpan({ cls: 'qc-chip-icon' }), 'layout-template'); templateBtn.createSpan({ text: current ? (view.zh ? current.zh : current.en) : view.t('templateChip'), cls: 'qc-chip-label' });
   const promptBtn = bar.createEl('button', { cls: 'qc-chip-btn', attr: { type: 'button' } }); setIcon(promptBtn.createSpan({ cls: 'qc-chip-icon' }), 'message-square-text'); promptBtn.createSpan({ text: view.zh ? '提示词' : 'Prompts', cls: 'qc-sr-only' }); promptBtn.addClass('is-icon');
-  const picOn = sel.value === 'ai' && ai.imageReady();
-  // The picture chip only exists when a picture model is actually configured; before that it is noise ("配图可选" meant nothing).
-  const picBtn = bar.createEl('button', { cls: `qc-chip-btn${picOn ? '' : ' qc-hidden'}`, attr: { type: 'button' } }); setIcon(picBtn.createSpan({ cls: 'qc-chip-icon' }), 'image');
-  picBtn.createSpan({ text: view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle'), cls: 'qc-chip-label' });
   bar.createDiv({ cls: 'qc-compose-spacer' });
   // Models are set once and rarely changed, so they live behind one small button instead of taking a row of their own.
   if (sel.value === 'ai') {
@@ -248,8 +231,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   view.win.requestAnimationFrame(syncInput);
 
   // The chips under the input are the tabs of a tray that opens inside the same card, so choosing and writing feel like one gesture.
-  const tray = buildTray(view, trayEl, { input, picOn, templates: templatesFor(view.platform()?.id), groups: startersFor(view.platform()?.id), chips: { template: templateBtn, prompt: promptBtn, picture: picBtn } });
-  templateBtn.addEventListener('click', () => tray.toggle('template')); promptBtn.addEventListener('click', () => tray.toggle('prompt')); picBtn.addEventListener('click', () => tray.toggle('picture'));
+  const tray = buildTray(view, trayEl, { input, templates: templatesFor(view.platform()?.id), groups: startersFor(view.platform()?.id), chips: { template: templateBtn, prompt: promptBtn } });
+  templateBtn.addEventListener('click', () => tray.toggle('template')); promptBtn.addEventListener('click', () => tray.toggle('prompt'));
 
   const starters = (): void => {
     const empty = messages.createDiv('qc-chat-empty');
@@ -291,7 +274,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       for (const w of m.warn ?? []) { const li = bubble.createDiv('qc-msg-applied qc-msg-warn'); setIcon(li.createSpan(), 'alert-triangle'); li.createSpan({ text: w }); }
       // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
       if (m.role === 'assistant' && m.snapshot) {
-        const restore = bubble.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button', title: view.t('msgRestore'), 'aria-label': view.t('msgRestore') } });
+        const restore = bubble.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button', 'aria-label': view.t('msgRestore') } });
         setIcon(restore, 'history');
         restore.addEventListener('click', () => void view.action(() => view.restoreSnapshot(m.snapshot!)));
       }
@@ -299,7 +282,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       // candidate is always possible; tweaks and retry act on the current state, so they stay on the last message.
       if (m.variants?.length) {
         if (!m.variants.some(v => v.spec)) bubble.createDiv({ text: view.t('variantsTitle'), cls: 'qc-msg-sub' }); const strip = bubble.createDiv('qc-variants');
-        strip.setAttribute('aria-label', view.t('variantsTitle'));
+        quietName(strip, view.t('variantsTitle'));
         strip.addEventListener('scroll', () => { m.variantScroll = strip.scrollLeft; });
         strip.addEventListener('keydown', e => {
           if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -321,7 +304,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
         strip.addEventListener('click', e => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
         view.win.requestAnimationFrame(() => { strip.scrollLeft = m.variantScroll ?? 0; });
         for (const v of m.variants) {
-          const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button', title: v.label } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
+          const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button' } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
           image.addEventListener('load', () => { if (image.naturalWidth > image.naturalHeight) card.style.flexBasis = '176px'; }); card.createSpan({ text: v.label });
           card.classList.toggle('is-active', !!v.selected); card.setAttribute('aria-pressed', String(!!v.selected)); card.disabled = view.busy;
           card.addEventListener('click', () => void view.chooseVariant(m, v));
@@ -333,7 +316,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
         void loadAssets(view.app, plugin.manifest.dir ?? '').then(data => {
           for (const it of [pick.chosen, ...pick.items.map(x => `${x.cat}:${x.id}`)]) {
             const [cat, id] = it.split(':') as [AssetCat, string]; const item = (cat === 'line' ? data.lines : data.stickers).find(a => a.id === id); if (!item) continue;
-            const b = strip.createEl('button', { cls: 'qc-pick', attr: { type: 'button', title: cat === 'sticker' ? item.zh : item.id, 'aria-pressed': String(it === pick.chosen) } });
+            const b = strip.createEl('button', { cls: 'qc-pick', attr: { type: 'button', 'aria-label': cat === 'sticker' ? item.zh : item.id, 'aria-pressed': String(it === pick.chosen) } });
             b.createEl('img', { attr: { src: assetThumb(item), alt: item.zh, draggable: 'false' } }); b.classList.toggle('is-active', it === pick.chosen);
             b.disabled = view.busy; b.addEventListener('click', () => { if (it === pick.chosen || view.busy) return; void view.action(async () => { await view.swapAsset(pick.target, cat, id); pick.chosen = it; view.persistChat(); draw(); }); });
           }
@@ -371,8 +354,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
       messages.scrollTop = (messages.children[anchor] as HTMLElement).offsetTop - messages.offsetTop - anchorOffset;
     } else messages.scrollTop = oldTop;
     previousCount = view.chat.length; followNext = false;
-    picBtn.querySelector('.qc-chip-label')!.textContent = view.t(view.pictureRequested ? 'pictureThisTimeChip' : 'pictureTitle');
-    const opt = trayEl.querySelector<HTMLButtonElement>('.qc-tray-pill[aria-pressed]'); if (opt) { opt.setAttribute('aria-pressed', String(view.pictureRequested)); opt.classList.toggle('is-active', view.pictureRequested); }
+
   };
   view.onChat = draw;
   const submit = (): void => {
@@ -452,11 +434,11 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
     segmented<'left' | 'center' | 'right'>(g, [{ value: 'left', icon: 'align-left', label: t('left') }, { value: 'center', icon: 'align-center', label: t('center') }, { value: 'right', icon: 'align-right', label: t('right') }], (f.textAlign as 'left') ?? 'left', v => view.update({ textAlign: v }, o => o instanceof Textbox), 'qc-seg-icons');
     slider(g, t('lineHeight'), Math.round(f.lineHeight * 100) / 100, 0.8, 2.4, 0.05, v => view.update({ lineHeight: v }, o => o instanceof Textbox), v => v.toFixed(2));
     slider(g, t('letterSpacing'), f.charSpacing, -100, 800, 10, v => view.update({ charSpacing: v }, o => o instanceof Textbox), v => `${Math.round(v / 10) / 100}em`);
-    colorControl(g, t('color'), typeof f.fill === 'string' ? f.fill : '#171717', c => view.update({ fill: c }, o => o instanceof Textbox), { recent, onCommit: commit });
+    colorControl(g, t('color'), typeof f.fill === 'string' ? f.fill : '#171717', c => view.update({ fill: c }, o => o instanceof Textbox), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
 
     const fx = group(el, t('effects'), { open: !!(f.textBackgroundColor || (f.stroke && f.strokeWidth) || f.shadow) });
-    colorControl(fx, t('highlight'), f.textBackgroundColor || '', c => view.update({ textBackgroundColor: c }, o => o instanceof Textbox), { recent, none: true, onCommit: commit });
-    colorControl(fx, t('stroke'), (f.strokeWidth && typeof f.stroke === 'string' ? f.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(f.strokeWidth || 0, 4) : 0, paintFirst: 'stroke' }, o => o instanceof Textbox), { recent, none: true, onCommit: commit });
+    colorControl(fx, t('highlight'), f.textBackgroundColor || '', c => view.update({ textBackgroundColor: c }, o => o instanceof Textbox), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
+    colorControl(fx, t('stroke'), (f.strokeWidth && typeof f.stroke === 'string' ? f.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(f.strokeWidth || 0, 4) : 0, paintFirst: 'stroke' }, o => o instanceof Textbox), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
     if (f.stroke) slider(fx, t('strokeWidth'), f.strokeWidth || 0, 0, 40, 1, v => view.update({ strokeWidth: v, paintFirst: 'stroke' }, o => o instanceof Textbox));
     shadowControl(view, fx, first);
   } else if (sel.every(o => o instanceof FabricImage)) {
@@ -476,8 +458,8 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
   } else if (sel.every(o => !(o instanceof Textbox) && !(o instanceof FabricImage))) {
     const g = group(el, t('shape'));
     const isLine = first instanceof Line;
-    if (!isLine) colorControl(g, t('fill'), typeof first.fill === 'string' && first.fill !== 'rgba(0,0,0,0)' ? first.fill : '', c => view.update({ fill: c || 'rgba(0,0,0,0)' }), { recent, none: true, onCommit: commit });
-    colorControl(g, t('stroke'), (first.strokeWidth && typeof first.stroke === 'string' ? first.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(first.strokeWidth || 0, 6) : 0 }), { recent, none: true, onCommit: commit });
+    if (!isLine) colorControl(g, t('fill'), typeof first.fill === 'string' && first.fill !== 'rgba(0,0,0,0)' ? first.fill : '', c => view.update({ fill: c || 'rgba(0,0,0,0)' }), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
+    colorControl(g, t('stroke'), (first.strokeWidth && typeof first.stroke === 'string' ? first.stroke : '') || '', c => view.update({ stroke: c || null, strokeWidth: c ? Math.max(first.strokeWidth || 0, 6) : 0 }), { recent, none: true, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: commit });
     if (first.stroke) slider(g, t('strokeWidth'), first.strokeWidth || 0, 0, 80, 1, v => view.update({ strokeWidth: v }));
     if (first instanceof Rect) slider(g, t('cornerRadius'), Math.round(first.rx || 0), 0, Math.round(Math.min(first.width, first.height) / 2), 1, v => view.update({ rx: v, ry: v }, o => o instanceof Rect));
     const fx = group(el, t('effects'), { open: !!first.shadow }); shadowControl(view, fx, first);
@@ -576,15 +558,14 @@ function renderCanvasPanel(view: CoverView, el: HTMLElement): void {
   if (mode === 'mesh') {
     const grid = bg.createDiv('qc-mesh-grid');
     for (const m of MESH_PRESETS) {
-      const b = grid.createEl('button', { cls: 'qc-mesh', attr: { type: 'button', title: view.zh ? m.zh : m.en } }); b.style.background = meshCss(m); b.createSpan({ text: view.zh ? m.zh : m.en, cls: m.dark ? 'qc-mesh-name is-dark' : 'qc-mesh-name' });
+      const b = grid.createEl('button', { cls: 'qc-mesh', attr: { type: 'button' } }); b.style.background = meshCss(m); b.createSpan({ text: view.zh ? m.zh : m.en, cls: m.dark ? 'qc-mesh-name is-dark' : 'qc-mesh-name' });
       b.addEventListener('click', () => view.applyMesh(m));
     }
-    bg.createDiv({ text: t('bgMeshHint'), cls: 'qc-hint' });
   } else {
-    if (spec.kind === 'solid') colorControl(bg, t('color'), spec.color, c => view.applyBackground({ kind: 'solid', color: c }), { recent, onCommit: c => view.plugin.rememberColor(c) });
+    if (spec.kind === 'solid') colorControl(bg, t('color'), spec.color, c => view.applyBackground({ kind: 'solid', color: c }), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: c => view.plugin.rememberColor(c) });
     else {
-      colorControl(bg, t('gradientFrom'), spec.from, c => view.applyBackground({ ...spec, from: c }), { recent, onCommit: c => view.plugin.rememberColor(c) });
-      colorControl(bg, t('gradientTo'), spec.to, c => view.applyBackground({ ...spec, to: c }), { recent, onCommit: c => view.plugin.rememberColor(c) });
+      colorControl(bg, t('gradientFrom'), spec.from, c => view.applyBackground({ ...spec, from: c }), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: c => view.plugin.rememberColor(c) });
+      colorControl(bg, t('gradientTo'), spec.to, c => view.applyBackground({ ...spec, to: c }), { recent, zh: view.zh, onStart: () => view.beginColorEdit(), onEnd: () => view.endColorEdit(), onCommit: c => view.plugin.rememberColor(c) });
       slider(bg, t('angle'), spec.angle, 0, 360, 5, v => view.applyBackground({ ...spec, angle: v }), v => `${v}°`);
     }
     const presets = bg.createDiv('qc-gradient-grid');

@@ -9,6 +9,7 @@ export type DrawerTab = 'templates' | 'add' | 'fonts' | 'assistant';
 export interface SavedChat { role: 'user' | 'assistant'; text: string; applied?: string[] }
 export interface Settings {
   imagePrompts?: ImagePrompt[];
+  toolbarLabels: boolean;
   designFolder: string; exportFolder: string; fontFolder: string; language: string; defaultPlatform: string;
   export: Partial<ExportPrefs>;
   guides: { safe: boolean; center: boolean; grid: boolean; snap: boolean };
@@ -19,7 +20,7 @@ export interface Settings {
 }
 export const DEFAULTS: Settings = {
   designFolder: 'Cover designs', exportFolder: 'Cover designs/Exports', fontFolder: 'Cover designs/Fonts', language: 'auto', defaultPlatform: DEFAULT_PLATFORM,
-  export: {}, guides: { safe: false, center: true, grid: false, snap: true },
+  toolbarLabels: false, export: {}, guides: { safe: false, center: true, grid: false, snap: true },
   defaultFont: 'sans-serif', recentColors: [], recentFonts: [], favFonts: [], drawer: 'assistant', assistant: 'ai', ai: { ...AI_DEFAULTS }, imageStyle: 'auto', fontNudgeOff: false, unsplashSecret: '', unsplashProxy: '', series: [], chats: {},
 };
 /** Keeps at most 30 turns per cover and 20 covers, so data.json stays small. */
@@ -39,6 +40,7 @@ export function mergeSettings(raw: unknown): Settings {
   const base: Settings = structuredClone(DEFAULTS);
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Record<string, unknown>;
+  if (typeof r.toolbarLabels === 'boolean') base.toolbarLabels = r.toolbarLabels;
   for (const key of ['designFolder', 'exportFolder', 'fontFolder', 'language', 'defaultPlatform', 'defaultFont', 'assistant', 'imageStyle'] as const) if (typeof r[key] === 'string' && r[key]) base[key] = r[key] as string;
   for (const key of ['recentColors', 'recentFonts', 'favFonts'] as const) if (Array.isArray(r[key])) base[key] = (r[key] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 60);
   if (r.export && typeof r.export === 'object') base.export = r.export as Partial<ExportPrefs>;

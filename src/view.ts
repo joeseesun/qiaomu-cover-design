@@ -1,8 +1,9 @@
+import { snapAxis, type SnapHit } from './snapping';
 import { bindMarquee } from './marquee';
 import { imageHash, type ImageSelection } from './imagejobs';
 import type { GeneratedPicture, ImageReference } from './seedream';
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
-import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
+import { ActiveSelection, Point, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
 import { DESIGN_PREVIEW_LIMIT, picturePolicy, requestsPicture, usefulFeedback, withoutPictures } from './designflow';
 import { templateThumb } from './panels';
@@ -28,7 +29,7 @@ import { arrangeForSubject, builtPalette, canReflow, reserveBelowTitle, rewrap, 
 import { decorInFront, drawDecor } from './decor';
 import { expandPattern, patternById } from './playbook';
 import { renderPattern } from './preview';
-import { MESH_PRESETS, MeshPreset } from './mesh';
+import { MESH_LIBRARY, MeshPreset } from './mesh';
 import { glow as kitGlow, grain } from './kit';
 import { Anchor, decorPlacement, defaultSubjectBox, SubjectBox, TitleBox } from './compose';
 import { ensureReadable, FEED_WIDTH, readableOn, THUMB_MIN, thumbCheck } from './quality';
@@ -65,7 +66,7 @@ export class CoverView extends FileView implements CoverApi {
   canvas?: Canvas; design?: Design;
   private expected = ''; private writer = new SerialWriter(); private history = new History(); private codec = new SnapshotCodec();
   restoring = false; private closingView = false; private dirty = false; private saveTimer?: number; private historyTimer?: number; private revision = 0;
-  private task = false; private generation = 0; private observer?: ResizeObserver; private clip: Record<string, unknown>[] = [];
+  private task = false; private generation = 0; private observer?: ResizeObserver; private resizeFrame?: number; private clip: Record<string, unknown>[] = [];
   stage?: HTMLElement; inspectorEl?: HTMLElement; private drawerEl?: HTMLElement; private baseRevision = 0; private lastDrawer: 'templates' | 'add' | 'fonts' | 'assistant' = 'assistant'; private guidesEl?: HTMLElement; private snapEl?: HTMLElement;
   private statusEl?: HTMLElement; private zoomLabel?: HTMLElement; private undoBtn?: HTMLButtonElement; private redoBtn?: HTMLButtonElement; private platformBtn?: HTMLElement;
   zoom: number | 'fit' = 'fit'; rightTab: 'design' | 'layers' | 'canvas' = 'canvas'; private tabsEl?: HTMLElement; private refreshQueued = false;
@@ -132,6 +133,7 @@ export class CoverView extends FileView implements CoverApi {
   async onClose(): Promise<void> { if (this.canvas) await this.onUnloadFile(); }
   private clearTimers(): void {
     const w = this.win;
+    if (this.resizeFrame !== undefined) w?.cancelAnimationFrame(this.resizeFrame); this.resizeFrame = undefined;
     if (this.saveTimer !== undefined) w?.clearTimeout(this.saveTimer); this.saveTimer = undefined;
     if (this.historyTimer !== undefined) w?.clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
@@ -165,6 +167,7 @@ export class CoverView extends FileView implements CoverApi {
   /* ---------- layout ---------- */
   private build(): void {
     if (this.canvas) void this.canvas.dispose();
+    if (this.resizeFrame !== undefined) this.win.cancelAnimationFrame(this.resizeFrame); this.resizeFrame = undefined;
     this.observer?.disconnect(); this.contentEl.empty();
     const design = this.design!; const root = this.contentEl;
     const header = root.createDiv('qc-header');
@@ -172,10 +175,17 @@ export class CoverView extends FileView implements CoverApi {
     iconButton(left, 'panel-left', this.t('togglePanel'), () => this.toggleDrawer());
     this.platformBtn = left.createEl('button', { cls: 'qc-platform', attr: { type: 'button' } });
     this.platformBtn.addEventListener('click', e => this.platformMenu(e));
-    const mid = header.createDiv('qc-header-mid');
-    textButton(mid, this.t('aiGenerateImage'), () => this.openImageGenerator(), 'qc-btn-sm qc-ai-image-btn', 'image-plus');
-    const insertBtn = textButton(mid, this.zh ? '插入' : 'Insert', () => openInsertPopover(this, insertBtn), 'qc-btn-sm qc-insert-btn', 'plus');
-    mid.createSpan({ cls: 'qc-sep' });
+    const tools = header.createDiv('qc-header-tools');
+    const create = tools.createDiv('qc-header-create');
+    const generate = textButton(create, this.t('aiGenerateImage'), () => this.openImageGenerator(), 'qc-btn-sm qc-ai-image-btn', 'image');
+    const imageIcon = generate.querySelector('.qc-btn-icon') as HTMLElement;
+    setIcon(imageIcon.createSpan('qc-image-sparkles-icon'), 'sparkles');
+    generate.setAttribute('aria-label', this.t('aiGenerateImage'));
+    for (const [category, zh, en, icon] of [['text', '文字', 'Text', 'type'], ['asset', '素材', 'Assets', 'smile-plus'], ['other', '插入其他', 'More', 'plus']] as const) {
+      const button = textButton(create, this.zh ? zh : en, () => openInsertPopover(this, button, category), `qc-btn-sm qc-insert-btn qc-insert-${category}`, icon);
+      button.setAttribute('aria-label', this.zh ? zh : en);
+    }
+    const mid = tools.createDiv('qc-header-mid');
     this.undoBtn = iconButton(mid, 'undo-2', this.t('undo'), () => void this.action(() => this.travel(-1)));
     this.redoBtn = iconButton(mid, 'redo-2', this.t('redo'), () => void this.action(() => this.travel(1)));
     mid.createSpan({ cls: 'qc-sep' });
@@ -188,7 +198,7 @@ export class CoverView extends FileView implements CoverApi {
     this.statusEl = right.createSpan({ cls: 'qc-status' });
     iconButton(right, 'more-horizontal', this.t('more'), e => this.moreMenu(e));
     const copyBtn = textButton(right, this.zh ? '复制' : 'Copy', () => void this.copyToClipboard(copyBtn), 'qc-btn-sm', 'copy');
-    copyBtn.title = this.zh ? '复制图片到剪贴板，可直接粘贴到别的应用（⌘⇧C）' : 'Copy the image to the clipboard (⌘⇧C)';
+    copyBtn.setAttribute('aria-label', this.zh ? '复制图片到剪贴板，可直接粘贴到别的应用（⌘⇧C）' : 'Copy the image to the clipboard (⌘⇧C)');
     const exportGroup = right.createDiv('qc-split');
     textButton(exportGroup, this.t('export'), () => void this.action(() => this.openExport()), 'qc-primary', 'download');
     iconButton(exportGroup, 'chevron-down', this.t('exportMore'), e => this.exportMenu(e), 'qc-primary qc-split-more');
@@ -217,7 +227,11 @@ export class CoverView extends FileView implements CoverApi {
       b.addEventListener('click', () => { this.rightTab = id; this.syncTabs(); this.refreshInspector(true); });
     }
     this.inspectorBody = body;
-    this.observer = new win.ResizeObserver(() => { if (this.zoom === 'fit') this.applyZoom(); });
+    this.observer = new win.ResizeObserver(() => {
+      // Fit writes layout; defer it out of ResizeObserver's delivery cycle and coalesce resizes.
+      if (this.resizeFrame !== undefined) return;
+      this.resizeFrame = win.requestAnimationFrame(() => { this.resizeFrame = undefined; if (!this.canvas || this.closingView) return; this.refreshToolbar(); if (this.zoom === 'fit') this.applyZoom(); });
+    });
     this.observer.observe(this.stage);
     this.registerStageEvents();
     this.updatePlatformLabel(); this.updateHistoryButtons();
@@ -302,14 +316,15 @@ export class CoverView extends FileView implements CoverApi {
     c.on('text:changed', e => { const t = e.target as (Textbox & QObject) | undefined; if (t) { t.splitByGrapheme = hasCjk(t.text); this.rehug(t); } this.changed(); });
     for (const ev of ['selection:created', 'selection:updated', 'selection:cleared'] as const) c.on(ev, () => { this.refreshInspector(true); this.onSelection?.(); });
     c.on('object:moving', e => { if (this.plugin.settings.guides.snap && e.target) this.snapMove(e.target); });
-    c.on('mouse:up', () => this.clearSnap()); c.on('mouse:down', () => { this.snapCache = undefined; });
+    c.on('mouse:up', () => this.clearSnap()); c.on('mouse:down', () => this.clearSnap());
     c.on('text:editing:exited', () => this.refreshInspector(true));
   }
   private registerStageEvents(): void {
     const stage = this.stage!;
     this.registerDomEvent(this.contentEl, 'keydown', (e: KeyboardEvent) => this.keyboard(e));
     this.registerDomEvent(stage, 'wheel', (e: WheelEvent) => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1); } }, { passive: false });
-    this.registerDomEvent(stage, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); this.contextMenu(e); });
+    // Capture before Fabric's default stopContextMenu swallows the event.
+    this.registerDomEvent(stage, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); this.contextMenu(e); }, { capture: true });
     this.registerDomEvent(this.contentEl, 'paste', (e: ClipboardEvent) => this.onPaste(e));
     this.registerDomEvent(stage, 'dragover', (e: DragEvent) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); stage.addClass('is-drop'); } });
     this.registerDomEvent(stage, 'dragleave', () => stage.removeClass('is-drop'));
@@ -332,12 +347,14 @@ export class CoverView extends FileView implements CoverApi {
     const c = this.canvas; if (!c || this.restoring) return;
     const hit = c.findTarget(e).target;
     if (hit && hit !== c.getActiveObject() && !c.getActiveObjects().includes(hit)) { c.setActiveObject(hit); c.requestRenderAll(); }
-    const has = c.getActiveObjects().length > 0; const m = new Menu();
+    const has = c.getActiveObjects().length > 0; const m = new Menu().setUseNativeMenu(false).setParentElement(this.stage!);
     if (has) {
       const selected = c.getActiveObject();
-      m.addItem(i => i.setTitle(this.t('imageCreateSelection')).setIcon('image-pen').onClick(() => void this.action(() => this.openSelectionImageGenerator())));
+      m.addItem(i => i.setTitle(this.t('imageEditSelection')).setIcon('image-pen').onClick(() => void this.action(() => this.openSelectionImageGenerator())));
+      m.addItem(i => i.setTitle(this.t('downloadSelection')).setIcon('download').onClick(() => void this.action(() => this.downloadSelection())));
+      m.addSeparator();
       m.addItem(i => i.setTitle(this.t('renameLayers')).setIcon('pencil').onClick(() => renameLayersDialog(this, c.getActiveObjects())));
-      if (c.getActiveObjects().length > 1) m.addItem(i => i.setTitle(this.t('groupLayers')).setIcon('group').onClick(() => this.groupLayers()));
+      if (c.getActiveObjects().length > 1) m.addItem(i => i.setTitle(this.t('groupLayers')).setIcon('group').setDisabled(c.getActiveObjects().some(o => o.parent !== c.getActiveObjects()[0]!.parent || o.lockMovementX || o.lockMovementY)).onClick(() => this.groupLayers()));
       if ((selected as QObject | undefined)?.qcLayerGroup) m.addItem(i => i.setTitle(this.t('ungroupLayers')).setIcon('ungroup').onClick(() => this.ungroupLayers()));
       m.addItem(i => i.setTitle(this.t('copyObj')).setIcon('copy').onClick(() => void this.action(() => this.copyObjects())));
       m.addItem(i => i.setTitle(this.t('duplicate')).setIcon('copy-plus').onClick(() => void this.action(() => this.cloneSelection())));
@@ -353,8 +370,9 @@ export class CoverView extends FileView implements CoverApi {
       m.addItem(i => i.setTitle(this.t('centerH')).setIcon('align-center-vertical').onClick(() => this.align('center')));
       m.addItem(i => i.setTitle(this.t('centerV')).setIcon('align-center-horizontal').onClick(() => this.align('middle')));
       m.addSeparator();
-      m.addItem(i => i.setTitle(this.t('locked')).setIcon('lock-keyhole').onClick(() => this.toggleLock()));
-      m.addItem(i => i.setTitle(this.t('remove')).setIcon('trash-2').onClick(() => this.removeSelection()));
+      const locked = c.getActiveObjects().every(o => o.lockMovementX);
+      m.addItem(i => i.setTitle(this.zh ? (locked ? '解锁' : '锁定') : (locked ? 'Unlock' : 'Lock')).setIcon(locked ? 'lock-keyhole-open' : 'lock-keyhole').onClick(() => this.toggleLock()));
+      m.addItem(i => i.setTitle(this.t('remove')).setIcon('trash-2').setWarning(true).onClick(() => this.removeSelection()));
     }
     m.showAtMouseEvent(e);
   }
@@ -376,13 +394,14 @@ export class CoverView extends FileView implements CoverApi {
     }
   }
   /** Guide lines gathered once per drag. Decorative layers (grain, glows, scrims, full-bleed pictures) are not snap targets, which also keeps dragging cheap. */
-  private snapCache?: { xs: number[]; ys: number[]; stickyX?: number; stickyY?: number; shownX?: number; shownY?: number };
+  private snapCache?: { xs: number[]; ys: number[]; stickyX?: SnapHit; stickyY?: SnapHit; shownX?: number; shownY?: number };
   private snapLines(): { xs: number[]; ys: number[] } {
-    const c = this.canvas!, d = this.design!; const active = c.getActiveObjects();
+    const c = this.canvas!, d = this.design!; const active = new Set<FabricObject>();
+    for (const object of c.getActiveObjects()) { active.add(object); for (let parent = object.parent; parent; parent = parent.parent) active.add(parent); }
     const p = platformFor(d.width, d.height, d.platform); const margin = (p?.margin ?? 0.05) * Math.min(d.width, d.height);
     const xs = [0, d.width / 2, d.width, margin, d.width - margin]; const ys = [0, d.height / 2, d.height, margin, d.height - margin];
     for (const o of c.getObjects()) {
-      const role = (o as QObject).qcRole; if (active.includes(o) || !o.visible || role === 'grain' || role === 'bgfx' || role === 'scrim' || role === 'ghost' || role === 'flourish') continue;
+      const role = (o as QObject).qcRole; if (active.has(o) || !o.visible || role === 'grain' || role === 'bgfx' || role === 'scrim' || role === 'ghost' || role === 'flourish') continue;
       const r = o.getBoundingRect(); if (r.width * r.height > d.width * d.height * 0.6) continue;
       xs.push(r.left, r.left + r.width / 2, r.left + r.width); ys.push(r.top, r.top + r.height / 2, r.top + r.height);
     }
@@ -390,17 +409,18 @@ export class CoverView extends FileView implements CoverApi {
   }
   private snapMove(target: FabricObject): void {
     const c = this.canvas!, d = this.design!; const th = 6 / c.getZoom(); this.snapCache ??= this.snapLines(); const cache = this.snapCache;
-    const b = target.getBoundingRect();
-    // Sticky: once on a line the object stays there until the pointer has clearly moved away, instead of flipping in and out every frame.
-    const best = (edges: number[], lines: number[], sticky?: number): { delta: number; line: number } | undefined => {
-      let hit: { delta: number; line: number } | undefined;
-      for (const e of edges) for (const l of lines) { const dist = l - e; const reach = l === sticky ? th * 1.8 : th; if (Math.abs(dist) <= reach && (!hit || Math.abs(dist) < Math.abs(hit.delta))) hit = { delta: dist, line: l }; }
-      return hit;
-    };
-    const sx = best([b.left, b.left + b.width / 2, b.left + b.width], cache.xs, cache.stickyX); const sy = best([b.top, b.top + b.height / 2, b.top + b.height], cache.ys, cache.stickyY);
-    cache.stickyX = sx?.line; cache.stickyY = sy?.line;
-    if (sx) target.set({ left: target.left + sx.delta }); if (sy) target.set({ top: target.top + sy.delta });
-    if (sx || sy) target.setCoords();
+    // Fabric fires moving before refreshing aCoords. Bounds from the previous frame
+    // feed the snap correction back into the next frame and produce oscillation.
+    target.setCoords(); const b = target.getBoundingRect();
+    const sx = target.lockMovementX ? undefined : snapAxis([b.left, b.left + b.width / 2, b.left + b.width], cache.xs, th, cache.stickyX);
+    const sy = target.lockMovementY ? undefined : snapAxis([b.top, b.top + b.height / 2, b.top + b.height], cache.ys, th, cache.stickyY);
+    cache.stickyX = sx; cache.stickyY = sy;
+    if (sx || sy) {
+      // Bounding rectangles live in world coordinates; nested elements move in parent coordinates.
+      const delta = new Point(sx?.delta ?? 0, sy?.delta ?? 0);
+      const local = target.group ? delta.transform(util.invertTransform(target.group.calcTransformMatrix()), true) : delta;
+      target.set({ left: target.left + local.x, top: target.top + local.y }); target.setCoords();
+    }
     const el = this.snapEl; if (!el) return;
     if (cache.shownX === sx?.line && cache.shownY === sy?.line) return; // only touch the DOM when the visible guides change
     cache.shownX = sx?.line; cache.shownY = sy?.line; el.empty();
@@ -439,7 +459,10 @@ export class CoverView extends FileView implements CoverApi {
     const bg = this.design!.bg; if (bg) canvas.background = bg.kind === 'solid' ? bg.color : bg.from;
     return { ...this.design!, canvas };
   }
-  private snapshot(): string { return this.codec.encode(this.currentDesign()); }
+  private snapshot(): string {
+    // Assign IDs before recording: restoring the drawer must not mutate a snapshot and discard redo.
+    this.sceneNodes(); return this.codec.encode(this.currentDesign());
+  }
   changed(): void {
     if (this.restoring || !this.canvas || !this.design || this.closingView) return;
     this.dirty = true; ++this.revision; this.setStatus('saving');
@@ -476,7 +499,7 @@ export class CoverView extends FileView implements CoverApi {
       this.canvas.discardActiveObject(); await this.canvas.loadFromJSON(d.canvas); this.design = d; await this.afterLoad();
       this.applyZoom(); this.updatePlatformLabel(); this.renderGuides();
     } finally { this.restoring = false; }
-    this.dirty = true; ++this.revision; this.updateHistoryButtons(); this.refreshAll(); await this.flush();
+    this.dirty = true; ++this.revision; this.refreshAll(); this.history.replaceCurrent(this.snapshot()); this.updateHistoryButtons(); await this.flush();
   }
   undo(): Promise<void> { return this.travel(-1); }
   redo(): Promise<void> { return this.travel(1); }
@@ -486,7 +509,18 @@ export class CoverView extends FileView implements CoverApi {
     if (!this.canvas) return;
     renderDrawer(this, this.drawerEl!); this.refreshInspector(true); this.renderGuides(); this.updatePlatformLabel();
   }
-  refreshDrawer(): void { if (this.drawerEl) { if (this.plugin.settings.drawer) this.lastDrawer = this.plugin.settings.drawer; renderDrawer(this, this.drawerEl); } }
+  refreshToolbar(): void {
+    const labels = this.plugin.settings.toolbarLabels;
+    this.contentEl.classList.toggle('qc-toolbar-icons', !labels);
+    for (const button of Array.from(this.contentEl.querySelectorAll<HTMLButtonElement>('.qc-header-create button'))) {
+      if (labels) button.removeAttribute('aria-label');
+      else button.setAttribute('aria-label', button.querySelector(':scope > span:last-child')?.textContent ?? '');
+    }
+    const drawerWidth = this.drawerEl?.getBoundingClientRect().width ?? 0;
+    const offset = `${Math.max(240, drawerWidth - 20)}px`;
+    if (this.contentEl.style.getPropertyValue('--qc-toolbar-offset') !== offset) this.contentEl.style.setProperty('--qc-toolbar-offset', offset);
+  }
+  refreshDrawer(): void { if (this.drawerEl) { if (this.plugin.settings.drawer) this.lastDrawer = this.plugin.settings.drawer; renderDrawer(this, this.drawerEl); this.refreshToolbar(); } }
   toggleDrawer(): void { const s = this.plugin.settings; s.drawer = s.drawer ? '' : this.lastDrawer; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom(); }
   private syncTabs(): void { for (const b of Array.from(this.tabsEl?.children ?? [])) b.classList.toggle('is-active', b.getAttribute('data-tab') === this.rightTab); }
   refreshInspector(force = false): void {
@@ -522,6 +556,8 @@ export class CoverView extends FileView implements CoverApi {
     }
     this.canvas?.requestRenderAll(); this.changed();
   }
+  beginColorEdit(): void { this.commitHistory(); this.inTurn = true; }
+  endColorEdit(): void { this.endTurn(); }
   async setFont(family: string): Promise<void> {
     await this.plugin.fonts.ensure(this.doc, family);
     this.plugin.rememberFont(family);
@@ -703,14 +739,17 @@ export class CoverView extends FileView implements CoverApi {
   layerQuery = ''; layerAnchor?: FabricObject; layerFolded = new WeakSet<FabricObject>();
   groupLayers(): void {
     const c = this.canvas; if (!c) return;
-    const chosen = c.getObjects().filter(o => c.getActiveObjects().includes(o));
+    const selected = c.getActiveObjects(); if (!selected.length) return;
+    const owner = selected[0]!.parent ?? c;
+    if (selected.some(o => (o.parent ?? c) !== owner)) return;
+    const chosen = owner.getObjects().filter(o => selected.includes(o));
     if (chosen.length < 2 || chosen.some(o => o.lockMovementX || o.lockMovementY)) return;
     this.beginTurn();
     try {
-      c.discardActiveObject(); const index = c.getObjects().filter(o => !chosen.includes(o) && c.getObjects().indexOf(o) < c.getObjects().indexOf(chosen[chosen.length - 1]!)).length;
-      c.remove(...chosen);
+      c.discardActiveObject(); const index = owner.getObjects().filter(o => !chosen.includes(o) && owner.getObjects().indexOf(o) < owner.getObjects().indexOf(chosen[chosen.length - 1]!)).length;
+      owner.remove(...chosen);
       const group = new Group(chosen, { subTargetCheck: true, interactive: true }) as Group & QObject;
-      group.qcLayerGroup = true; group.qcName = this.t('layerGroup'); c.insertAt(index, group); c.setActiveObject(group); group.setCoords(); this.changed();
+      group.qcLayerGroup = true; group.qcName = this.t('layerGroup'); owner.insertAt(index, group); c.setActiveObject(group); group.setCoords(); this.changed();
     } finally { this.endTurn(); }
     c.requestRenderAll(); this.refreshInspector(true);
   }
@@ -764,8 +803,14 @@ export class CoverView extends FileView implements CoverApi {
   }
   order(where: 'front' | 'forward' | 'backward' | 'back'): void {
     const c = this.canvas; if (!c) return;
-    for (const o of where === 'front' || where === 'forward' ? c.getActiveObjects() : c.getActiveObjects().reverse()) {
-      if (where === 'front') c.bringObjectToFront(o); else if (where === 'forward') c.bringObjectForward(o); else if (where === 'backward') c.sendObjectBackwards(o); else c.sendObjectToBack(o);
+    const selected = c.getActiveObjects(); const owners = new Set(selected.map(o => o.parent ?? c));
+    for (const owner of owners) {
+      const ordered = owner.getObjects().filter(o => selected.includes(o));
+      if (where === 'forward' || where === 'back') ordered.reverse();
+      for (const o of ordered) {
+        if (where === 'front') owner.bringObjectToFront(o); else if (where === 'forward') owner.bringObjectForward(o);
+        else if (where === 'backward') owner.sendObjectBackwards(o); else owner.sendObjectToBack(o);
+      }
     }
     c.requestRenderAll(); this.changed();
   }
@@ -826,7 +871,7 @@ export class CoverView extends FileView implements CoverApi {
     c.requestRenderAll(); if (record) this.changed();
   }
   setBackground(spec: { color?: string; from?: string; to?: string; angle?: number; mesh?: string }): boolean {
-    if (spec.mesh) { const m = MESH_PRESETS.find(x => x.id === spec.mesh); if (!m) return false; this.applyMesh(m); this.refreshInspector(true); return true; }
+    if (spec.mesh) { const m = MESH_LIBRARY.find(x => x.id === spec.mesh); if (!m) return false; this.applyMesh(m); this.refreshInspector(true); return true; }
     if (spec.color) this.applyBackground({ kind: 'solid', color: spec.color });
     else if (spec.from && spec.to) this.applyBackground({ kind: 'linear', from: spec.from, to: spec.to, angle: spec.angle ?? 135 });
     else return false;
@@ -855,7 +900,7 @@ export class CoverView extends FileView implements CoverApi {
     this.applyTemplate(tplId, { title: copy.title, subtitle: copy.subtitle, badge: copy.badge, points: spec?.points, palette: spec?.palette }, ['image', 'subject', 'decor', '*user']);
     for (const o of c.getObjects()) { const q = o as QObject; if (q.qcRole === 'subject') this.fitSubject(o); else if (q.qcRole === 'image' && !o.clipPath) this.fitImage(o, 'cover'); }
     this.finishLayout(spec, false);
-    if (meshId) { const m = MESH_PRESETS.find(x => x.id === meshId); if (m) this.applyMesh(m); }
+    if (meshId) { const m = MESH_LIBRARY.find(x => x.id === meshId); if (m) this.applyMesh(m); }
     c.requestRenderAll(); this.changed(); this.refreshInspector(true);
     new Notice(this.t('relaidOut', { platform: this.zh ? p.zh : p.en }));
   }
@@ -1799,17 +1844,32 @@ export class CoverView extends FileView implements CoverApi {
     if (!selected.length) return;
     const guard=this.imageGuard();
     for(const o of selected)o.qcImageId ??= crypto.randomUUID();
+    const hashes=await Promise.all(selected.map(async o=>({id:o.qcImageId!,hash:await this.selectionObjectHash(o)})));
+    const { reference, box } = await this.selectionPicture(selected);
+    if(!guard()||!await this.selectionMatches({objects:hashes,box}))throw Error(this.t('imageOriginalChanged'));
+    this.changed();await this.flush();this.openImageGenerator(undefined,{reference,selection:{objects:hashes,box}});
+  }
+  private async selectionPicture(selected: FabricObject[]): Promise<{reference: ImageReference; box: ImageSelection['box']}> {
     const boxes=selected.map(o=>o.getBoundingRect()),left=Math.min(...boxes.map(b=>b.left)),top=Math.min(...boxes.map(b=>b.top));
     const box={left,top,width:Math.max(...boxes.map(b=>b.left+b.width))-left,height:Math.max(...boxes.map(b=>b.top+b.height))-top};
     if(!Number.isFinite(box.width+box.height)||box.width<=0||box.height<=0)throw Error(this.t('imageNotInserted'));
-    const hashes=await Promise.all(selected.map(async o=>({id:o.qcImageId!,hash:await this.selectionObjectHash(o)})));
+    // Match canvas stacking even when layers were selected in a different order.
+    const flatten = (items: FabricObject[]): FabricObject[] => items.flatMap(o => o instanceof Group ? [o, ...flatten(o.getObjects())] : [o]);
+    const order = flatten(this.canvas!.getObjects()); selected = [...selected].sort((a,b) => order.indexOf(a)-order.indexOf(b));
     const clones=await Promise.all(selected.map(async o=>{const clone=await o.clone(PROPS);util.applyTransformToObject(clone,util.multiplyTransformMatrices([1,0,0,1,-left,-top],o.calcTransformMatrix()));let opacity=o.opacity;for(let p=o.parent;p;p=p.parent)opacity*=p.opacity;clone.set({opacity});return clone;}));
     const scale=Math.min(1,4096/Math.max(box.width,box.height)),element=this.doc.createElement('canvas');
     const off=new StaticCanvas(element,{width:Math.max(1,Math.ceil(box.width*scale)),height:Math.max(1,Math.ceil(box.height*scale)),enableRetinaScaling:false,renderOnAddRemove:false});
     let reference:ImageReference;
     try{off.setViewportTransform([scale,0,0,scale,0,0]);off.add(...clones);off.renderAll();reference={url:off.toDataURL({format:'png',multiplier:1}),width:off.width,height:off.height};}finally{void off.dispose();}
-    if(!guard()||!await this.selectionMatches({objects:hashes,box}))throw Error(this.t('imageOriginalChanged'));
-    this.changed();await this.flush();this.openImageGenerator(undefined,{reference,selection:{objects:hashes,box}});
+    return { reference, box };
+  }
+  async downloadSelection(): Promise<void> {
+    const selected = this.canvas?.getActiveObjects() ?? []; if (!selected.length) return;
+    const { reference } = await this.selectionPicture(selected);
+    const data = await (await this.win.fetch(reference.url!)).arrayBuffer();
+    const name = selected.length === 1 ? (selected[0] as QObject).qcName : undefined;
+    const path = await this.plugin.saveSystemPng(`${safeName(name || (this.zh ? '选中内容' : 'Selection'))}.png`, data);
+    if (path) new Notice(this.t('exportDone', { path }));
   }
   private async selectionObjectHash(object:QObject):Promise<string>{
     const walk=(items:Record<string,unknown>[]):Record<string,unknown>|undefined=>{for(const item of items){if(item.qcImageId===object.qcImageId)return item;const found=Array.isArray(item.objects)?walk(item.objects as Record<string,unknown>[]):undefined;if(found)return found;}return undefined;};
