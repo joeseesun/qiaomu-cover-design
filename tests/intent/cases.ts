@@ -3,11 +3,12 @@
  * Checks look at results (which layer, which direction, which colour), not at exact JSON, so a different but correct
  * phrasing still passes. Run with `npm run eval` against the configured model.
  */
-import type { Op } from '../../src/ops';
+import type { DesignSpec, Op } from '../../src/ops';
+import { fontProblem, type BookFont } from '../../src/fontcheck';
 import { resolveTarget, type Target } from '../../src/scene';
 import { META, NODES } from '../fixtures/scene';
 
-export interface Ctx { ops: Op[]; selection: string[]; designs: number; options: number }
+export interface Ctx { ops: Op[]; selection: string[]; designs: number; specs: DesignSpec[]; options: number; fontBook: BookFont[] }
 export interface Case { id: string; domain: string; prompt: string; selection?: string[]; check: (c: Ctx) => true | string }
 
 const ids = (t: Target | undefined, sel: string[]): string[] => resolveTarget(t, NODES, { selection: sel, width: META.width, height: META.height });
@@ -61,6 +62,14 @@ export const CASES: Case[] = [
   { id: 'subtitle-bold', domain: 'text', prompt: '副标题加粗', check: all(noDesign, some('style', (o, c) => hits(o.target, c, 't2') && o.bold === true, '副标题没加粗')) },
   { id: 'spacing', domain: 'text', prompt: '标题字间距大一点', check: all(noDesign, some('style', (o, c) => hits(o.target, c, 't1') && (o.letterSpacing ?? 0) > 0, '字间距没变大')) },
   { id: 'highlight', domain: 'text', prompt: '给标题加个荧光笔效果', check: all(noDesign, c => find(c, 'style').some(o => hits(o.target, c, 't1') && !!o.highlight) || find(c, 'textPreset').some(o => /marker|highlight/.test(o.id)) || find(c, 'decor').some(o => o.items.some(i => /marker|highlight|underline/.test(i.kind))) ? true : '没有荧光笔效果') },
+  { id: 'font-calligraphy', domain: 'font', prompt: '标题换成书法字体', check: all(noDesign, some('style', (o, c) => hits(o.target, c, 't1') && ['马善政楷书', '志莽行书', '龙藏体', '刘建毛草'].includes(o.font ?? ''), '标题没换成中文书法字体')) },
+  { id: 'font-handwriting', domain: 'font', prompt: '副标题换成手写感的字体', check: all(noDesign, c => find(c, 'style').some(o => hits(o.target, c, 't2') && !!o.font && !fontProblem(o.font, NODES.find(n => n.id === 't2')!.text!, c.fontBook, true)) ? true : `副标题字体不存在或显示不了中文（得到 ${JSON.stringify(find(c, 'style').map(o => o.font))}）`) },
+  { id: 'font-redesign', domain: 'font', prompt: '重新排版，字体要更有个性', check: c => {
+    if (!c.designs && !c.ops.some(o => o.op === 'design')) return '没有重新排版';
+    const specs = [...c.specs, ...find(c, 'design')]; const bad = specs.flatMap(s => [s.titleFont && fontProblem(s.titleFont, s.title ?? '普通人如何用 AI 做副业', c.fontBook, true), s.bodyFont && fontProblem(s.bodyFont, s.subtitle ?? '从 0 到月入 3000', c.fontBook, true)]).filter(Boolean);
+    if (bad.length) return String(bad[0]);
+    return new Set(specs.map(s => s.titleFont).filter(Boolean)).size >= 2 || specs.length < 2 ? true : '三个方案的标题字体没有区分';
+  } },
   // the current selection
   { id: 'sel-bigger', domain: 'selection', prompt: '这个大一点', selection: ['i1'], check: all(noDesign, some('resize', (o, c) => hits(o.target ?? 'selection', c, 'i1') && (o.scale ?? 0) > 1, '选中的星星没放大')) },
   { id: 'sel-blue', domain: 'selection', prompt: '它换成蓝色', selection: ['i1'], check: all(noDesign, some('recolor', (o, c) => hits(o.target ?? 'selection', c, 'i1') && isBlue(o.color), '选中的星星没变蓝')) },

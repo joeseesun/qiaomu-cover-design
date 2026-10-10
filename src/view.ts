@@ -11,6 +11,7 @@ import { AssetCat, assetSvg, loadAssets } from './assets';
 import { assignIds, layoutIssues, placeBox, regionOf, resolveTarget, WHERE_ZH, type Box as SceneBox, type NodeKind, type SceneMeta, type SceneNode, type Target } from './scene';
 import { ADJUST_ZH, adjustPalette, colorMap, hexToHsl, fixPalette, mergePalette, MOOD_PALETTES, toneOf, type Tone } from './color';
 import { rankAssets } from './resolve';
+import { fontProblem } from './fontcheck';
 import type { RunResult } from './capabilities';
 import { downloadPhoto, hasSource, searchPhotos, unsplashKey } from './unsplash';
 import { resolvePair, typeFor, usePairing, type Resolved } from './typeset';
@@ -929,10 +930,15 @@ export class CoverView extends FileView implements CoverApi {
     const d = this.design; if (!d || !this.canvas) return [];
     const targetCanvas = this.canvas;
     const spec = expandPattern(input, family => this.plugin.fonts.available(this.doc, family));
+    // A face that cannot set the words (or does not exist) is dropped, so the template's own pairing takes over.
+    const fontNotes: string[] = []; const words = this.copyText();
+    for (const [key, text] of [['titleFont', spec.title ?? words.title], ['bodyFont', spec.subtitle ?? words.subtitle]] as const) {
+      const family = spec[key]; const issue = family ? this.fontIssue(family, text ?? '') : undefined; if (issue) { delete spec[key]; fontNotes.push(issue); }
+    }
     const pair = this.pairing(spec.template);
     await Promise.all([spec.titleFont ?? pair.title, spec.bodyFont ?? pair.body].filter((f): f is string => !!f).map(f => this.plugin.fonts.ensure(this.doc, f)));
     if (this.canvas !== targetCanvas || this.design !== d) return [];
-    const notes: string[] = []; const zh = this.zh; this.lastSpec = spec; if (spec.pattern) this.currentPattern = spec.pattern;
+    const notes: string[] = [...fontNotes]; const zh = this.zh; this.lastSpec = spec; if (spec.pattern) this.currentPattern = spec.pattern;
     if (spec.platform && spec.platform !== this.platform()?.id && this.setPlatform(spec.platform, false)) notes.push(zh ? `已切换平台：${spec.platform}` : `Platform: ${spec.platform}`);
     const imageOkEarly = this.plugin.ai.imageReady(); const picture = !!spec.imagePrompt && imageOkEarly;
     let role: 'background' | 'side' | undefined = picture ? spec.imageRole ?? 'background' : undefined;
@@ -1177,7 +1183,7 @@ export class CoverView extends FileView implements CoverApi {
       prompt, zh: this.zh, fonts: book.map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
       selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), scene: { nodes: this.sceneNodes(), meta: this.sceneMeta() }, history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
       state: { ...(template ? { template } : {}), ...(this.palette ? { palette: this.palette } : {}), ...(titleFont ? { titleFont } : {}), ...(bodyFont ? { bodyFont } : {}) },
-      fontBook: book.map(f => ({ family: f.family, source: f.source, ...(f.zh ? { zh: f.zh } : {}), ...(f.mood ? { mood: f.mood } : {}), ...(f.hint ? { hint: f.hint } : {}) })),
+      fontBook: book.map(f => ({ family: f.family, source: f.source, ...(f.zh ? { zh: f.zh } : {}), ...(f.mood ? { mood: f.mood } : {}), ...(f.hint ? { hint: f.hint } : {}), ...(f.cjk !== undefined ? { cjk: f.cjk } : {}) })),
       photoSearch: hasSource({ key: unsplashKey(this.app, this.plugin.settings.unsplashSecret), proxy: this.plugin.settings.unsplashProxy }),
     };
   }
@@ -1435,6 +1441,7 @@ export class CoverView extends FileView implements CoverApi {
     if (!targets.length && target === 'selection') targets = texts.filter(o => o.qcRole === 'title').slice(0, 1);
     if (!targets.length) return false;
     const pal = this.currentPalette();
+    if (change.font) for (const o of targets) { const issue = this.fontIssue(change.font, change.text ?? o.text); if (issue) throw new OpProblem(issue); }
     for (const o of targets) {
       const props: Record<string, unknown> = {};
       if (change.text !== undefined) props.text = change.text;
@@ -1614,6 +1621,8 @@ export class CoverView extends FileView implements CoverApi {
     c.setActiveObject(objs.length === 1 ? objs[0]! : new ActiveSelection(objs, { canvas: c })); c.requestRenderAll(); this.refreshInspector(true);
     return this.zh ? `已选中 ${objs.length} 个元素` : `Selected ${objs.length}`;
   }
+  /** Why a font cannot set this text (unknown name, or Latin-only on Chinese), for the assistant's commands. */
+  fontIssue(family: string, text: string): string | undefined { return fontProblem(family, text, this.plugin.fonts.all(), this.zh); }
   /** The palette the cover follows: the template's, the saved one, or one read off the canvas for hand-made covers. */
   currentPalette(): Palette {
     if (this.palette) return this.palette;

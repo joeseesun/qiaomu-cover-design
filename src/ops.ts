@@ -75,6 +75,8 @@ export interface CoverApi {
   setBackground(spec: { color?: string; from?: string; to?: string; angle?: number; mesh?: string }): boolean;
   addText(text: string, o: { size?: number; color?: string; font?: string; bold?: boolean; align?: 'left' | 'center' | 'right' }): void;
   styleText(target: Target, change: TextChange): boolean;
+  /** Why a font cannot set this text (unknown, or Latin-only on Chinese); undefined when it can. */
+  fontIssue(family: string, text: string): string | undefined;
   /** A ready-made text look (caption, display type, pill label, highlighter) with the model's own words. */
   addTextPreset(id: string, text?: string): boolean;
   /** A basic or named vector shape, optionally recoloured and placed. */
@@ -110,7 +112,7 @@ export interface AssistantInput {
   /** The current look (template, palette, fonts), so "darker" or "a livelier font" has a known starting point. */
   state?: { template?: string; palette?: Partial<Palette>; titleFont?: string; bodyFont?: string };
   /** Every installed font with its flavour, so the model picks faces itself instead of from a fixed shortlist. */
-  fontBook?: { family: string; source: string; zh?: string; mood?: string; hint?: string }[];
+  fontBook?: { family: string; source: string; zh?: string; mood?: string; hint?: string; cjk?: boolean }[];
   /** Unsplash photo backgrounds are only possible when a key (or proxy) is configured. */
   photoSearch?: boolean;
   /** The cover pattern currently in use; the assistant keeps it unless asked to change style. */

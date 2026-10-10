@@ -11,6 +11,7 @@ import { routeDomains } from '../src/router';
 import { buildPrompt } from '../src/prompt';
 import { interpret, type AssistantInput } from '../src/ops';
 import { META, NODES, PALETTE } from './fixtures/scene';
+import { fontProblem, scriptOf } from '../src/fontcheck';
 
 const catalog = { platforms: ['xhs', 'youtube'], templates: ['folio', 'number'] };
 const at = { selection: [] as string[], width: META.width, height: META.height };
@@ -149,4 +150,22 @@ test('the offline interpreter speaks the new commands', () => {
   assert.deepEqual(run('挪到左下角'), [{ op: 'move', target: 'selection', to: 'bottom-left' }]);
   assert.deepEqual(run('换个暖一点的配色'), [{ op: 'palette', adjust: 'warmer' }]);
   assert.equal((run('换下配色')[0] as { op: string }).op, 'palette');
+});
+
+test('fonts: Latin-only faces are fenced off from Chinese text, unknown names are refused', () => {
+  const book = [{ family: '得意黑', source: 'bundled', cjk: true }, { family: 'Anton', source: 'bundled', cjk: false }, { family: 'Bebas Neue', source: 'vault' }, { family: 'Mystery Sans', source: 'vault' }, { family: 'PingFang SC', source: 'system', zh: '苹方' }];
+  assert.equal(scriptOf(book[2]!), 'latin'); assert.equal(scriptOf(book[3]!), 'unknown'); assert.equal(scriptOf(book[4]!), 'cjk');
+  assert.equal(fontProblem('得意黑', '普通人如何用 AI', book, true), undefined);
+  assert.equal(fontProblem('Anton', 'NO. 01', book, true), undefined);
+  assert.match(fontProblem('Anton', '普通人如何用 AI', book, true)!, /只有英文字形/);
+  assert.match(fontProblem('Bebas Neue', '副业', book, true)!, /只有英文字形/);
+  assert.equal(fontProblem('Mystery Sans', '副业', book, true), undefined);
+  assert.match(fontProblem('不存在的字体', '副业', book, true)!, /没有「不存在的字体」/);
+});
+
+test('the font guide groups faces by what they can set and says nothing needs installing', () => {
+  const fontBook = [{ family: '得意黑', source: 'bundled', mood: 'display', hint: '科技', cjk: true }, { family: '思源黑体', source: 'bundled', mood: 'sans', hint: '正文', cjk: true }, { family: 'Anton', source: 'bundled', mood: 'display', hint: '冲击', cjk: false }];
+  const p = buildPrompt({ prompt: '换个字体', zh: true, fonts: [], size: { width: 1080, height: 1440 }, fontBook }, false, ['text']);
+  assert.match(p, /不需要另外安装/);
+  assert.match(p, /中文标题字体[^]*· 得意黑[^]*中文正文字体[^]*· 思源黑体[^]*仅英文字体[^]*· Anton/);
 });

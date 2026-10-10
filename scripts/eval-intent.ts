@@ -11,7 +11,6 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planTurn, type Complete } from '../src/planner';
-import { FONT_LIBRARY } from '../src/fontlib';
 import type { AssistantInput } from '../src/ops';
 import { CASES } from '../tests/intent/cases';
 import { META, NODES, PALETTE } from '../tests/fixtures/scene';
@@ -44,7 +43,9 @@ function transport(m: Model): Complete {
   return call;
 }
 
-const fontBook = FONT_LIBRARY.map(f => ({ family: f.family, source: 'library', zh: f.zh, mood: f.mood, hint: f.hint }));
+/** What a fresh install offers: the fonts bundled in assets/fonts, exactly as FontService.all() describes them. */
+const bundled = JSON.parse(readFileSync(resolve(root, 'assets/fonts/index.json'), 'utf8')) as { family: string; mood: string; zh: string; hint: string; cjk: boolean }[];
+const fontBook = bundled.map(b => ({ family: b.family, source: 'bundled', ...(b.cjk ? { zh: b.family } : {}), mood: b.mood, cjk: b.cjk, hint: b.cjk ? b.hint : b.zh }));
 function input(prompt: string, selection: string[]): AssistantInput {
   return {
     prompt, zh: true, fonts: fontBook.map(f => f.family), platform: 'xhs', size: { width: META.width, height: META.height },
@@ -64,7 +65,7 @@ async function main(): Promise<void> {
       const t0 = Date.now();
       try {
         const plan = await planTurn(complete, input(c.prompt, c.selection ?? []), false);
-        const verdict = c.check({ ops: plan.ops, selection: c.selection ?? [], designs: plan.designs?.length ?? 0, options: plan.options?.length ?? 0 });
+        const verdict = c.check({ ops: plan.ops, selection: c.selection ?? [], designs: plan.designs?.length ?? 0, specs: plan.designs ?? [], options: plan.options?.length ?? 0, fontBook });
         rows.push({ id: c.id, domain: c.domain, prompt: c.prompt, ok: verdict === true, why: verdict === true ? '' : verdict, intent: plan.intent, ops: JSON.stringify(plan.designs?.length ? { designs: plan.designs.length } : plan.ops), ms: Date.now() - t0, repaired: plan.repaired });
       } catch (e) { rows.push({ id: c.id, domain: c.domain, prompt: c.prompt, ok: false, why: `error: ${e instanceof Error ? e.message : String(e)}`, ops: '', ms: Date.now() - t0 }); }
       const r = rows[rows.length - 1]!; console.log(`${r.ok ? '✔' : '✖'} ${r.id.padEnd(18)} ${String(r.ms).padStart(6)}ms  ${r.ok ? '' : r.why}`);

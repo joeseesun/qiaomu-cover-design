@@ -133,7 +133,7 @@ export const CAPABILITIES: AnyCapability[] = [
     op: 'addText', domain: 'text', zh: '添加一段文字',
     card: '{"op":"addText","text":"…","size":60,"color":"#…","bold":true,"align":"left"}  新增普通文字；需要放到某处再接一个 move（target 用 "last"）。',
     sanitize: o => { const text = str(o.text, 200); return text ? defined({ op: 'addText' as const, text, size: num(o.size, 8, 600), color: hex(o.color), font: str(o.font, 60), bold: bool(o.bold), align: alignOf(o.align) }) : undefined; },
-    run: async (api, op, zh) => { api.addText(op.text, op); return say(zh, `已添加文字：${op.text.slice(0, 18)}`, `Added text: ${op.text.slice(0, 18)}`); },
+    run: async (api, op, zh) => { const issue = op.font ? api.fontIssue(op.font, op.text) : undefined; if (issue) throw new OpProblem(issue); api.addText(op.text, op); return say(zh, `已添加文字：${op.text.slice(0, 18)}`, `Added text: ${op.text.slice(0, 18)}`); },
     ui: ['addText', 'addPreset'],
   }),
   cap({

@@ -14,6 +14,7 @@ import { IMAGE_STYLES } from './prompts';
 import { seriesPrompt } from './series';
 import { capabilityCards, DOMAINS, type Domain } from './capabilities';
 import { describeScene } from './scene';
+import { scriptOf } from './fontcheck';
 
 /** Shared by every prompt: who the model is, the one output shape, and the rules that keep edits precise. */
 function coreRules(input: AssistantInput): string {
@@ -26,7 +27,7 @@ ${input.chooseDesigns ? '新封面：{"intent":"…","reply":"选一个喜欢的
 - reply 里说的每一处改动，必须已经真的写进了 ops / designs；ops 为空时 reply 不许声称改过任何东西。
 
 # 精准修改的原则
-1. 最小改动：只动用户点名的东西。“标题大一点”只改标题字号；“换下配色”只换颜色，不动版式、文案和位置；“加个图标”只新增一个图标。局部修改绝不用 design 重做整页。
+1. 最小改动：只动用户点名的东西。“标题大一点”只改标题字号；“换下配色”只换颜色，不动版式、文案和位置；“加个图标”只新增一个图标。局部修改绝不用 design 重做整页。反过来，用户明确说“重新排版 / 重排 / 换个版式 / 换个风格 / 再来一版”时，必须给整页方案（候选模式下输出 designs，否则输出 design），即使同一句话还带着字体、颜色等要求——把这些要求写进每个方案（titleFont、palette 等）。
 2. 指代：用场景里的 #id 指定对象（如 "target":"#i3"）。“这个 / 它 / 选中的”= 选中的对象（target 写 "selection"）；“标题 / 副标题”= 对应 role；“右上角那个图标”= 在场景里按位置找到它的 #id。刚新增的对象用 "last"。
 3. 相对调整（大一点、往左一点、暖一点、暗一点）以场景里的当前值为基准，幅度适中：大小约 ±15%，位置约 ±4% 画布。
 4. 不确定时：用户的话有多种合理解法且做错代价大时，不要硬猜，输出 {"intent":"…","reply":"一个简短的澄清问题","ops":[],"options":["选项A","选项B"]}（2~4 个、每个 ≤20 字）。意思够明确时绝不用 options。
@@ -63,7 +64,7 @@ export function buildPrompt(input: AssistantInput, imageOn: boolean, domains: Do
   if (domains.includes('design')) return designPrompt(input, imageOn) + feedbackBlock(input);
   const parts = [coreRules(input), `# 可用指令\n${capabilityCards(domains)}`];
   if (domains.includes('asset') || domains.includes('text')) parts.push(extrasGuide(input));
-  if (domains.includes('text')) parts.push(`# 字体\n${fontGuide(input)}\n换字体：用 style 的 font 改对应文字（标题、副标题分别改），从清单里挑一款气质明显不同、适合主题的；回复里说明换了哪款。`);
+  if (domains.includes('text')) parts.push(`# 字体\n${fontGuide(input)}\n换字体：用 style 的 font 改对应文字（标题、副标题分别改），从清单里挑一款气质明显不同、适合主题、且能显示这段文字的（中文文字只能用中文字体）；回复里说明换了哪款。`);
   if (domains.includes('canvas')) parts.push(`# 平台\n${PLATFORMS.map(p => `- ${p.id}：${p.zh} ${p.width}×${p.height}`).join('\n')}\n# 模板\n${TEMPLATES.map(t => `- ${t.id}（${t.zh}）：${t.zhUse}`).join('\n')}${imageOn ? '' : '\n本次未开启配图：不要用 image 指令。'}`);
   parts.push(EDIT_RULES, sceneBlock(input), seriesPrompt(input.series ?? []).trim(), feedbackBlock(input).trim(), SAFETY);
   return parts.filter(Boolean).join('\n\n');
@@ -71,24 +72,28 @@ export function buildPrompt(input: AssistantInput, imageOn: boolean, domains: Do
 /** Back-compat entry: the prompt as if every domain were in play. */
 export function systemPrompt(input: AssistantInput, imageOn: boolean): string { return buildPrompt(input, imageOn, DOMAINS.map(d => d.id)); }
 
-/** Every installed font with its flavour, so the model picks faces itself: library/bundled with mood hints, the user's own imports, and system faces by name. */
+/**
+ * Every usable font, grouped by what it can set: Chinese display faces for headlines, quiet Chinese faces for body text, and
+ * Latin-only faces fenced off for English, numbers and tags. Bundled fonts ship inside the plugin and need no installation.
+ */
 function fontGuide(input: AssistantInput): string {
   const book = input.fontBook ?? [];
-  const rules = '搭配规则：全图最多 2 种字体——标题用 1 款展示字体，副标题和其余文字用 1 款安静的正文字体；标题粗、正文细，靠字重对比建立层级；展示字体不要叠用；衬线标题配楷体/宋体正文，黑体标题配黑体正文。不写 titleFont/bodyFont 时，插件会按模板气质自动搭配，应积极选择适合内容的展示字体；不要所有方案都使用同一种粗黑。titleFont/bodyFont 必须来自下面的清单。';
+  const rules = '搭配规则：全图最多 2 种字体——标题用 1 款展示字体，副标题和其余文字用 1 款安静的正文字体；标题粗、正文细，靠字重对比建立层级；展示字体不要叠用；衬线标题配楷体/宋体正文，黑体标题配黑体正文。不写 titleFont/bodyFont 时，插件会按模板气质自动搭配，应积极按主题选择展示字体，不要所有方案都用同一种粗黑。字体名必须一字不差地来自上面的清单。';
   if (!book.length) return `字体：还没有可用字体信息，不要写 titleFont / bodyFont。${rules}`;
-  const lib = FONT_LIBRARY.filter(f => book.some(e => e.family === f.family));
-  const libIds = new Set(lib.map(f => f.family));
-  const bundled = book.filter(e => e.source === 'bundled' && !libIds.has(e.family));
-  const vault = book.filter(e => e.source === 'vault' && !libIds.has(e.family));
-  const system = book.filter(e => e.source === 'system').slice(0, 60);
-  const body = lib.filter(f => f.mood === 'sans' || f.mood === 'serif');
+  const info = (f: (typeof book)[number]): { mood?: string; hint?: string } => { const lib = FONT_LIBRARY.find(l => l.family === f.family); return { mood: f.mood ?? lib?.mood, hint: f.hint ?? lib?.hint }; };
+  const ready = book.filter(f => f.source !== 'system' && f.source !== 'generic');
+  const cjk = ready.filter(f => scriptOf(f) !== 'latin'); const latin = ready.filter(f => scriptOf(f) === 'latin');
+  const isBody = (f: (typeof book)[number]): boolean => { const m = info(f).mood; return (m === 'sans' || m === 'serif') && !/Bold|Heavy/i.test(f.family); };
+  const tag = (f: (typeof book)[number]): string => f.source === 'bundled' ? '' : f.source === 'vault' ? (FONT_LIBRARY.some(l => l.family === f.family) ? '（已下载）' : '（用户导入）') : '';
+  const line = (f: (typeof book)[number]): string => `   · ${f.family}${tag(f)}${info(f).hint ? `：${info(f).hint}` : ''}`;
+  const system = book.filter(f => f.source === 'system').slice(0, 40);
   const rows: string[] = [];
-  if (lib.length) rows.push(`展示字体（按主题气质选标题字）：\n${lib.map(f => `   · ${f.family}：${f.hint}`).join('\n')}`);
-  if (bundled.length) rows.push(`内置字体：${bundled.map(f => `${f.family}${f.hint ? `（${f.hint}）` : ''}`).join('、')}`);
-  if (vault.length) rows.push(`用户自己导入的字体（用户在意这些，可优先）：${vault.map(f => f.family).join('、')}`);
-  if (system.length) rows.push(`系统字体（中规中矩，适合正文）：${system.map(f => f.zh ? `${f.family}（${f.zh}）` : f.family).join('、')}`);
-  if (body.length) rows.push(`适合做 bodyFont 的：${body.map(f => f.family).join('、')}`);
-  return `字体：可用 titleFont 指定标题字体、bodyFont 指定副标题字体。${rows.join('\n')}\n${rules}`;
+  const titles = cjk.filter(f => !isBody(f)); const bodies = cjk.filter(isBody);
+  if (titles.length) rows.push(`中文标题字体（按主题气质选）：\n${titles.map(line).join('\n')}`);
+  if (bodies.length) rows.push(`中文正文字体（副标题、说明文字；也可做稳重的标题）：\n${bodies.map(line).join('\n')}`);
+  if (latin.length) rows.push(`仅英文字体（没有中文字形！只用于英文标题、数字、“No. 01”这类角标；任何含中文的文字都不能用）：\n${latin.map(line).join('\n')}`);
+  if (system.length) rows.push(`系统字体（中规中矩，只在用户点名时用）：${system.map(f => f.zh ? `${f.family}（${f.zh}）` : f.family).join('、')}`);
+  return `字体：以下字体都随插件打包或已安装，直接可用，用户不需要另外安装。titleFont 指定标题字体、bodyFont 指定副标题字体；局部修改用 style 的 font。\n${rows.join('\n')}\n${rules}`;
 }
 /** The current look in one block, so relative asks ("更暗一点", "换个更活泼的字体") have a known baseline. */
 function stateBlock(state: AssistantInput['state']): string {
