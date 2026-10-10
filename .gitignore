@@ -1,0 +1,9 @@
+node_modules/
+main.js
+*.map
+artifacts/
+.DS_Store
+scripts/template-gallery/bundle.js
+scripts/template-gallery/review.js
+.claude/
+design-previews/
