@@ -94,16 +94,16 @@ export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c);
 /** A new saved model starts as a copy of the active one, which becomes active so it can be edited at once. */
 export function addChat(c: AiConfig): string { syncProfiles(c); const id = fresh('chat'); c.chats.push({ id, snap: { ...pickChat(c), apiKey: '' } }); c.chatId = id; c.apiKey = ''; return id; }
 export function addImage(c: AiConfig): string { syncProfiles(c); const id = fresh('image'); c.images.push({ id, snap: { ...pickImage(c), imageKey: '' } }); c.imageId = id; c.imageKey = ''; return id; }
-/** A new saved model from the add dialog: it is stored and becomes the active one. Editing replaces the saved one in place. */
-export function saveChat(c: AiConfig, snap: ChatSnap, editId?: string): string {
+/** Callers may append without changing the active model. Editing replaces the saved one in place. */
+export function saveChat(c: AiConfig, snap: ChatSnap, editId?: string, activate = true): string {
   syncProfiles(c); const id = editId ?? fresh('chat'); const at = c.chats.find(x => x.id === id);
   if (at) at.snap = snap; else c.chats.push({ id, snap });
-  if (!editId || editId === c.chatId) { c.chatId = id; c.chatAlias = snap.chatAlias; Object.assign(c, snap); } return id;
+  if ((!editId && activate) || editId === c.chatId) { c.chatId = id; c.chatAlias = snap.chatAlias; Object.assign(c, snap); } return id;
 }
-export function saveImage(c: AiConfig, snap: ImageSnap, editId?: string): string {
+export function saveImage(c: AiConfig, snap: ImageSnap, editId?: string, activate = true): string {
   syncProfiles(c); const id = editId ?? fresh('image'); const at = c.images.find(x => x.id === id);
   if (at) at.snap = snap; else c.images.push({ id, snap });
-  if (!editId || editId === c.imageId) { c.imageId = id; c.imageAlias = snap.imageAlias; c.imageFamily = snap.imageFamily; Object.assign(c, snap); } return id;
+  if ((!editId && activate) || editId === c.imageId) { c.imageId = id; c.imageAlias = snap.imageAlias; c.imageFamily = snap.imageFamily; Object.assign(c, snap); } return id;
 }
 export function removeChat(c: AiConfig, id: string): void {
   syncProfiles(c); c.chats = c.chats.filter(x => x.id !== id);
@@ -142,6 +142,16 @@ export function imageReady(c: AiConfig): boolean {
 export function imageConnection(c: Pick<AiConfig, 'protocol' | 'baseUrl' | 'apiKey'>, snap: ImageSnap): ImageSnap {
   if (snap.imageEngine !== 'api' || snap.imageBaseUrl) return { ...snap };
   return { ...snap, imageBaseUrl: c.protocol === 'openai' ? c.baseUrl : '', imageKey: snap.imageKey || c.apiKey };
+}
+/** A model is already configured only for the same connection; aliases/options do not change its identity. */
+export function sameChatModel(a: ChatSnap, b: ChatSnap): boolean {
+  if (a.protocol !== b.protocol) return false;
+  if (a.protocol === 'codex') return a.codexModel === b.codexModel && a.codexBin.trim() === b.codexBin.trim();
+  return trimBase(a.baseUrl) === trimBase(b.baseUrl) && a.apiKey === b.apiKey && a.model === b.model;
+}
+export function sameImageModel(c: AiConfig, a: ImageSnap, b: ImageSnap): boolean {
+  const left = imageConnection(c, a), right = imageConnection(c, b);
+  return left.imageEngine === right.imageEngine && trimBase(left.imageBaseUrl) === trimBase(right.imageBaseUrl) && left.imageKey === right.imageKey && left.imageModel === right.imageModel;
 }
 /** An explicit image request opts into its selected profile without changing the designer's defaults. */
 export function directImageConfig(c: AiConfig, id: string): AiConfig | undefined {

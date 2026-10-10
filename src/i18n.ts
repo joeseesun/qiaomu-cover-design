@@ -1,5 +1,12 @@
 /** One table keeps zh and en in lockstep; the test suite checks placeholders match. */
 const T = {
+  modelMultiHint: ['可多选；已有默认模型保持不变。首次添加时，第一个选中的模型作为默认。', 'Select multiple models. Your existing default stays unchanged; on first setup, the first selection becomes the default.'],
+  modelSelectResults: ['全选当前结果', 'Select all results'], modelClearSelection: ['清空选择', 'Clear selection'], modelAdded: ['已添加', 'Added'],
+  modelSelectedCount: ['已选 {count} 个', '{count} selected'], modelHiddenSelection: ['其中 {count} 个不在当前结果中', '{count} outside current results'],
+  modelAddCount: ['添加 {count} 个模型', 'Add models ({count})'], modelShowMore: ['显示更多（{shown}/{total}）', 'Show more ({shown}/{total})'],
+  modelSelectionLimit: ['最多保存 100 个模型；还可添加 {count} 个，请缩小搜索范围或减少选择。', 'Up to 100 saved models; room for {count} more. Narrow your search or select fewer models.'],
+  modelAlreadyAdded: ['此模型已添加，可在设置列表中编辑。', 'This model is already added. Edit it in settings.'],
+
   chatNew: ['新对话', 'New chat'], chatHistory: ['切换对话', 'Switch conversation'], chatUntitled: ['新对话', 'New chat'], chatRename: ['重命名对话', 'Rename conversation'], chatDelete: ['删除当前对话', 'Delete this conversation'], chatDeleteHint: ['只删除这段对话，画布上的作品会保留。', 'This deletes the conversation only. Your canvas stays intact.'], chatLimit: ['已有 30 个对话，请先删除不再需要的对话。', 'You have 30 conversations. Delete an unused conversation first.'], chatBranch: ['从这里尝试新方案', 'Explore a direction from here'], chatDirection: ['新方向', 'New direction'], chatCopyDirection: ['复制画布，尝试新方向', 'Duplicate canvas for a new direction'], chatBlank: ['从空白画布开始', 'Start with a blank canvas'], chatCanvasScope: ['当前画布', 'Current canvas'], chatClearSelection: ['取消选中，编辑整个画布', 'Deselect to work on the whole canvas'], chatFreshTitle: ['这次想怎么改？', 'What would you like to change?'], chatFreshHint: ['画布已保留，这次从新的对话开始。', 'Your canvas is intact. This conversation starts fresh.'], chatFreshPlaceholder: ['继续打磨眼前的设计，或说说新的方向…', 'Refine this design, or describe a new direction…'], chatMessageMore: ['对话操作', 'Message actions'],
   imageCreateSelection: ['用 AI 编辑', 'Edit with AI'], imageEditSelection: ['AI 编辑', 'AI edit'], downloadSelection: ['下载选中内容（PNG）', 'Download selection (PNG)'], imageReplaceSelection: ['替换所选元素', 'Replace selected elements'], imageContinueCreate: ['继续创作', 'Continue creating'],
   imagePreviousRound: ['上一轮要求', 'Previous request'],

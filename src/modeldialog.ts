@@ -2,7 +2,7 @@
 import { Modal, requestUrl, setIcon } from 'obsidian';
 import { jimengModels } from './jimeng';
 import type CoverPlugin from './main';
-import { ChatSnap, ImageSnap, saveChat, saveImage, syncProfiles, imageConnection, switchChat, switchImage } from './aiparse';
+import { ChatSnap, ImageSnap, saveChat, saveImage, syncProfiles, imageConnection, sameChatModel, sameImageModel, switchChat, switchImage } from './aiparse';
 import { CHAT_SOURCES, ChatSource, GROUPS, IMAGE_SOURCES, ImageSource, chatSnapFrom, chatSourceOf, imageSnapFrom, imageSourceOf, PopularModel } from './catalog';
 import { codexAccount, codexModels, startCodexLogin } from './codex';
 import { LoginHandle, startKeyLogin } from './authflow';
@@ -32,6 +32,7 @@ export class ModelDialog extends Modal {
     this.titleEl.setText(this.editing ? (this.z ? '编辑模型' : 'Edit model') : this.kind === 'chat' ? (this.z ? '添加排版模型' : 'Add layout models') : (this.z ? '添加生图模型' : 'Add image models'));
     const steps = this.contentEl.createDiv('qc-md-steps');
     const index = !this.source ? 0 : this.step === 'connection' ? 1 : 2;
+    this.contentEl.toggleClass('qc-md-model-step', index === 2);
     (this.z ? ['选择服务', '连接账号', '选择模型'] : ['Service', 'Connect', 'Models']).forEach((text, i) => steps.createSpan({ text: `${i + 1}  ${text}`, cls: i === index ? 'is-current' : '' }));
     if (!this.source) this.gallery(); else if (this.step === 'connection') this.connection(this.source); else this.models(this.source);
   }
@@ -164,75 +165,136 @@ export class ModelDialog extends Modal {
     try { const u = new URL(base); return !u.username && !u.password && !u.search && !u.hash && (u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))); } catch { return false; }
   }
   private models(s: Source): void {
-    const el = this.contentEl; const d = this.draft(s); const z = this.z; const generation = this.generation;
+    const el = this.contentEl.createDiv('qc-md-selection-body'); const d = this.draft(s); const z = this.z; const generation = this.generation;
+    const t = this.plugin.t.bind(this.plugin);
+    const chatSnap = (model: string): ChatSnap => chatSnapFrom(s as ChatSource, { key: d.key, baseUrl: s.id === 'codex' ? '' : d.base, model, codexBin: d.bin });
+    const imageSnap = (model: string): ImageSnap => imageSnapFrom(s as ImageSource, { key: d.key, baseUrl: s.id === 'codex' ? '' : d.base, model });
+    const added = (model: string): boolean => {
+      if (this.editing) return false;
+      const ai = this.plugin.settings.ai;
+      return this.kind === 'chat' ? ai.chats.some(p => sameChatModel(p.snap, chatSnap(model))) : ai.images.some(p => sameImageModel(ai, p.snap, imageSnap(model)));
+    };
+    const remaining = (): number => 100 - (this.kind === 'chat' ? this.plugin.settings.ai.chats.length : this.plugin.settings.ai.images.length);
     this.brand(el.createDiv('qc-md-head'), s);
-    el.createDiv({ text: this.editing ? (z ? '选择一个模型，保存后替换当前配置。' : 'Choose one model to replace this configuration.') : (z ? '可一次勾选多个模型。第一个选中的模型设为默认，之后可在设置中切换。' : 'Select one or more models. The first selected becomes the default.'), cls: 'qc-hint' });
+    el.createDiv({ text: this.editing ? (z ? '选择一个模型，保存后替换当前配置。' : 'Choose one model to replace this configuration.') : t('modelMultiHint'), cls: 'qc-hint' });
     const tools = el.createDiv('qc-md-model-tools');
     const search = tools.createEl('input', { type: 'search', attr: { placeholder: z ? '搜索模型名称或 ID' : 'Search model name or ID', 'aria-label': z ? '搜索模型' : 'Search models' } });
     const refresh = textButton(tools, z ? '刷新列表' : 'Refresh', () => void load(), 'qc-btn-sm', 'refresh-cw');
     const status = el.createDiv({ cls: 'qc-md-status', attr: { role: 'status', 'aria-live': 'polite' } });
+    let selectAll: HTMLInputElement | undefined;
+    if (!this.editing) {
+      const bulk = el.createDiv('qc-md-bulk');
+      const label = bulk.createEl('label', { cls: 'qc-md-select-all' }); selectAll = label.createEl('input', { type: 'checkbox' });
+      label.createSpan({ text: t('modelSelectResults') });
+      selectAll.addEventListener('change', () => {
+        const ids = matching().filter(m => !added(m.id)).map(m => m.id);
+        const next = new Set(d.models); for (const id of ids) { if (selectAll!.checked) next.add(id); else next.delete(id); }
+        if (next.size > remaining()) error.setText(t('modelSelectionLimit', { count: Math.max(0, remaining()) }));
+        else { d.models = next; error.empty(); }
+        updateSelection();
+      });
+    }
     const list = el.createDiv('qc-md-models qc-md-select-models');
+    let visibleLimit = 150; let loading = false;
+    const more = textButton(el, '', () => { visibleLimit += 150; const top = list.scrollTop; render(); list.scrollTop = top; }, 'qc-md-more qc-ghost');
     const manual = el.createEl('details', { cls: 'qc-md-adv' }); manual.createEl('summary', { text: z ? '手动填写模型 ID' : 'Enter a model ID manually' });
     const manualInput = this.field(manual, z ? '模型 ID' : 'Model ID', '', () => undefined);
-    textButton(manual, z ? '加入选择' : 'Select model', () => { const id = manualInput.value.trim(); if (!id) return; if (!d.all.some(m => m.id === id)) d.all.push({ id }); if (this.editing) d.models.clear(); d.models.add(id); manualInput.value = ''; render(); }, 'qc-btn-sm');
+    textButton(manual, z ? '加入选择' : 'Select model', () => {
+      const id = manualInput.value.trim(); if (!id) return;
+      if (added(id)) { error.setText(t('modelAlreadyAdded')); return; }
+      if (!this.editing && !d.models.has(id) && d.models.size >= remaining()) { error.setText(t('modelSelectionLimit', { count: Math.max(0, remaining()) })); return; }
+      if (!d.all.some(m => m.id === id)) d.all.push({ id }); if (this.editing) d.models.clear();
+      d.models.add(id); manualInput.value = ''; error.empty(); render();
+    }, 'qc-btn-sm');
     if (this.editing) this.field(el, z ? '显示名称（可选）' : 'Display name (optional)', d.alias, v => { d.alias = v.trim().slice(0, 80); });
-    const error = el.createDiv({ cls: 'qc-md-status is-error', attr: { role: 'alert' } });
-    const actions = el.createDiv('qc-md-actions');
+    const error = this.contentEl.createDiv({ cls: 'qc-md-status is-error', attr: { role: 'alert' } });
+    const actions = this.contentEl.createDiv('qc-md-actions qc-md-selection-footer');
+    const summary = !this.editing ? actions.createDiv({ cls: 'qc-md-selection-summary', attr: { role: 'status', 'aria-live': 'polite' } }) : undefined;
+    const count = summary?.createDiv(); const hidden = summary?.createDiv('qc-hint');
+    const clear = !this.editing ? textButton(actions, t('modelClearSelection'), () => { d.models.clear(); error.empty(); updateSelection(); }, 'qc-ghost') : undefined;
     const back = textButton(actions, z ? '返回' : 'Back', () => { this.step = 'connection'; this.draw(); }, 'qc-ghost');
     const cancel = textButton(actions, z ? '取消' : 'Cancel', () => this.close());
     const save = textButton(actions, z ? '添加模型' : 'Add models', () => void persist(), 'qc-primary');
-    const updateSave = (): void => {
+    let controls: { id: string; check: HTMLInputElement; exists: boolean }[] = [];
+    const matching = (): PopularModel[] => {
+      const all = new Map(d.all.map(m => [m.id, m]));
+      if (s.id === 'codex') all.set('', { id: '', name: z ? '使用 Codex 默认模型' : 'Use Codex default' });
+      for (const id of d.models) if (!all.has(id)) all.set(id, { id });
+      const q = search.value.trim().toLowerCase(); return [...all.values()].filter(m => `${m.name ?? ''} ${m.id}`.toLowerCase().includes(q));
+    };
+    const updateSelection = (): void => {
+      for (const item of controls) { item.check.checked = item.exists || d.models.has(item.id); item.check.disabled = item.exists || this.saving; }
+      search.disabled = this.saving; more.disabled = this.saving; refresh.disabled = loading || this.saving;
+      manual.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button').forEach(control => { control.disabled = this.saving; });
+      const matches = matching(), eligible = matches.filter(m => !added(m.id));
+      if (selectAll) {
+        const selected = eligible.filter(m => d.models.has(m.id)).length;
+        selectAll.checked = eligible.length > 0 && selected === eligible.length;
+        selectAll.indeterminate = selected > 0 && selected < eligible.length;
+        selectAll.disabled = !eligible.length || this.saving;
+      }
+      count?.setText(t('modelSelectedCount', { count: d.models.size }));
+      const hiddenCount = [...d.models].filter(id => !matches.some(m => m.id === id)).length;
+      hidden?.setText(hiddenCount ? t('modelHiddenSelection', { count: hiddenCount }) : '');
+      if (clear) clear.disabled = !d.models.size || this.saving;
       save.disabled = !d.models.size || this.saving;
-      save.setText(this.editing ? (z ? '保存' : 'Save') : z ? `添加 ${d.models.size || ''} 个模型` : `Add ${d.models.size || ''} models`);
+      save.setText(this.editing ? (z ? '保存' : 'Save') : t('modelAddCount', { count: d.models.size }));
     };
     const render = (): void => {
-      list.empty(); const q = search.value.trim().toLowerCase(); const all = [...d.all];
-      if (s.id === 'codex') all.unshift({ id: '', name: z ? '使用 Codex 默认模型' : 'Use Codex default' });
-      for (const id of d.models) if (!all.some(m => m.id === id)) all.push({ id });
-      const visible = all.filter(m => `${m.name ?? ''} ${m.id}`.toLowerCase().includes(q)).slice(0, 150);
+      list.empty(); controls = [];
+      for (const id of d.models) if (added(id)) d.models.delete(id);
+      const matches = matching(), visible = matches.slice(0, visibleLimit);
       for (const m of visible) {
-        const row = list.createEl('label', { cls: 'qc-md-model-option' }); const check = row.createEl('input', { type: this.editing ? 'radio' : 'checkbox' });
-        check.name = `qc-model-selection-${generation}`; check.checked = d.models.has(m.id);
+        const exists = added(m.id);
+        const row = list.createEl('label', { cls: `qc-md-model-option${exists ? ' is-added' : ''}` }); const check = row.createEl('input', { type: this.editing ? 'radio' : 'checkbox' });
+        check.name = `qc-model-selection-${generation}`; check.disabled = exists;
         const text = row.createDiv(); text.createDiv({ text: m.name || m.id }); if (m.name && m.id) text.createDiv({ text: m.id, cls: 'qc-hint' });
-        check.addEventListener('change', () => { if (this.editing) d.models.clear(); if (check.checked) d.models.add(m.id); else d.models.delete(m.id); updateSave(); });
+        if (exists) row.createSpan({ text: t('modelAdded'), cls: 'qc-md-added' });
+        controls.push({ id: m.id, check, exists });
+        check.addEventListener('change', () => {
+          if (!this.editing && check.checked && d.models.size >= remaining()) error.setText(t('modelSelectionLimit', { count: Math.max(0, remaining()) }));
+          else { if (this.editing) d.models.clear(); if (check.checked) d.models.add(m.id); else d.models.delete(m.id); error.empty(); }
+          updateSelection();
+        });
       }
       if (!visible.length) list.createDiv({ text: z ? '没有匹配项，可以手动填写模型 ID。' : 'No match. You can enter a model ID manually.', cls: 'qc-md-empty' });
-      updateSave();
+      more.hidden = matches.length <= visibleLimit; more.setText(t('modelShowMore', { shown: visible.length, total: matches.length }));
+      updateSelection();
     };
-    search.addEventListener('input', render); render(); status.setText(d.note);
+    search.addEventListener('input', () => { visibleLimit = 150; render(); }); render(); status.setText(d.note);
     const load = async (): Promise<void> => {
-      refresh.disabled = true; status.setText(z ? '正在获取可用模型…' : 'Loading available models…');
+      loading = true; refresh.disabled = true; status.setText(z ? '正在获取可用模型…' : 'Loading available models…');
       try { const found = s.id === 'codex' ? await codexModels(d.bin) : await this.fetchModels(s, d.base.replace(/\/+$/, ''), d.key); if (!this.current(generation)) return;
         d.loaded = true; d.all = found.length ? found : [...s.models]; d.note = found.length ? (z ? `已获取 ${found.length} 个模型；能否调用取决于账号权限与额度。` : `${found.length} models found; access depends on your account.`) : (z ? '服务未返回列表，以下为常用模型，尚未验证可调用。也可手动填写。' : 'No list returned. These suggestions are unverified; you can enter a model ID.');
       } catch { if (!this.current(generation)) return; d.note = z ? '获取失败。请检查账号或返回修改连接；以下常用模型尚未验证，也可手动填写。' : 'Could not load models. Retry or go back to check your connection. Suggestions are unverified.'; }
-      finally { if (this.current(generation)) { refresh.disabled = false; status.setText(d.note); render(); } }
+      finally { if (this.current(generation)) { loading = false; status.setText(d.note); render(); } }
     };
     if (!d.loaded) void load();
     const persist = async (): Promise<void> => {
       if (this.saving || !d.models.size) return;
       const old = this.plugin.settings.ai; const previous = structuredClone(old); const next = structuredClone(old); const ids: string[] = []; syncProfiles(next);
-      if ((this.kind === 'chat' ? next.chats.length : next.images.length) + (this.editing ? 0 : d.models.size) > 100) { error.setText(z ? '最多保存 100 个模型，请先移除不需要的模型。' : 'Up to 100 models. Remove unused models first.'); return; }
-      for (const model of d.models) {
+      const selected = [...d.models].filter(model => !added(model));
+      if (!selected.length) { error.setText(t('modelAlreadyAdded')); render(); return; }
+      if ((this.kind === 'chat' ? next.chats.length : next.images.length) + (this.editing ? 0 : selected.length) > 100) { error.setText(t('modelSelectionLimit', { count: Math.max(0, remaining()) })); return; }
+      const defaultId = this.kind === 'chat' ? next.chatId : next.imageId;
+      const hasDefault = this.kind === 'chat' ? next.chats.some(p => p.id === defaultId) : next.images.some(p => p.id === defaultId);
+      for (const model of selected) {
         if (this.kind === 'chat') {
-          const snap = chatSnapFrom(s as ChatSource, { key: d.key, baseUrl: s.id === 'codex' ? '' : d.base, model, codexBin: d.bin });
-          snap.chatAlias = d.alias || undefined;
-          const duplicate = next.chats.find(p => p.snap.preset === snap.preset && p.snap.baseUrl === snap.baseUrl && p.snap.model === snap.model && p.snap.codexModel === snap.codexModel && p.snap.apiKey === snap.apiKey);
-          ids.push(saveChat(next, snap, this.editing?.id ?? duplicate?.id));
+          const snap = chatSnap(model); snap.chatAlias = d.alias || undefined;
+          ids.push(saveChat(next, snap, this.editing?.id, false));
         } else {
-          const snap = imageSnapFrom(s as ImageSource, { key: d.key, baseUrl: s.id === 'codex' ? '' : d.base, model });
-          snap.imageAlias = d.alias || undefined;
+          const snap = imageSnap(model); snap.imageAlias = d.alias || undefined;
           if (this.editing) { const previous = this.editing.snap as ImageSnap; snap.imageSize = previous.imageSize; snap.imageOn = previous.imageOn; if (model === previous.imageModel) snap.imageFamily = previous.imageFamily; }
-          const duplicate = next.images.find(p => p.snap.imageEngine === snap.imageEngine && p.snap.imageBaseUrl === snap.imageBaseUrl && p.snap.imageModel === snap.imageModel && p.snap.imageKey === snap.imageKey);
-          ids.push(saveImage(next, snap, this.editing?.id ?? duplicate?.id));
+          ids.push(saveImage(next, snap, this.editing?.id, false));
           if (s.id === 'codex') next.codexBin = d.bin;
         }
       }
-      if (!this.editing) { if (this.kind === 'chat') switchChat(next, ids[0]!); else switchImage(next, ids[0]!); }
-      next.enabled = true; this.saving = true; save.disabled = true; back.disabled = true; cancel.disabled = true;
+      if (!this.editing && !hasDefault) { if (this.kind === 'chat') switchChat(next, ids[0]!); else switchImage(next, ids[0]!); }
+      next.enabled = true; this.saving = true; updateSelection(); back.disabled = true; cancel.disabled = true;
       Object.assign(old, next);
       try { await this.plugin.saveSettings(); this.close(); this.done(); }
-      catch { if (this.plugin.settings.ai === old) Object.assign(old, previous); if (this.current(generation)) { error.setText(z ? '保存失败，输入已保留，请重试。' : 'Could not save. Your input is preserved; please retry.'); save.disabled = false; back.disabled = false; cancel.disabled = false; } }
-      finally { this.saving = false; }
+      catch { if (this.plugin.settings.ai === old) Object.assign(old, previous); if (this.current(generation)) { error.setText(z ? '保存失败，输入已保留，请重试。' : 'Could not save. Your input is preserved; please retry.'); back.disabled = false; cancel.disabled = false; } }
+      finally { this.saving = false; if (this.current(generation)) updateSelection(); }
     };
   }
   private async fetchModels(s: Source, base: string, key: string): Promise<PopularModel[]> {

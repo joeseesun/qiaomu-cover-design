@@ -1104,3 +1104,19 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 
 .qcs-model-provider { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
 .qcs-model-provider .qc-hint { margin-left: auto; overflow-wrap: anywhere; font-weight: 400; }
+
+/* Model selection: keep the count and final action visible while browsing. */
+.qc-md-bulk, .qc-md-select-all { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.qc-md-select-all { cursor: pointer; }
+.qc-md-select-all input { accent-color: var(--qc-ink); }
+.qc-md-selection-footer { flex-shrink: 0; background: var(--qc-paper); padding: 12px 0 4px; border-top: 1px solid var(--qc-line); align-items: center; flex-wrap: wrap; z-index: 1; }
+.qc-md-selection-summary { margin-right: auto; font-size: 12px; min-width: 90px; }
+.qc-md-selection-summary .qc-hint:empty { display: none; }
+.qc-md-model-option.is-added { cursor: default; color: var(--qc-muted); }
+.qc-md-added { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--qc-muted); }
+.qc-model-dialog button.qc-md-more { align-self: center; }
+
+.qc-model-dialog.qc-md-model-step { max-height: min(680px, calc(80vh - 80px)); overflow: hidden; }
+.qc-md-model-step > .qc-md-steps, .qc-md-model-step > .qc-md-status { flex-shrink: 0; }
+.qc-md-selection-body { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 1px; }
+.qc-md-selection-body > * { flex-shrink: 0; }
