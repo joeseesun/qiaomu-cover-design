@@ -1,0 +1,22 @@
+name: 问题反馈 / Bug report
+description: 报告可复现问题，请勿提交密钥或私人笔记。
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: 版本与环境 / Versions and environment
+      description: 插件版本、Obsidian 版本、操作系统
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 操作步骤、预期结果、实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏截图与日志 / Sanitized evidence
+      description: 删除密钥、私人笔记、模型提示词和敏感参考图后再提交。
