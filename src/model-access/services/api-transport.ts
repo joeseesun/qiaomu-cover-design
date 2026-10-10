@@ -2,11 +2,15 @@ import { requestUrl } from "obsidian";
 import { getRuntimeRequire } from "./runtime-require";
 import { connectionText as t } from "../i18n/connection";
 
-// Native Electron uses event-specific callback signatures.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Listener = (...args: any[]) => void;
+interface NativeResponse {
+  statusCode: number;
+  headers: Record<string, string | string[]>;
+  on(event: "data", listener: (chunk: Uint8Array) => void): void;
+  on(event: "end" | "error" | "aborted" | "close", listener: () => void): void;
+}
 export interface NativeRequest {
-  on(event: string, listener: Listener): unknown;
+  on(event: "response", listener: (response: NativeResponse) => void): unknown;
+  on(event: "redirect" | "error", listener: () => void): unknown;
   setHeader(name: string, value: string): void;
   write(body: string | Uint8Array): void;
   end(): void;
@@ -31,7 +35,7 @@ export function nativeApiFetch(net: NativeNet, url: string, init: RequestInit): 
     const req = net.request({ url, method: init.method ?? "GET", redirect: "manual", useSessionCookies: false });
     let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
     let done = false;
-    const cleanup = () => { signal?.removeEventListener("abort", abort); clearTimeout(timer); };
+    const cleanup = () => { signal?.removeEventListener("abort", abort); window.clearTimeout(timer); };
     const fail = (error: unknown) => {
       if (done) return;
       done = true; cleanup();
@@ -41,12 +45,12 @@ export function nativeApiFetch(net: NativeNet, url: string, init: RequestInit): 
     };
     const abort = () => fail(signal?.reason ?? new DOMException(t("cancelled"), "AbortError"));
     // Bound connection / inactivity, not the total duration of an active stream.
-    let timer = setTimeout(() => fail(new DOMException(t("timeout"), "TimeoutError")), 60_000);
-    const tick = () => { clearTimeout(timer); timer = setTimeout(() => fail(new DOMException(t("timeout"), "TimeoutError")), 60_000); };
+    let timer = window.setTimeout(() => fail(new DOMException(t("timeout"), "TimeoutError")), 60_000);
+    const tick = () => { window.clearTimeout(timer); timer = window.setTimeout(() => fail(new DOMException(t("timeout"), "TimeoutError")), 60_000); };
     signal?.addEventListener("abort", abort, { once: true });
     req.on("redirect", () => fail(new Error(t("redirect"))));
     req.on("error", () => fail(new Error(t("network"))));
-    req.on("response", (res: { statusCode: number; headers: Record<string, string | string[]>; on: (event: string, cb: Listener) => void }) => {
+    req.on("response", (res) => {
       if (done) return;
       if (res.statusCode >= 300 && res.statusCode < 400) { fail(new Error(t("redirect"))); return; }
       try {
@@ -82,8 +86,8 @@ async function bufferedApiFetch(url: string, init: RequestInit): Promise<Respons
   return new Promise((resolve, reject) => {
     let settled = false;
     const abort = () => { settled = true; cleanup(); reject(signal?.reason ?? new DOMException(t("cancelled"), "AbortError")); };
-    const timer = setTimeout(() => { settled = true; cleanup(); reject(new DOMException(t("timeout"), "TimeoutError")); }, 120_000);
-    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener("abort", abort); };
+    const timer = window.setTimeout(() => { settled = true; cleanup(); reject(new DOMException(t("timeout"), "TimeoutError")); }, 120_000);
+    const cleanup = () => { window.clearTimeout(timer); signal?.removeEventListener("abort", abort); };
     signal?.addEventListener("abort", abort, { once: true });
     void Promise.resolve().then(() => {
       signal?.throwIfAborted();
