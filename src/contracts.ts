@@ -63,8 +63,6 @@ export const CONTRACTS: Record<string, Contract> = {
   neo: { jobs: ['lifestyle', 'howto', 'launch'], title: [4, 14], keep: '黑粗框、硬阴影卡片、荧光底', tone: 'light' },
   acid: { jobs: ['launch', 'lifestyle'], title: [4, 12], keep: '粉紫弥散光、颗粒与一枚闪光', tone: 'light' },
   glass: { jobs: ['launch', 'howto'], title: [4, 14], keep: '磨砂玻璃卡片与悬浮胶囊', tone: 'light' },
-  aurora: { jobs: ['launch'], title: [4, 14], keep: '近黑底与顶部极光', tone: 'dark' },
-  photo: { jobs: ['story', 'lifestyle'], title: [4, 16], keep: '整张图做底，底部渐变压字', tone: 'dark' },
 };
 
 /** Title length as a reader counts it: a CJK character is one, a Latin letter about half. */
