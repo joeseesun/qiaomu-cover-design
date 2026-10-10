@@ -1,3 +1,5 @@
+import { completeChatGPT, connectionToken } from './model-access/client';
+import type { SecretStore } from './model-access/services/provider-auth';
 import { jimengProtocol } from './jimeng';
 import { jimengGenerate } from './jimengservice';
 import { seedreamGenerate } from './seedreamservice';
@@ -30,7 +32,7 @@ async function send(req: RequestUrlParam): Promise<{ json: unknown; buffer: Arra
 }
 
 export class AiService {
-  constructor(private cfg: () => AiConfig) {}
+  constructor(private cfg: () => AiConfig, private secrets?: SecretStore) {}
   /** Boots the shared Codex process in the background when it is the selected engine. */
   warm(): void { const c = this.cfg(); if (c.enabled && (c.protocol === 'codex' || (c.imageOn && c.imageEngine === 'codex'))) { try { warmCodex(findCodex(c.codexBin)); } catch { /* shown on first use */ } } }
   ready(): boolean { return aiReady(this.cfg()); }
@@ -44,18 +46,24 @@ export class AiService {
       const hist = history.slice(-6).map(m => `${m.role === 'user' ? '用户' : '你'}：${m.text}`).join('\n');
       return codexText({ bin: findCodex(c.codexBin), model: c.codexModel.trim() || undefined }, system, hist ? `${hist}\n用户：${user}` : user);
     }
+    if (c.preset === 'chatgpt') {
+      if (!this.secrets) throw new Error('SecretStorage unavailable');
+      return completeChatGPT({ provider: 'chatgpt', baseUrl: c.baseUrl, model: c.model, secretId: c.apiKey, protocol: 'openai-responses' }, this.secrets,
+        [{ role: 'system', content: system }, ...history.slice(-6).map(m => ({ role: m.role, content: m.text })), { role: 'user', content: user }], { effort: c.chatEfforts?.includes(c.chatEffort ?? '') ? c.chatEffort : undefined });
+    }
+    const apiKey = c.preset === 'magpie' && this.secrets ? await connectionToken({ provider: c.preset, baseUrl: c.baseUrl, model: c.model, secretId: '' }, c.apiKey, this.secrets) : c.apiKey;
     const base = trimBase(c.baseUrl); const key = `${c.protocol}|${base}|${c.model}`; const forced = structured && !this.plainOnly.has(key);
     const messages = [...history.slice(-6).map(m => ({ role: m.role, content: m.text })), { role: 'user' as const, content: user }];
     try {
       if (c.protocol === 'anthropic') {
         const extra = forced ? { tools: [ANSWER_TOOL], tool_choice: { type: 'tool', name: ANSWER_TOOL.name } } : {};
-        const { json } = await send({ url: `${base}/v1/messages`, method: 'POST', contentType: 'application/json', headers: { 'x-api-key': c.apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify({ model: c.model, max_tokens: 4000, system, messages, ...extra }) });
+        const { json } = await send({ url: `${base}/v1/messages`, method: 'POST', contentType: 'application/json', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify({ model: c.model, max_tokens: 4000, system, messages, ...extra }) });
         const content = (json as { content?: { type: string; text?: string; input?: unknown }[] } | undefined)?.content;
         const tool = content?.find(p => p.type === 'tool_use'); if (tool?.input) return JSON.stringify(tool.input);
         const text = content?.filter(p => p.type === 'text').map(p => p.text ?? '').join('') ?? ''; if (!text) throw new Error('empty-reply'); return text;
       }
-      const headers: Record<string, string> = c.apiKey ? { Authorization: `Bearer ${c.apiKey}` } : {};
-      const extra = forced ? { response_format: { type: 'json_object' } } : {};
+      const headers: Record<string, string> = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+      const extra = { ...(forced ? { response_format: { type: 'json_object' } } : {}), ...(c.preset === 'magpie' && c.chatEffort && c.chatEfforts?.includes(c.chatEffort) ? { reasoning_effort: c.chatEffort } : {}) };
       const { json } = await send({ url: `${base}/chat/completions`, method: 'POST', contentType: 'application/json', headers, body: JSON.stringify({ model: c.model, messages: [{ role: 'system', content: system }, ...messages], ...extra }) });
       const text = (json as { choices?: { message?: { content?: string | { text?: string }[] } }[] } | undefined)?.choices?.[0]?.message?.content;
       const out = Array.isArray(text) ? text.map(p => p.text ?? '').join('') : text ?? ''; if (!out) throw new Error('empty-reply'); return out;

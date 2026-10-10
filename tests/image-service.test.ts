@@ -9,7 +9,7 @@ const bundle = await build({ entryPoints: ['src/ai.ts'], bundle: true, platform:
   b.onResolve({ filter: /^obsidian$/ }, () => ({ path: 'obsidian', namespace: 'fixture' }));
   b.onResolve({ filter: /^\.\/codex$/ }, () => ({ path: 'codex', namespace: 'fixture' }));
   b.onLoad({ filter: /.*/, namespace: 'fixture' }, a => ({ contents: a.path === 'obsidian'
-    ? 'export const requestUrl = request => globalThis.__imageRequest(request);'
+    ? 'export const Platform = { isDesktopApp: true }; export const getLanguage = () => "zh"; export const requestUrl = request => globalThis.__imageRequest(request);'
     : 'export const findCodex = () => "fixture"; export const warmCodex = () => {}; export const codexText = () => { throw Error("layout planner called"); }; export const codexImage = (options, prompt) => globalThis.__codexImage(options, prompt);' }));
 } }] });
 const mod = { exports: {} as { AiService: new (cfg: () => AiConfig) => { image(prompt: string, w: number, h: number, style?: string, subject?: boolean, mode?: string): Promise<{ data: ArrayBuffer; type: string }> } } };

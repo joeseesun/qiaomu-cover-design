@@ -1,14 +1,18 @@
+import { API_PROVIDERS } from './model-access/services/api-providers';
 import { SEEDREAM_MODELS } from './seedream';
 /** Where models come from: the cards in the "add model" dialog. Names and ids are starting points; the dialog always lets you type your own. */
 import type { KeyAccount } from './authflow';
 import type { ChatSnap, ImageEngine, ImageSnap } from './aiparse';
 
-export type Group = 'account' | 'provider' | 'local' | 'custom';
-export interface PopularModel { id: string; name?: string }
-export interface ChatSource { id: string; name: string; group: Group; sub: string; protocol: ChatSnap['protocol']; baseUrl: string; keyUrl?: string; keyless?: boolean; login?: KeyAccount | 'codex'; models: PopularModel[] }
-export interface ImageSource { id: string; name: string; group: Group; sub: string; engine: ImageEngine; baseUrl: string; keyUrl?: string; keyless?: boolean; login?: KeyAccount | 'codex'; models: PopularModel[] }
+export type Group = 'account' | 'provider' | 'local' | 'custom' | 'plan';
+export interface PopularModel { id: string; name?: string; efforts?: string[] }
+export interface ChatSource { id: string; name: string; group: Group; sub: string; protocol: ChatSnap['protocol']; baseUrl: string; keyUrl?: string; keyless?: boolean; login?: KeyAccount | 'codex' | 'chatgpt'; models: PopularModel[] }
+export interface ImageSource { id: string; name: string; group: Group; sub: string; engine: ImageEngine; baseUrl: string; keyUrl?: string; keyless?: boolean; login?: KeyAccount | 'codex' | 'chatgpt'; models: PopularModel[] }
 
 export const CHAT_SOURCES: ChatSource[] = [
+  { id: 'chatgpt', name: 'ChatGPT', group: 'account', sub: 'Continue with ChatGPT', protocol: 'openai-responses', baseUrl: 'https://api.openai.com/v1', login: 'chatgpt', models: [] },
+  { id: 'magpie', name: 'Magpie', group: 'local', sub: 'Claude Codex Copilot Kimi Qoder ZCode WorkBuddy Trae MiniMax MiMo', protocol: 'openai', baseUrl: 'http://127.0.0.1:3425/v1', keyless: true, models: [] },
+  ...Object.entries(API_PROVIDERS).filter(([, preset]) => preset.group === 'plan').map(([id, preset]): ChatSource => ({ id, name: preset.label, group: 'plan', sub: 'Coding / Token Plan', protocol: 'openai', baseUrl: preset.baseUrl, keyUrl: preset.website, models: [] })),
   { id: 'codex', name: 'Codex CLI', group: 'account', sub: 'ChatGPT 账号，免密钥', protocol: 'codex', baseUrl: '', keyless: true, login: 'codex', models: [] },
   { id: 'tokendance', name: '词元跳动', group: 'account', sub: 'TokenDance · tokendance.space', login: 'tokendance', protocol: 'openai', baseUrl: 'https://tokendance.space/gateway/v1', keyUrl: 'https://tokendance.space/keys', models: [] },
   { id: 'deepseek', name: 'DeepSeek', group: 'provider', sub: 'api.deepseek.com', protocol: 'openai', baseUrl: 'https://api.deepseek.com/v1', keyUrl: 'https://platform.deepseek.com/api_keys', models: [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }] },
@@ -34,7 +38,7 @@ export const IMAGE_SOURCES: ImageSource[] = [
   { id: 'siliconflow', name: 'SiliconFlow', group: 'provider', sub: 'FLUX 等 · api.siliconflow.cn', engine: 'api', baseUrl: 'https://api.siliconflow.cn/v1', keyUrl: 'https://cloud.siliconflow.cn/account/ak', models: [{ id: 'black-forest-labs/FLUX.1-schnell' }] },
   { id: 'custom', name: '自定义', group: 'custom', sub: 'OpenAI 兼容 /images/generations', engine: 'api', baseUrl: '', models: [] },
 ];
-export const GROUPS: { id: Group; zh: string; en: string }[] = [{ id: 'account', zh: '支持账号登录', en: 'Sign in with an account' }, { id: 'provider', zh: 'API 服务商', en: 'API providers' }, { id: 'local', zh: '本地', en: 'Local' }, { id: 'custom', zh: '自定义', en: 'Custom' }];
+export const GROUPS: { id: Group; zh: string; en: string }[] = [{ id: 'plan', zh: 'Coding 套餐', en: 'Coding plans' }, { id: 'account', zh: '支持账号登录', en: 'Sign in with an account' }, { id: 'provider', zh: 'API 服务商', en: 'API providers' }, { id: 'local', zh: '本地', en: 'Local' }, { id: 'custom', zh: '自定义', en: 'Custom' }];
 
 export function chatSnapFrom(s: ChatSource, o: { key: string; baseUrl: string; model: string; codexBin?: string }): ChatSnap {
   return { preset: s.id === 'codex' ? 'codex' : s.id, protocol: s.protocol, baseUrl: o.baseUrl, apiKey: o.key, model: o.model, codexBin: o.codexBin ?? '', codexModel: s.id === 'codex' ? o.model : '' };

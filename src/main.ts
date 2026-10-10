@@ -1,3 +1,4 @@
+import { cancelAccountLogins } from './model-access/services/provider-auth';
 import { cancelKeyLogins } from './authflow';
 import { cancelCodexLogins } from './codex';
 import { COVER_ICON, registerCoverIcon } from './cover-icon';
@@ -25,7 +26,8 @@ import { SerialWriter } from './model';
 
 export default class CoverPlugin extends Plugin {
   qiaomuHome?: HomeProvider; imageJobs!: ImageJobs; gallery!: GalleryStore; private galleryDialog?: GalleryDialog;
-  settings: Settings = structuredClone(DEFAULTS); fonts!: FontService; ai = new AiService(() => this.settings.ai);
+  modelAccessDialogs = new Set<{ close(): void }>();
+  settings: Settings = structuredClone(DEFAULTS); fonts!: FontService; ai = new AiService(() => this.settings.ai, this.app.secretStorage);
   /** Text a new cover should be designed from once its view has loaded, keyed by file path. */
   private briefs = new Map<string, string>();
   private writer = new SerialWriter(); private assistants = new Map<string, AssistantProvider>(); private settingsTab?: CoverSettings; private fontTimer?: number;
@@ -151,7 +153,7 @@ export default class CoverPlugin extends Plugin {
     // Hide the host status bar only while a cover tab is in front.
     this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => { document.body.toggleClass('qc-cover-active', leaf?.view.getViewType() === VIEW); }));
   }
-  onunload(): void { cancelKeyLogins(); cancelCodexLogins(); this.galleryDialog?.close(); this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
+  onunload(): void { cancelAccountLogins(); for (const modal of this.modelAccessDialogs) modal.close(); cancelKeyLogins(); cancelCodexLogins(); this.galleryDialog?.close(); this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
 
   /** Covers opened with one click and not yet touched. They vanish again if closed untouched, so trying the designer leaves no clutter. */
   scratch = new Set<string>();
