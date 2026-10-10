@@ -246,7 +246,7 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-root .qc-conversation-bar .qc-icon-btn:hover:not(:disabled) { background: var(--qc-hover); color: var(--qc-ink); }
 /* Message actions: icon-only, quiet; older messages reveal them on hover or focus, the newest and touch screens always show them. */
 .qc-root .qc-msg-controls { display: flex; align-items: center; gap: 2px; margin: 6px 0 0 -4px; opacity: 0; transition: opacity .12s ease; }
-.qc-root .qc-msg-user .qc-msg-controls { justify-content: flex-end; height: 0; margin: 2px -4px 0 0; overflow: visible; }
+.qc-root .qc-msg-user .qc-msg-controls { justify-content: flex-end; min-height: 22px; margin: 4px 0 0; }
 .qc-root .qc-msg-user .qc-msg-controls .qc-icon-btn { width: 22px; height: 22px; min-height: 22px; }
 .qc-root .qc-msg:hover .qc-msg-controls, .qc-root .qc-msg:focus-within .qc-msg-controls, .qc-root .qc-msg-assistant .qc-msg-controls.is-latest { opacity: 1; }
 @media (pointer: coarse) { .qc-root .qc-msg-controls { opacity: 1; } }
@@ -265,8 +265,8 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-followup-icon { display: flex; color: var(--qc-muted); } .qc-followup-icon svg { width: 13px; height: 13px; }
 /* Fixes for a warning: inline, accent-tinted, read as "do this" rather than another set of options. */
 .qc-root .qc-fixes { margin-top: 8px; }
-.qc-root button.qc-fix { display: inline-flex; align-items: center; gap: 5px; color: var(--interactive-accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 35%, transparent) !important; background: color-mix(in srgb, var(--interactive-accent) 6%, transparent); }
-.qc-root button.qc-fix:hover { background: var(--interactive-accent) !important; color: var(--text-on-accent) !important; }
+.qc-root button.qc-fix { display: inline-flex; align-items: center; gap: 5px; color: var(--qc-ink); box-shadow: 0 0 0 1px var(--qc-line); background: var(--qc-paper); }
+.qc-root button.qc-fix:hover { background: var(--qc-hover); color: var(--qc-ink); }
 .qc-tweak-icon { display: flex; } .qc-tweak-icon svg { width: 12px; height: 12px; }
 .qc-root .qc-chat-scope { margin: 2px 2px 8px; padding: 0; gap: 6px; min-height: 24px; background: transparent; box-shadow: none; border-radius: 0; color: var(--qc-muted); }
 .qc-root .qc-chat-scope svg { color: var(--qc-muted); }

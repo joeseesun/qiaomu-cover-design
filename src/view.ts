@@ -191,8 +191,17 @@ export class CoverView extends FileView implements CoverApi {
     if (this.chat[start]!.role !== 'user') start = index;
     let end = index + 1; while (end < this.chat.length && this.chat[end]!.role !== 'user') end++;
     this.chat.splice(start, end - start);
+    this.resetConversationContext();
     this.lastPrompt = [...this.chat].reverse().find(m => m.role === 'user')?.text ?? '';
     await this.saveChatNow(); this.onChat?.();
+  }
+  async retryTurn(index: number): Promise<void> {
+    const prompt = this.chat[index - 1]?.role === 'user' ? this.chat[index - 1]!.text : '';
+    if (!prompt || this.busy || this.restoring || this.closingView) return;
+    const generation = this.generation, conversation = this.activeConversation?.id;
+    await this.deleteTurn(index);
+    if (generation !== this.generation || conversation !== this.activeConversation?.id || this.closingView) return;
+    await this.ask(prompt);
   }
   async renameConversation(title: string): Promise<void> { if (this.busy || !this.activeConversation || !title.trim()) return; this.activeConversation.title = title.trim().slice(0, 80); await this.saveChatNow(); this.onChat?.(); }
   async deleteConversation(): Promise<void> {

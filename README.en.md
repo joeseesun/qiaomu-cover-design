@@ -12,7 +12,7 @@ The editorial illustrations in this guide were made with Codex's built-in image 
 
 **Desktop Obsidian 1.11.4+ · Offline core editing · Optional AI · Free and open source**
 
-Previously Qiaomu Cover Design. The plugin ID `qiaomu-cover-design` and `.qcover` format remain unchanged. Existing designs, settings and image history do not need to be migrated because of the rename. This guide describes the **0.2.2** implementation.
+Previously Qiaomu Cover Design. The plugin ID `qiaomu-cover-design` and `.qcover` format remain unchanged. Existing designs, settings and image history do not need to be migrated because of the rename. This guide describes the **0.2.3** implementation.
 
 ## Start with a note; finish with a reusable design
 
@@ -49,7 +49,7 @@ Example brief:
 
 > Create a clear editorial cover for “30 days of AI writing.” Use a strong headline, a short subtitle for beginners, and a blue-and-cream palette. Do not generate an image yet.
 
-New chat preserves the artwork while isolating prior chat context. Click the conversation title to switch, rename or delete history; drafts persist per conversation. The composer shows the current canvas or selection. Applied turns offer an independent direction during the current editing session; starting blank creates a separate file. Only recent successful pairs from the active conversation enter model context. Reopening retains words, statuses and drafts; rich previews and canvas snapshots remain session-local. Storage is bounded to 30 conversations per canvas and the latest 100 messages each. An offline assistant supports a smaller set of Chinese/English commands.
+New chat preserves the artwork while isolating prior chat context. Use the history icon beside the title to switch, rename or delete conversations; drafts persist per conversation. The composer shows the current canvas or selection. Applied turns offer an independent direction during the current editing session; starting blank creates a separate file. Only recent successful pairs from the active conversation enter model context. Reopening retains words, statuses and drafts; rich previews and canvas snapshots remain session-local. Storage is bounded to 30 conversations per canvas and the latest 100 messages each. Message actions copy, edit and delete exchanges without changing the canvas. Explicit text colours are preserved; low-contrast text offers optional outline/deepen repairs. An offline assistant supports a smaller set of Chinese/English commands.
 
 ### Formats, templates and consistent series
 

@@ -184,6 +184,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   }, 'qc-conversation-history');
   historyButton.setAttribute('aria-haspopup', 'menu');
   const newButton = iconButton(conversations, 'square-pen', view.t('chatNew'), () => void view.action(() => view.newChat()), 'qc-conversation-new');
+  for (const b of [historyButton, newButton]) { const label = b.getAttribute('aria-label')!; b.removeAttribute('aria-label'); quietName(b, label); }
   const head = body.createDiv('qc-chat-head');
   const sel = head.createEl('select', { cls: 'qc-select' });
   for (const p of providers) sel.createEl('option', { text: p.name, value: p.id });
@@ -366,18 +367,18 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const messageActions = (m: ChatMessage, index: number, bubble: HTMLElement): void => {
     const latest = index === view.chat.length - 1;
     const row = bubble.createDiv({ cls: `qc-msg-controls${latest ? ' is-latest' : ''}`, attr: { role: 'group' } });
-    const act = (icon: string, key: Key, fn: () => void, cls = ''): void => { const b = iconButton(row, icon, view.t(key), fn, cls); b.disabled = view.busy; };
+    const act = (icon: string, key: Key, fn: () => void, cls = ''): void => { const b = iconButton(row, icon, view.t(key), fn, cls); b.removeAttribute('aria-label'); quietName(b, view.t(key)); b.disabled = view.busy; };
     if (m.role === 'assistant') {
       // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
       if (m.snapshot) act('history', 'msgRestore', () => void view.action(() => view.restoreSnapshot(m.snapshot!)), 'qc-msg-restore');
       if (m.snapshot) act('git-branch', 'chatBranch', () => void view.action(() => view.branchConversation(index)), 'qc-msg-branch');
       if (latest && m.retry) act('refresh-cw', 'retry', () => void view.retry(), 'qc-msg-retry');
       const prompt = view.chat[index - 1]?.role === 'user' ? view.chat[index - 1]!.text : '';
-      if (latest && m.failed && prompt) act('rotate-ccw', 'msgRetryFailed', () => { if (input.value.trim() === prompt.trim()) { input.value = ''; syncInput(); } void view.deleteTurn(index).then(() => view.ask(prompt)); }, 'qc-msg-retry');
+      if (latest && m.failed && prompt) act('rotate-ccw', 'msgRetryFailed', () => { if (input.value.trim() === prompt.trim()) { input.value = ''; syncInput(); } void view.action(() => view.retryTurn(index)); }, 'qc-msg-retry');
       if (latest && m.retry && m.snapshot) act('download', 'exportShort', () => void view.action(() => view.openExport()));
     } else act('pencil', 'msgEdit', () => { input.value = m.text; syncInput(); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 'qc-msg-edit');
     act('copy', 'msgCopy', () => { void view.win.navigator.clipboard.writeText(m.text).then(() => new Notice(view.t('msgCopied'))); });
-    act('trash-2', 'msgDeleteTurn', () => void view.deleteTurn(index), 'qc-msg-delete');
+    act('trash-2', 'msgDeleteTurn', () => void view.action(() => view.deleteTurn(index)), 'qc-msg-delete');
   };
   const drawFollowups = (): void => {
     followups.empty(); const last = view.chat.at(-1);
