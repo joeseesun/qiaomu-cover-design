@@ -1,6 +1,6 @@
 {
   "name": "qiaomu-cover-design",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Offline visual cover designer for Obsidian",
   "type": "module",
   "main": "main.js",

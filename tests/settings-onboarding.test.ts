@@ -42,3 +42,32 @@ test('legacy inherited image connections keep their actual endpoint and do not b
   const explicit=imageConnection({protocol:'openai',baseUrl:'https://relay.example/v1',apiKey:'layout-key'},{...snap,imageBaseUrl:'https://another.example/v1'});
   assert.equal(explicit.imageKey,'');assert.equal(snap.imageBaseUrl,'');
 });
+
+test('batch append keeps existing defaults, aliases and image parameters intact after reload', async () => {
+  const { pickChat, pickImage } = await import('../src/aiparse');
+  const c = mergeAi(null), chat = CHAT_SOURCES.find(s => s.id === 'openrouter')!, image = IMAGE_SOURCES.find(s => s.id === 'ark')!;
+  saveChat(c, { ...chatSnapFrom(chat, { key: 'original', baseUrl: chat.baseUrl, model: 'default-chat' }), chatAlias: 'My default' });
+  saveImage(c, { ...imageSnapFrom(image, { key: 'original', baseUrl: image.baseUrl, model: 'default-image' }), imageAlias: 'My image', imageFamily: '5.0-pro', imageSize: '1536x1024' });
+  const before = { chat: pickChat(c), image: pickImage(c), chatId: c.chatId, imageId: c.imageId };
+  for (const model of ['new-one', 'new-two']) {
+    saveChat(c, chatSnapFrom(chat, { key: 'other', baseUrl: chat.baseUrl, model }), undefined, false);
+    saveImage(c, imageSnapFrom(image, { key: 'other', baseUrl: image.baseUrl, model }), undefined, false);
+  }
+  const loaded = mergeAi(JSON.parse(JSON.stringify(c)));
+  assert.deepEqual({ chat: pickChat(loaded), image: pickImage(loaded), chatId: loaded.chatId, imageId: loaded.imageId }, before);
+  assert.equal(loaded.chats.length, 3); assert.equal(loaded.images.length, 3);
+});
+
+test('added-model detection respects endpoint, credentials, inherited images and Codex executable identity', async () => {
+  const { sameChatModel, sameImageModel } = await import('../src/aiparse');
+  const chat = chatSnapFrom(CHAT_SOURCES.find(s => s.id === 'openrouter')!, { key: 'a', baseUrl: 'https://relay.example/v1/', model: 'same' });
+  assert.equal(sameChatModel(chat, { ...chat, baseUrl: 'https://relay.example/v1', preset: 'custom', chatAlias: 'alias' }), true);
+  assert.equal(sameChatModel(chat, { ...chat, apiKey: 'b' }), false);
+  assert.equal(sameChatModel(chat, { ...chat, baseUrl: 'https://different.example/v1' }), false);
+  const codex = chatSnapFrom(CHAT_SOURCES.find(s => s.id === 'codex')!, { key: '', baseUrl: '', model: '', codexBin: '/opt/bin/codex' });
+  assert.equal(sameChatModel(codex, { ...codex, codexBin: '/other/codex' }), false);
+  const c = mergeAi({ apiKey: 'a', baseUrl: 'https://relay.example/v1' });
+  const image = imageSnapFrom(IMAGE_SOURCES.find(s => s.id === 'custom')!, { key: '', baseUrl: '', model: 'same' });
+  assert.equal(sameImageModel(c, image, { ...image, imageBaseUrl: c.baseUrl, imageKey: 'a', imageAlias: 'alias' }), true);
+  assert.equal(sameImageModel(c, image, { ...image, imageBaseUrl: c.baseUrl, imageKey: 'b' }), false);
+});
