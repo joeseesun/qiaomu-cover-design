@@ -279,6 +279,8 @@ export const UI_ONLY: Record<string, string> = {
   switchConversation: 'Conversation history is selected explicitly by the user.',
   renameConversation: 'Conversation management is not a canvas operation.',
   deleteConversation: 'Deleting history requires the user confirmation dialog.',
+  deleteTurn: 'Pruning the thread edits the conversation, not the canvas; the model never deletes its own context.',
+  retryTurn: 'Retrying a failed exchange is an explicit user action scoped to its conversation.',
   branchConversation: 'Creating an independent canvas direction is an explicit user action.',
   blankConversation: 'Starting an empty artwork must never happen from model output.',
   setDrawing: 'Pointer brush mode is controlled by the user, not an assistant operation.',

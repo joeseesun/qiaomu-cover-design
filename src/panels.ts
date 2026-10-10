@@ -5,7 +5,7 @@ import { chatLabel, imageLabel, switchChat, switchImage } from './aiparse';
 import { installPack, packMissing } from './fontpack';
 import { Notice, setIcon } from 'obsidian';
 import { ActiveSelection, Circle, FabricImage, FabricObject, Group, Line, Polygon, Rect, StaticCanvas, Textbox, Triangle } from 'fabric';
-import type { CoverView, QObject } from './view';
+import type { ChatMessage, CoverView, QObject } from './view';
 import { SHADOWS } from './view';
 import { DrawerTab } from './config';
 import { decorById } from './decor';
@@ -171,17 +171,20 @@ function fontNudge(view: CoverView, body: HTMLElement): void {
 function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const plugin = view.plugin; const providers = plugin.assistantList(); const ai = plugin.ai;
   const conversations = body.createDiv('qc-conversation-bar');
-  const historyButton = conversations.createEl('button', { cls: 'qc-conversation-title', attr: { type: 'button', 'aria-haspopup': 'menu' } });
-  const title = historyButton.createSpan('qc-conversation-name'); setIcon(historyButton.createSpan('qc-conversation-chevron'), 'chevron-down'); quietName(historyButton, view.t('chatHistory'));
-  historyButton.addEventListener('click', event => {
+  // Title on the left, two icon actions on the right (history, new chat): the same header every chat app uses, one slim row.
+  const title = conversations.createSpan('qc-conversation-name');
+  const historyButton = iconButton(conversations, 'history', view.t('chatHistory'), () => {
     if (view.busy) return; const menu = new Menu().setUseNativeMenu(false).setParentElement(body);
     for (const session of view.conversations) menu.addItem(i => i.setTitle(session.title || view.t('chatUntitled')).setChecked(session.id === view.activeConversation?.id).onClick(() => void view.action(() => view.switchConversation(session.id))));
     menu.addSeparator(); menu.addItem(i => i.setTitle(view.t('chatRename')).setIcon('pencil').onClick(() => conversationDialog(view, false)));
     menu.addItem(i => i.setTitle(view.t('chatDelete')).setIcon('trash-2').onClick(() => conversationDialog(view, true)));
     menu.addSeparator(); menu.addItem(i => i.setTitle(view.t('chatCopyDirection')).setIcon('copy-plus').onClick(() => void view.action(() => view.branchConversation())));
-    menu.addItem(i => i.setTitle(view.t('chatBlank')).setIcon('file-plus-2').onClick(() => void view.action(() => view.blankConversation()))); menu.showAtMouseEvent(event);
-  });
-  const newButton = textButton(conversations, view.t('chatNew'), () => void view.action(() => view.newChat()), 'qc-conversation-new', 'plus');
+    menu.addItem(i => i.setTitle(view.t('chatBlank')).setIcon('file-plus-2').onClick(() => void view.action(() => view.blankConversation())));
+    const r = historyButton.getBoundingClientRect(); menu.showAtPosition({ x: r.right, y: r.bottom + 4, left: true }, view.doc);
+  }, 'qc-conversation-history');
+  historyButton.setAttribute('aria-haspopup', 'menu');
+  const newButton = iconButton(conversations, 'square-pen', view.t('chatNew'), () => void view.action(() => view.newChat()), 'qc-conversation-new');
+  for (const b of [historyButton, newButton]) { const label = b.getAttribute('aria-label')!; b.removeAttribute('aria-label'); quietName(b, label); }
   const head = body.createDiv('qc-chat-head');
   const sel = head.createEl('select', { cls: 'qc-select' });
   for (const p of providers) sel.createEl('option', { text: p.name, value: p.id });
@@ -200,6 +203,8 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const cfg = plugin.settings.ai;
   const messages = body.createDiv({ cls: 'qc-chat-messages', attr: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' } });
   quietName(messages, view.t('tabAssistant'), head);
+  // Next steps after a reply sit right above the box, one quiet row, instead of a labelled block inside every message.
+  const followups = body.createDiv({ cls: 'qc-followups qc-hidden', attr: { role: 'group' } }); quietName(followups, view.t('tweaksTitle'));
   const compose = body.createDiv('qc-chat-compose'); const trayEl = compose.createDiv('qc-tray qc-hidden');
   const book = playbookFor(view.platform()?.id); const current = templateById(view.design?.template ?? '');
   // The current canvas pick shows above the box, so "make it bigger / change its colour" has a visible referent.
@@ -278,25 +283,14 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     const anchorOffset = anchor >= 0 ? (messages.children[anchor] as HTMLElement).offsetTop - messages.offsetTop - oldTop : 0;
     messages.empty();
     messages.setAttribute('aria-busy', String(view.busy)); syncInput();
-    if (!view.chat.length && !view.busy) { starters(); previousCount = 0; return; }
+    if (!view.chat.length && !view.busy) { starters(); drawFollowups(); previousCount = 0; return; }
     view.chat.forEach((m, index) => {
       const bubble = messages.createDiv({ cls: `qc-msg qc-msg-${m.role}` });
-      if (m.role === 'assistant') bubble.createDiv({ text: view.t('assistantAi'), cls: 'qc-msg-author' });
       bubble.createDiv({ text: m.text, cls: 'qc-msg-text' });
       let changes = bubble;
       if ((m.applied?.length ?? 0) > 2) { const details = bubble.createEl('details', { cls: 'qc-msg-details' }); details.createEl('summary', { text: view.t('chatChanges', { n: m.applied!.length }) }); changes = details.createDiv(); }
       for (const a of m.applied ?? []) { const li = changes.createDiv('qc-msg-applied'); setIcon(li.createSpan(), 'check'); li.createSpan({ text: a }); }
       for (const w of m.warn ?? []) { const li = bubble.createDiv('qc-msg-applied qc-msg-warn'); setIcon(li.createSpan(), 'alert-triangle'); li.createSpan({ text: w }); }
-      // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
-      if (m.role === 'assistant' && m.snapshot) {
-        const controls = bubble.createDiv('qc-msg-controls');
-        const restore = controls.createEl('button', { cls: 'qc-msg-restore', attr: { type: 'button' } }); quietName(restore, view.t('msgRestore'));
-        setIcon(restore, 'history');
-        restore.disabled = view.busy;
-        restore.addEventListener('click', () => void view.action(() => view.restoreSnapshot(m.snapshot!)));
-        const more = iconButton(controls, 'more-horizontal', view.t('chatMessageMore'), event => { if (view.busy) return; const menu = new Menu().setUseNativeMenu(false).setParentElement(body); menu.addItem(i => i.setTitle(view.t('chatBranch')).setIcon('git-branch').onClick(() => void view.action(() => view.branchConversation(index)))); menu.showAtMouseEvent(event); }, 'qc-msg-more');
-        more.removeAttribute('aria-label'); quietName(more, view.t('chatMessageMore')); more.disabled = view.busy;
-      }
       // Variant strips stay visible (and clickable) on older messages, so going back to an earlier
       // candidate is always possible; tweaks and retry act on the current state, so they stay on the last message.
       if (m.variants?.length) {
@@ -347,24 +341,15 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
           const chips = bubble.createDiv('qc-tweaks');
           for (const opt of m.options) { const b = chips.createEl('button', { text: opt, cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => void view.ask(opt)); }
         }
-        // Feed-size problems found by the quality pass become one-tap fixes.
+        // Problems the checks found (feed size, a faint colour) become one-tap fixes right under the warning they answer.
         if (m.suggestions?.length) {
-          bubble.createDiv({ text: view.t('sugTitle'), cls: 'qc-msg-sub' }); const chips = bubble.createDiv('qc-tweaks');
-          for (const s of m.suggestions) { const b = chips.createEl('button', { text: s.label, cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => void view.runThumbSuggestion(s.id)); }
-        }
-        if (m.tweaks) {
-          bubble.createDiv({ text: view.t('tweaksTitle'), cls: 'qc-msg-sub' }); const chips = bubble.createDiv('qc-tweaks');
-          const list: [Key, Key][] = [['tweakBold', 'tweakBoldP'], ['tweakColor', 'tweakColorP'], ['tweakCalm', 'tweakCalmP'], ['tweakShort', 'tweakShortP'], ['tweakDeco', 'tweakDecoP']];
-          if (ai.imageReady()) list.splice(3, 0, ['tweakSubject', 'tweakSubjectP']);
-          for (const [label, prompt] of list) { const b = chips.createEl('button', { text: view.t(label), cls: 'qc-tweak', attr: { type: 'button' } }); b.addEventListener('click', () => { if (label === 'tweakSubject') { view.pictureRequested = true; if (plugin.settings.imageStyle === 'none') plugin.settings.imageStyle = 'auto'; } void view.ask(view.t(prompt), view.t(label)); }); }
-        }
-        if (m.retry) {
-          const row = bubble.createDiv('qc-msg-actions');
-          textButton(row, view.t('retry'), () => void view.retry(), 'qc-btn-sm', 'refresh-cw');
-          textButton(row, view.t('exportShort'), () => void view.action(() => view.openExport()), 'qc-btn-sm', 'download');
+          const chips = bubble.createDiv('qc-tweaks qc-fixes');
+          for (const s of m.suggestions) { const b = chips.createEl('button', { cls: 'qc-tweak qc-fix', attr: { type: 'button' } }); setIcon(b.createSpan('qc-tweak-icon'), 'wand-sparkles'); b.createSpan({ text: s.label }); b.addEventListener('click', () => void view.runThumbSuggestion(s.id)); }
         }
       }
+      messageActions(m, index, bubble);
     });
+    drawFollowups();
     if (view.busy) { const b = messages.createDiv({ cls: 'qc-msg qc-msg-assistant qc-thinking', attr: { role: 'status' } }); setIcon(b.createSpan(), 'loader-circle'); b.createSpan({ text: view.progress || view.t('thinking') }); }
     if ((nearEnd || followNext) && view.chat.length > previousCount) {
       const newest = messages.children[view.chat.length - 1] as HTMLElement;
@@ -374,6 +359,36 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     } else messages.scrollTop = oldTop;
     previousCount = view.chat.length; followNext = false;
 
+  };
+  /**
+   * Icon actions under each message, the set every chat app converged on: copy, edit (yours), restore / branch / another take
+   * (the designer's), delete the turn. Older messages show them on hover or focus; the newest and touch screens always do.
+   */
+  const messageActions = (m: ChatMessage, index: number, bubble: HTMLElement): void => {
+    const latest = index === view.chat.length - 1;
+    const row = bubble.createDiv({ cls: `qc-msg-controls${latest ? ' is-latest' : ''}`, attr: { role: 'group' } });
+    const act = (icon: string, key: Key, fn: () => void, cls = ''): void => { const b = iconButton(row, icon, view.t(key), fn, cls); b.removeAttribute('aria-label'); quietName(b, view.t(key)); b.disabled = view.busy; };
+    if (m.role === 'assistant') {
+      // Every applied turn keeps a canvas snapshot, so the chat doubles as a visual version history.
+      if (m.snapshot) act('history', 'msgRestore', () => void view.action(() => view.restoreSnapshot(m.snapshot!)), 'qc-msg-restore');
+      if (m.snapshot) act('git-branch', 'chatBranch', () => void view.action(() => view.branchConversation(index)), 'qc-msg-branch');
+      if (latest && m.retry) act('refresh-cw', 'retry', () => void view.retry(), 'qc-msg-retry');
+      const prompt = view.chat[index - 1]?.role === 'user' ? view.chat[index - 1]!.text : '';
+      if (latest && m.failed && prompt) act('rotate-ccw', 'msgRetryFailed', () => { if (input.value.trim() === prompt.trim()) { input.value = ''; syncInput(); } void view.action(() => view.retryTurn(index)); }, 'qc-msg-retry');
+      if (latest && m.retry && m.snapshot) act('download', 'exportShort', () => void view.action(() => view.openExport()));
+    } else act('pencil', 'msgEdit', () => { input.value = m.text; syncInput(); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 'qc-msg-edit');
+    act('copy', 'msgCopy', () => { void view.win.navigator.clipboard.writeText(m.text).then(() => new Notice(view.t('msgCopied'))); });
+    act('trash-2', 'msgDeleteTurn', () => void view.action(() => view.deleteTurn(index)), 'qc-msg-delete');
+  };
+  const drawFollowups = (): void => {
+    followups.empty(); const last = view.chat.at(-1);
+    const show = !view.busy && last?.role === 'assistant' && !!last.tweaks; followups.toggleClass('qc-hidden', !show); if (!show) return;
+    const list: [Key, Key, string][] = [['tweakBold', 'tweakBoldP', 'zap'], ['tweakColor', 'tweakColorP', 'palette'], ['tweakCalm', 'tweakCalmP', 'eraser'], ['tweakShort', 'tweakShortP', 'scissors'], ['tweakDeco', 'tweakDecoP', 'shapes']];
+    if (ai.imageReady()) list.splice(3, 0, ['tweakSubject', 'tweakSubjectP', 'image-plus']);
+    for (const [label, prompt, icon] of list) {
+      const b = followups.createEl('button', { cls: 'qc-followup', attr: { type: 'button' } }); setIcon(b.createSpan('qc-followup-icon'), icon); b.createSpan({ text: view.t(label) });
+      b.addEventListener('click', () => { if (label === 'tweakSubject') { view.pictureRequested = true; if (plugin.settings.imageStyle === 'none') plugin.settings.imageStyle = 'auto'; } followNext = true; void view.ask(view.t(prompt), view.t(label)); });
+    }
   };
   view.onChat = draw;
   const submit = (): void => {
