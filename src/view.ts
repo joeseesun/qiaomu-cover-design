@@ -181,7 +181,7 @@ export class CoverView extends FileView implements CoverApi {
     const imageIcon = generate.querySelector('.qc-btn-icon') as HTMLElement;
     setIcon(imageIcon.createSpan('qc-image-sparkles-icon'), 'sparkles');
     generate.setAttribute('aria-label', this.t('aiGenerateImage'));
-    for (const [category, zh, en, icon] of [['text', '文字', 'Text', 'type'], ['asset', '素材', 'Assets', 'smile-plus'], ['other', '插入其他', 'More', 'plus']] as const) {
+    for (const [category, zh, en, icon] of [['text', '文字', 'Text', 'type'], ['asset', '素材', 'Assets', 'smile-plus'], ['shape', '形状', 'Shapes', 'shapes']] as const) {
       const button = textButton(create, this.zh ? zh : en, () => openInsertPopover(this, button, category), `qc-btn-sm qc-insert-btn qc-insert-${category}`, icon);
       button.setAttribute('aria-label', this.zh ? zh : en);
     }
@@ -196,6 +196,7 @@ export class CoverView extends FileView implements CoverApi {
     toggleButton(mid, 'magnet', this.t('snap'), g.snap, v => { g.snap = v; this.guidesChanged(); });
     const right = header.createDiv('qc-header-right');
     this.statusEl = right.createSpan({ cls: 'qc-status' });
+    iconButton(right, 'gallery-horizontal-end', this.zh ? '图库' : 'Image library', () => this.plugin.openGallery('images',this), 'qc-gallery-trigger');
     iconButton(right, 'more-horizontal', this.t('more'), e => this.moreMenu(e));
     const copyBtn = textButton(right, this.zh ? '复制' : 'Copy', () => void this.copyToClipboard(copyBtn), 'qc-btn-sm', 'copy');
     copyBtn.setAttribute('aria-label', this.zh ? '复制图片到剪贴板，可直接粘贴到别的应用（⌘⇧C）' : 'Copy the image to the clipboard (⌘⇧C)');

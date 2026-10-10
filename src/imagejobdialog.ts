@@ -5,22 +5,6 @@ import { imageHash, type ImageJob } from './imagejobs';
 import type { QObject } from './view';
 import { iconButton, textButton } from './ui';
 
-export class ImageJobsDialog extends Modal {
-  private unsubscribe?:()=>void;
-  constructor(private plugin:CoverPlugin){super(plugin.app);}
-  onOpen():void{this.titleEl.setText(this.plugin.t('imageTasks'));this.modalEl.addClass('qc-image-generate-modal');this.contentEl.addClass('qc-modal');this.unsubscribe=this.plugin.imageJobs.subscribe(()=>this.draw());this.draw();void this.plugin.imageJobs.refresh().catch(e=>this.plugin.report(e));}
-  private draw():void {
-    const el=this.contentEl;el.empty();const t=this.plugin.t.bind(this.plugin);
-    const jobs=[...this.plugin.imageJobs.jobs.values()].sort((a,b)=>b.created-a.created);
-    if(!jobs.length)el.createDiv({text:t('imageTasksEmpty'),cls:'qc-hint'});
-    for(const job of jobs){const row=el.createDiv('qc-image-task');row.createDiv({text:job.prompt||t('imageDecompose'),cls:'qc-image-task-prompt'});row.createDiv({text:`${job.model} · ${t(job.state==='ready'?'imageTaskReady':job.state==='failed'?'imageTaskFailed':job.state==='interrupted'?'imageTaskInterrupted':job.state==='queued'?'imageTaskQueued':'imageGenerating')}`,cls:'qc-hint'});
-      if(job.error)row.createDiv({text:job.error,cls:'qc-image-task-error'});
-      if(job.state==='interrupted')row.createDiv({text:t('imageTaskRestartHint'),cls:'qc-hint'});
-      if(job.state==='ready')textButton(row,t('imageViewResults'),()=>{this.close();new ImageResultsDialog(this.plugin,job).open();},'qc-btn-sm');
-    }
-  }
-  onClose():void{this.unsubscribe?.();this.contentEl.empty();}
-}
 export class ImageResultsDialog extends Modal {
   private urls:string[]=[];private closed=false;private busy=false;
   constructor(private plugin:CoverPlugin,private job:ImageJob){super(plugin.app);}

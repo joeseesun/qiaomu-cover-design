@@ -12,7 +12,7 @@ import { ModelDialog } from './modeldialog';
 import { textButton } from './ui';
 import type { CoverView } from './view';
 
-export interface ImageGenerationContext { reference?: ImageReference; selection?: ImageSelection; previousPrompt?: string; target?: ImageJob['target'] }
+export interface ImageGenerationContext { reference?: ImageReference; selection?: ImageSelection; previousPrompt?: string; recipe?: ImageJob; target?: ImageJob['target'] }
 
 /** A generation job is tied to its source canvas; edit results are reviewed before replacing the raster. */
 export class ImageGenerateDialog extends Modal {
@@ -34,7 +34,8 @@ export class ImageGenerateDialog extends Modal {
     const field = (parent: HTMLElement, name: string, suffix: string): HTMLElement => { const row = parent.createDiv('qc-image-field'); row.createEl('label', { text: name, attr: { for: `${uid}-${suffix}` } }); return row; };
     const select = (parent: HTMLElement, name: string, suffix: string) => field(parent, name, suffix).createEl('select', { cls: 'qc-select', attr: { id: `${uid}-${suffix}` } });
     const refs: ImageReference[] = [];
-    if (this.context?.reference) refs.push(this.context.reference);
+    if (this.context?.recipe?.request) refs.push(...(this.context.recipe.request.options.references ?? []));
+    else if (this.context?.reference) refs.push(this.context.reference);
     else if (this.target) {
       const img = this.target.getElement(), canvas = v.doc.createElement('canvas');
       canvas.width = (img as HTMLImageElement).naturalWidth || img.width; canvas.height = (img as HTMLImageElement).naturalHeight || img.height;
@@ -42,7 +43,7 @@ export class ImageGenerateDialog extends Modal {
       refs.push({ url: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height });
     }
     const prompt = field(el, t('imagePrompt'), 'prompt').createEl('textarea', { cls: 'qc-image-prompt', attr: { id: `${uid}-prompt`, rows: '5', placeholder: t(editing ? 'imageEditHint' : 'imagePromptHint') } });
-    prompt.value = editing ? '' : v.imageDraft;
+    prompt.value = this.context?.recipe?.prompt ?? (editing ? '' : v.imageDraft);
     if(this.context?.previousPrompt)prompt.parentElement!.createDiv({text:`${t('imagePreviousRound')}：${this.context.previousPrompt}`,cls:'qc-image-previous'});
     prompt.addEventListener('input', () => { if (!editing) v.imageDraft = prompt.value; sync(); });
     promptLibrary(el, v.plugin, editing ? 'edit' : 'create', prompt, () => { if (!editing) v.imageDraft = prompt.value; sync(); });
@@ -55,7 +56,7 @@ export class ImageGenerateDialog extends Modal {
         const c = directImageConfig(cfg, id); if (!c || !imageReady({ ...c, enabled: true }) || (editing && (!(['ark', 'codex'].includes(c.imageEngine) || jimengProtocol(c)) || (c.imageEngine === 'ark' && (c.imageFamily ?? seedreamFamily(c.imageModel)) === '3.0')))) continue;
         model.createEl('option', { value: id, text: imageLabel(c) });
       }
-      const wanted = v.imageModelId || cfg.imageId;
+      const wanted = this.context?.recipe?.request?.modelId || v.imageModelId || cfg.imageId;
       if (Array.from(model.options).some(o => o.value === wanted)) model.value = wanted;
       model.toggleClass('qc-hidden', !model.options.length); modelChanged();
     };
@@ -163,7 +164,7 @@ export class ImageGenerateDialog extends Modal {
         if (!this.valid() || !v.file || (this.context?.selection && !await v.selectionMatches(this.context.selection))) throw new Error(t('imageNotInserted'));
         v.plugin.scratch.delete(v.file.path);
         const snapshot = structuredClone(c), text = prompt.value.trim();
-        const job=await v.plugin.imageJobs.submit({ prompt: text, model: imageLabel(c), path: v.file.path, layers: !!options.layers, target, selection:this.context?.selection }, () => new AiService(() => snapshot).images(text, width, height, options));
+        const job=await v.plugin.imageJobs.submit({ prompt: text, model: imageLabel(c), path: v.file.path, layers: !!options.layers, target, selection:this.context?.selection, request:{modelId:model.value,width,height,options} }, () => new AiService(() => snapshot).images(text, width, height, options));
         if (!this.closed) waitFor(job);
       } catch (e) { if (!this.closed) status.setText(t('error', { message: e instanceof Error && e.message.includes('ModelNotOpen') ? t('seedreamNotOpen', { model: c.imageModel }) : e instanceof Error ? e.message : String(e) })); }
       finally { if (!this.unsubscribe) this.running = false; if (!this.closed) sync(); }
@@ -187,7 +188,18 @@ export class ImageGenerateDialog extends Modal {
       };this.unsubscribe=v.plugin.imageJobs.subscribe(update);update();
     };
     if(this.context?.selection)referenceRow.createDiv({text:t('imageSelectionHint',{count:this.context.selection.objects.length}),cls:'qc-hint'});
-    renderRefs(); populate(); v.win.requestAnimationFrame(() => { if (prompt.isConnected) prompt.focus({ preventScroll: true }); });
+    renderRefs(); populate();
+    const recipe=this.context?.recipe?.request;
+    if(recipe){const o=recipe.options;
+      if(o.family){family.value=o.family;refreshSizes();}
+      if(o.size && Array.from(size.options).some(x=>x.value===o.size))size.value=o.size;else if(o.size){size.value='custom';custom.value=o.size;}
+      if(o.resolution)size.value=o.resolution;if(o.seed!==undefined)seed.value=String(o.seed);if(o.guidance!==undefined)guidance.value=String(o.guidance);
+      count.value=String(o.maxImages??1);if(o.outputFormat)format.value=o.outputFormat;if(o.responseFormat)response.value=o.responseFormat;if(o.optimize)optimize.value=o.optimize;
+      watermark.checked=o.watermark??true;search.checked=!!o.webSearch;transparent.checked=!!o.transparent;layers.checked=!!o.layers;
+      const nearest=Array.from(ratio.options).find(x=>x.value!=='canvas'&&Math.abs(Number(x.value.split(':')[0])/Number(x.value.split(':')[1])-recipe.width/recipe.height)<0.01);if(nearest)ratio.value=nearest.value;
+      renderRefs();sync();
+    }
+    v.win.requestAnimationFrame(() => { if (prompt.isConnected) prompt.focus({ preventScroll: true }); });
   }
   onClose(): void { this.closed = true; this.unsubscribe?.(); this.unsubscribe=undefined; if(this.timer!==undefined)this.view.win.clearInterval(this.timer); this.contentEl.empty(); this.done(); }
 }
