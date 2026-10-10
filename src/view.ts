@@ -1,11 +1,14 @@
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
-import { picturePolicy, requestsPicture, usefulFeedback, withoutPictures } from './designflow';
+import { DESIGN_PREVIEW_LIMIT, picturePolicy, requestsPicture, usefulFeedback, withoutPictures } from './designflow';
 import { templateThumb } from './panels';
 import { calmLayout, clearCopyOfZones, decorOnText, layoutPass } from './calm';
 import { faceFor, isSingleWeight, pillFor, styleText, textPresetById, type TextPreset } from './textstyles';
 import { openInsertPopover } from './insertpop';
+import { ImageGenerateDialog } from './imagegenerate';
+import { AiService } from './ai';
+import { imageReady, type AiConfig } from './aiparse';
 import { BASIC_SHAPES, PATH_SHAPES, type BasicShape } from './shapes';
 import { AssetCat, assetSvg, loadAssets } from './assets';
 import { assignIds, layoutIssues, placeBox, regionOf, resolveTarget, WHERE_ZH, type Box as SceneBox, type NodeKind, type SceneMeta, type SceneNode, type Target } from './scene';
@@ -69,6 +72,8 @@ export class CoverView extends FileView implements CoverApi {
   /** Conversation with the designer. It lives on the view so it survives drawer redraws. */
   pictureRequested = false;
   chatDraft = '';
+  imageDraft = ''; imageModelId = ''; directImageBusy = false;
+  private imageDialog?: ImageGenerateDialog;
   chat: ChatMessage[] = []; busy = false; progress = ''; private centerEl?: HTMLElement; private progressEl?: HTMLElement; onChat?: () => void; /** Redraws the composer chip when the canvas pick changes. */ onSelection?: () => void; private lastPrompt = ''; currentPattern?: string; private lastSpec?: DesignSpec; palette?: import('./templates').Palette; private templateId?: string;
 
   constructor(leaf: WorkspaceLeaf, public plugin: CoverPlugin) { super(leaf); }
@@ -83,6 +88,7 @@ export class CoverView extends FileView implements CoverApi {
 
   /* ---------- lifecycle ---------- */
   async onLoadFile(file: TFile): Promise<void> {
+    this.imageDialog?.close();
     const generation = ++this.generation; this.closingView = false; this.restoring = true; this.dirty = false;
     try {
       const raw = await this.app.vault.read(file); const design = parseDesign(raw);
@@ -105,6 +111,7 @@ export class CoverView extends FileView implements CoverApi {
     }
   }
   async onUnloadFile(): Promise<void> {
+    this.imageDialog?.close();
     this.closingView = true; this.clearTimers(); this.unsubscribeFonts?.(); this.unsubscribeFonts = undefined;
     const untouched = !!this.file && this.plugin.scratch.has(this.file.path) && this.revision === this.baseRevision;
     this.commitHistory(); await this.flush();
@@ -165,6 +172,7 @@ export class CoverView extends FileView implements CoverApi {
     this.platformBtn = left.createEl('button', { cls: 'qc-platform', attr: { type: 'button' } });
     this.platformBtn.addEventListener('click', e => this.platformMenu(e));
     const mid = header.createDiv('qc-header-mid');
+    textButton(mid, this.t('aiGenerateImage'), () => this.openImageGenerator(), 'qc-btn-sm qc-ai-image-btn', 'image-plus');
     const insertBtn = textButton(mid, this.zh ? '插入' : 'Insert', () => openInsertPopover(this, insertBtn), 'qc-btn-sm', 'plus');
     mid.createSpan({ cls: 'qc-sep' });
     this.undoBtn = iconButton(mid, 'undo-2', this.t('undo'), () => void this.action(() => this.travel(-1)));
@@ -266,6 +274,7 @@ export class CoverView extends FileView implements CoverApi {
   }
   private moreMenu(e: MouseEvent): void {
     const m = new Menu();
+    m.addItem(i => i.setTitle(this.t('aiGenerateImage')).setIcon('image-plus').onClick(() => this.openImageGenerator()));
     m.addItem(i => i.setTitle(this.t('duplicateDesign')).setIcon('copy-plus').onClick(() => void this.action(() => this.plugin.duplicateDesign(`${this.file!.basename} copy`, this.currentDesign()))));
     m.addItem(i => i.setTitle(this.t('renameDesign')).setIcon('pencil').onClick(() => { if (this.file) new RenameModal(this.plugin, this.file).open(); }));
     m.addItem(i => i.setTitle(this.t('newCover')).setIcon('image-plus').onClick(() => this.plugin.openNew()));
@@ -1269,10 +1278,11 @@ export class CoverView extends FileView implements CoverApi {
    */
   async designChoices(proposals: DesignSpec[]): Promise<Variant[]> {
     const d = this.design; if (!d) return [];
-    const specs = proposals.slice(0, 3).map(withoutPictures);
-    if (specs.length < 3) {
+    const specs = proposals.slice(0, DESIGN_PREVIEW_LIMIT).map(withoutPictures).filter((s, i, all) => all.findIndex(p => p.template === s.template) === i);
+    if (!specs.length) return [];
+    if (specs.length < DESIGN_PREVIEW_LIMIT) {
       const seed = specs[0]!;
-      const ids = pickVariants(templatesFor(this.platform()?.id).filter(t => !t.photo && !t.slot).map(t => t.id), seed.template, { title: seed.title ?? '', subtitle: seed.subtitle }, 3 - specs.length);
+      const ids = pickVariants(templatesFor(this.platform()?.id).filter(t => !t.photo && !t.slot && !specs.some(s => s.template === t.id)).map(t => t.id), seed.template, { title: seed.title ?? '', subtitle: seed.subtitle }, DESIGN_PREVIEW_LIMIT - specs.length);
       for (const id of ids) specs.push({ ...seed, template: id, titleFont: undefined, bodyFont: undefined, palette: undefined });
     }
     const out: Variant[] = [];
@@ -1321,12 +1331,12 @@ export class CoverView extends FileView implements CoverApi {
     this.dirty = true; ++this.revision; this.refreshAll(); this.commitHistory(); await this.flush();
     new Notice(this.t('msgRestored'));
   }
-  async variantThumbs(n = 3): Promise<Variant[]> {
+  async variantThumbs(n = DESIGN_PREVIEW_LIMIT): Promise<Variant[]> {
     const d = this.design, c = this.canvas; if (!d || !c) return [];
     const copy = this.copyText(); const hasPhoto = c.getObjects().some(o => (o as QObject).qcRole === 'image' && !o.clipPath);
     const candidates = templatesFor(this.platform()?.id).filter(t => !['checklist', 'compare'].includes(t.id) && (hasPhoto || !t.photo)).map(t => t.id);
     const out: Variant[] = [];
-    for (const id of pickVariants(candidates, this.templateId, { title: copy.title, subtitle: copy.subtitle, points: this.lastSpec?.points }, n)) {
+    for (const id of pickVariants(candidates, this.templateId, { title: copy.title, subtitle: copy.subtitle, points: this.lastSpec?.points }, Math.min(DESIGN_PREVIEW_LIMIT, n))) {
       const t = templateById(id); if (!t) continue;
       const sc = new StaticCanvas(this.doc.createElement('canvas'), { width: d.width, height: d.height, enableRetinaScaling: false });
       usePairing(this.pairing(t.id));
@@ -1339,12 +1349,12 @@ export class CoverView extends FileView implements CoverApi {
     }
     return out;
   }
-  /** A/B on demand: three clearly different directions for the current words, shown in the assistant panel. */
+  /** A/B on demand: up to seven different directions for the current words. */
   async showVariants(): Promise<void> {
     if (!this.canvas) return;
     this.plugin.settings.drawer = 'assistant'; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom();
     const message: ChatMessage = { role: 'assistant', text: this.t('abTitle') }; this.chat.push(message); this.onChat?.();
-    message.variants = await this.variantThumbs(3); this.onChat?.();
+    message.variants = await this.variantThumbs(); this.onChat?.();
   }
   /* ---------- series: one look reused across covers ---------- */
   /** Saves the current layout, colours and faces as a series (newest first; the first one is the default). */
@@ -1743,12 +1753,32 @@ export class CoverView extends FileView implements CoverApi {
       return await readDataUrl(this.win, out);
     } finally { bitmap.close(); }
   }
-  async importImage(blob: Blob): Promise<void> {
+  openImageGenerator(): void {
+    if (this.directImageBusy) { new Notice(this.t('imageGenerating')); return; }
+    if (this.imageDialog) return;
+    const dialog = new ImageGenerateDialog(this, () => { if (this.imageDialog === dialog) this.imageDialog = undefined; });
+    this.imageDialog = dialog; dialog.open();
+  }
+  /** One image request, bound to this canvas; the layout planner and existing layers are untouched. */
+  async generateInsertedImage(prompt: string, config: AiConfig, width: number, height: number, keep: () => boolean): Promise<boolean> {
+    if (this.directImageBusy || this.restoring || this.closingView || !this.canvas || !this.design) return false;
+    if (!prompt.trim() || !imageReady(config)) throw new Error(this.t('imageSkipped'));
+    const generation = this.generation; const canvas = this.canvas;
+    const current = (): boolean => keep() && generation === this.generation && canvas === this.canvas && !this.closingView && !this.restoring;
+    this.directImageBusy = true;
+    try {
+      const pic = await new AiService(() => config).image(prompt, width, height, '', false, 'direct');
+      if (!current()) return false;
+      return await this.importImage(new Blob([pic.data], { type: pic.type }), current);
+    } finally { this.directImageBusy = false; }
+  }
+  async importImage(blob: Blob, keep: () => boolean = () => true): Promise<boolean> {
     const generation = this.generation; const url = await this.prepareImage(blob);
     const image = await FabricImage.fromURL(url);
-    if (generation !== this.generation || this.closingView || !this.canvas || !this.design) return;
+    if (!keep() || generation !== this.generation || this.closingView || !this.canvas || !this.design) return false;
     const d = this.design; image.scaleToWidth(Math.min(d.width * 0.7, image.width)); if (image.getScaledHeight() > d.height * 0.8) image.scaleToHeight(d.height * 0.8);
     image.set({ left: (d.width - image.getScaledWidth()) / 2, top: (d.height - image.getScaledHeight()) / 2 }); this.place(image);
+    return true;
   }
   async replaceImage(target: FabricImage, blob: Blob): Promise<void> {
     const url = await this.prepareImage(blob); const shown = target.getScaledWidth(); const generation = this.generation;

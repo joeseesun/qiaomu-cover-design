@@ -23,7 +23,7 @@ function coreRules(input: AssistantInput): string {
 只输出一个 JSON 对象，不要解释，不要 Markdown 围栏。无论对话历史里出现过什么格式（包括你自己过去的纯文字回复，那是错误示范），输出永远只是那一个 JSON 对象。
 
 # 输出格式
-${input.chooseDesigns ? '新封面：{"intent":"…","reply":"选一个喜欢的方向","ops":[],"designs":[{"template":"…","title":"…","subtitle":"…"},{…},{…}]}，必须是三个独立方案。已有画布的局部调整：{"intent":"…","reply":"…","ops":[…]}，绝不输出 designs。' : '{"intent":"…","reply":"一句话说明做了什么（≤40 字，用用户的语言）","ops":[ …指令… ]}'}
+${input.chooseDesigns ? '新封面：{"intent":"…","reply":"选一个喜欢的方向","ops":[],"designs":[{"template":"…","title":"…","subtitle":"…"},{…},{…}]}，给出最多七个独立方案，优先凑足七个。已有画布的局部调整：{"intent":"…","reply":"…","ops":[…]}，绝不输出 designs。' : '{"intent":"…","reply":"一句话说明做了什么（≤40 字，用用户的语言）","ops":[ …指令… ]}'}
 - intent：先用一句话写下你对请求的理解，要具体到对象和动作（例：“在标题右侧加一个强调色的吉他线性图标”）。
 - reply 里说的每一处改动，必须已经真的写进了 ops / designs；ops 为空时 reply 不许声称改过任何东西。
 
@@ -116,8 +116,8 @@ function designPrompt(input: AssistantInput, imageOn: boolean): string {
   return `${coreRules(input)}
 
 ${input.chooseDesigns ? `# 候选方案
-用户要从文案和版式中选择。若需要 design，输出 {"reply":"选一个喜欢的方向","ops":[],"designs":[三个完整 design 字段对象，不含 op]}。
-三个方案各自提炼真实、不同角度的标题和副标题，使用不同构图模板，并各写一个 typeset 字体搭配，三个方案的 typeset 两两不同；不只是换颜色。每个对象必须有 template/title/subtitle，平台一致。
+用户要从文案和版式中选择。若需要 design，输出 {"reply":"选一个喜欢的方向","ops":[],"designs":[最多七个完整 design 字段对象，不含 op]}。
+七个方案各自提炼真实、不同角度的标题和副标题，使用不同构图模板，并各写一个 typeset 字体搭配，方案尽量使用不同的 typeset；不只是换颜色。每个对象必须有 template/title/subtitle，平台一致。
 数字、收益、案例只能来自用户材料，不编造。优先完整的纯文字构图，不为未生成的图片留空位。候选不得写 imagePrompt/subjectPrompt/decor/pattern。微调已有画布（换配色、换字体、换装饰、更简洁、更大胆、标题改短等）时只输出 ops，绝不输出 designs；保持不变的字段（template/title/subtitle/palette）省略不写，省略即保留当前值。
 ` : ''}
 # 指令

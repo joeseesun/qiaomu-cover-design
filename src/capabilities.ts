@@ -3,6 +3,7 @@
  * its prompt card, so the model is told exactly what exists, every reply is checked against the same list, and a new UI
  * feature becomes available to the assistant by registering it here (tests/capabilities.test.ts fails when one is missing).
  */
+import { DESIGN_PREVIEW_LIMIT } from './designflow';
 import { ADJUSTS, MOOD_PALETTES, TONES, type Tone } from './color';
 import { MESH_PRESETS } from './mesh';
 import { PATH_SHAPES, SHAPE_IDS, BASIC_SHAPES } from './shapes';
@@ -310,7 +311,7 @@ export function sanitizeOps(raw: unknown, c: Catalog): Sanitized {
     const clean = (entry.sanitize as (o: Record<string, unknown>, c: Catalog) => Op | undefined)(o, c);
     if (clean) ops.push(clean); else if (k !== 'export') rejected.push(`${k} 参数无效：${JSON.stringify(o).slice(0, 160)}`);
   }
-  const designs = Array.isArray(root.designs) ? root.designs.slice(0, 3).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map(x => sanitizeDesign(x, c)).filter(x => !!x.title && !!x.template) : [];
+  const designs = Array.isArray(root.designs) ? root.designs.slice(0, DESIGN_PREVIEW_LIMIT).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map(x => sanitizeDesign(x, c)).filter(x => !!x.title && !!x.template) : [];
   // Clarifying quick answers only count when the model changed nothing; 2–4 short tappable replies.
   const options = !ops.length && !designs.length && Array.isArray(root.options) ? root.options.map(x => str(x, 40)).filter((x): x is string => !!x).slice(0, 4) : [];
   const intent = str(root.intent, 160);
