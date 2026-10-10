@@ -65,7 +65,7 @@ export class CoverView extends FileView implements CoverApi {
   private expected = ''; private writer = new SerialWriter(); private history = new History(); private codec = new SnapshotCodec();
   restoring = false; private closingView = false; private dirty = false; private saveTimer?: number; private historyTimer?: number; private revision = 0;
   private task = false; private generation = 0; private observer?: ResizeObserver; private clip: Record<string, unknown>[] = [];
-  stage?: HTMLElement; inspectorEl?: HTMLElement; private drawerEl?: HTMLElement; private emptyHint?: HTMLElement; private baseRevision = 0; private lastDrawer: 'templates' | 'add' | 'fonts' | 'assistant' = 'assistant'; private guidesEl?: HTMLElement; private snapEl?: HTMLElement;
+  stage?: HTMLElement; inspectorEl?: HTMLElement; private drawerEl?: HTMLElement; private baseRevision = 0; private lastDrawer: 'templates' | 'add' | 'fonts' | 'assistant' = 'assistant'; private guidesEl?: HTMLElement; private snapEl?: HTMLElement;
   private statusEl?: HTMLElement; private zoomLabel?: HTMLElement; private undoBtn?: HTMLButtonElement; private redoBtn?: HTMLButtonElement; private platformBtn?: HTMLElement;
   zoom: number | 'fit' = 'fit'; rightTab: 'design' | 'layers' | 'canvas' = 'canvas'; private tabsEl?: HTMLElement; private refreshQueued = false;
   private unsubscribeFonts?: () => void;
@@ -103,7 +103,7 @@ export class CoverView extends FileView implements CoverApi {
       this.history.reset(this.snapshot()); this.restoring = false; this.baseRevision = this.revision;
       // The conversation picks up where this cover left off; rich payloads (variants, snapshots) start empty.
       this.chat = (this.plugin.settings.chats[file.path] ?? []).map(m => ({ ...m }));
-      this.applyZoom(); this.refreshAll(); this.setStatus('saved'); this.updateEmptyHint();
+      this.applyZoom(); this.refreshAll(); this.setStatus('saved');
       const brief = this.plugin.takeBrief(file.path); if (brief) void this.autoDesign(brief);
       this.unsubscribeFonts = this.plugin.fonts.onChange(() => { void this.reflowFonts(); this.refreshInspector(true); });
     } catch (e) {
@@ -432,7 +432,7 @@ export class CoverView extends FileView implements CoverApi {
   private snapshot(): string { return this.codec.encode(this.currentDesign()); }
   changed(): void {
     if (this.restoring || !this.canvas || !this.design || this.closingView) return;
-    this.dirty = true; ++this.revision; this.setStatus('saving'); this.updateEmptyHint();
+    this.dirty = true; ++this.revision; this.setStatus('saving');
     const w = this.win; if (this.historyTimer !== undefined) w.clearTimeout(this.historyTimer);
     this.historyTimer = w.setTimeout(() => { this.historyTimer = undefined; this.commitHistory(); void this.flush(); }, 450);
     if (!this.refreshQueued) { this.refreshQueued = true; w.requestAnimationFrame(() => { this.refreshQueued = false; this.refreshLayers(); }); }
@@ -476,7 +476,7 @@ export class CoverView extends FileView implements CoverApi {
     if (!this.canvas) return;
     renderDrawer(this, this.drawerEl!); this.refreshInspector(true); this.renderGuides(); this.updatePlatformLabel();
   }
-  refreshDrawer(): void { if (this.drawerEl) { if (this.plugin.settings.drawer) this.lastDrawer = this.plugin.settings.drawer; renderDrawer(this, this.drawerEl); } this.updateEmptyHint(); }
+  refreshDrawer(): void { if (this.drawerEl) { if (this.plugin.settings.drawer) this.lastDrawer = this.plugin.settings.drawer; renderDrawer(this, this.drawerEl); } }
   toggleDrawer(): void { const s = this.plugin.settings; s.drawer = s.drawer ? '' : this.lastDrawer; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom(); }
   private syncTabs(): void { for (const b of Array.from(this.tabsEl?.children ?? [])) b.classList.toggle('is-active', b.getAttribute('data-tab') === this.rightTab); }
   refreshInspector(force = false): void {
@@ -990,15 +990,6 @@ export class CoverView extends FileView implements CoverApi {
     await Promise.all(jobs);
     notes.push(...this.qualityPass(), ...this.thumbIssues());
     return notes;
-  }
-  /** A blank artboard says where to start instead of looking broken. Not part of the cover, so it is never exported. */
-  updateEmptyHint(): void {
-    const c = this.canvas; const host = this.centerEl; if (!c || !host) return;
-    const empty = c.getObjects().length === 0;
-    if (!empty) { this.emptyHint?.remove(); this.emptyHint = undefined; return; }
-    if (this.emptyHint?.isConnected) return;
-    const box = host.createDiv('qc-empty-hint'); this.emptyHint = box; setIcon(box.createSpan({ cls: 'qc-empty-hint-icon' }), 'sparkles');
-    box.createDiv({ text: this.t('emptyHintTitle'), cls: 'qc-empty-hint-title' }); box.createDiv({ text: this.t('emptyHintBody'), cls: 'qc-empty-hint-body' });
   }
   /** Shows what the designer is doing, in the chat and as a floating chip over the canvas, so a 30 s picture never looks like a hang. */
   setProgress(text = ''): void {
