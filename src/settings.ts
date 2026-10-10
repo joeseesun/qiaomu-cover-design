@@ -3,19 +3,18 @@ import type CoverPlugin from './main';
 import { folderPath } from './model';
 import { GROUPS, PLATFORMS } from './platforms';
 import { FONT_SITES } from './fontbrowser';
-import { PROVIDER_PRESETS } from './aiparse';
 import { CodexInfo, detectCodex } from './codex';
 import { ModelDialog } from './modeldialog';
-import { chatLabel, IMAGE_ENGINES, imageLabel, removeChat, removeImage, switchChat, switchImage } from './aiparse';
+import { chatLabel, imageLabel, removeChat, removeImage, switchChat, switchImage, pickChat, pickImage, aiReady, imageReady, type ChatSnap, type ImageSnap } from './aiparse';
 import { FONT_PACKS } from './fontlib';
 import { installPack, packMissing } from './fontpack';
 import { FontLibraryModal, ShortcutsModal } from './modals';
-import { bytes, textButton } from './ui';
-import { choiceCards, more, Row, section, statusBar } from './settingsui';
+import { bytes, textButton, iconButton } from './ui';
+import { more, Row, section, statusBar } from './settingsui';
 
 export type SettingsTab = 'general' | 'export' | 'fonts' | 'assistant' | 'about';
 const TABS: { id: SettingsTab; icon: string }[] = [{ id: 'general', icon: 'sliders-horizontal' }, { id: 'export', icon: 'download' }, { id: 'fonts', icon: 'type' }, { id: 'assistant', icon: 'sparkles' }, { id: 'about', icon: 'info' }];
-type Source = 'codex' | 'api' | 'off';
+import { chatSourceOf, imageSourceOf } from './catalog';
 
 export class CoverSettings extends PluginSettingTab {
   tab: SettingsTab = 'general'; private off?: () => void; private codex?: CodexInfo | 'missing' | 'checking'; private testLine?: { tone: 'ok' | 'warn'; text: string };
@@ -83,157 +82,98 @@ export class CoverSettings extends PluginSettingTab {
 
   /* ---------- fonts ---------- */
   private fontsTab(body: HTMLElement): void {
-    const s = this.plugin.settings; const t = this.t; const fonts = this.plugin.fonts; const doc = this.containerEl.ownerDocument;
-    const lib = section(body, t('s_fontGetTitle'), t('s_fontGetDesc'));
-    for (const pk of FONT_PACKS) {
-      const left = packMissing(this.plugin, pk.id); const zh = this.plugin.isZh();
-      const row = new Row(lib, zh ? pk.zh : pk.en, pk.desc);
-      if (!left) row.addButton(b => b.setButtonText(zh ? '已安装' : 'Installed').setDisabled(true));
-      else row.addButton(b => b.setButtonText(zh ? `一键安装（${left} 款）` : `Install all (${left})`).setCta().onClick(() => {
-        b.setDisabled(true); void installPack(this.plugin, doc, pk.id, (done, total, fam) => b.setButtonText(fam ? `${done + 1}/${total} ${fam}…` : '…')).then(() => { if (pk.id === 'designer') this.plugin.repairOpenCovers(); this.display(); });
-      }));
-    }
-    new Row(lib, t('fontLibTitle'), t('s_fontLibRow')).addButton(b => b.setButtonText(t('fontLibOpen')).setCta().onClick(() => new FontLibraryModal(this.plugin, doc, () => this.display()).open()));
+    const s = this.plugin.settings, t = this.t, fonts = this.plugin.fonts, doc = this.containerEl.ownerDocument, zh = this.plugin.isZh();
+    const state = fonts.libraryState(), bar = statusBar(body, state.ready === state.total ? 'ok' : 'warn', zh ? `内置字库 ${state.ready}/${state.total} 款已就绪` : `Built-in library: ${state.ready}/${state.total} ready`, zh ? '内置字体在画布的字体选择器里使用，无需逐个安装。' : 'Built-in fonts are available in the canvas font picker; no individual installation needed.');
+    const browse = section(body, zh ? '选择与添加字体' : 'Choose and add fonts', zh ? '在字体库中预览和选择，或导入你自己的字体。' : 'Preview the font library or import your own fonts.');
+    const actions = browse.createDiv('qcs-font-actions'); textButton(actions, t('fontLibOpen'), () => new FontLibraryModal(this.plugin, doc, () => this.display()).open(), 'qc-primary', 'type');
     const picker = doc.createElement('input'); picker.type = 'file'; picker.multiple = true; picker.accept = '.ttf,.otf,.woff,.woff2';
     picker.addEventListener('change', () => void fonts.importFiles(Array.from(picker.files ?? []), doc).then(added => { new Notice(added.length ? t('fontsImported', { names: added.join(', ') }) : t('fontsNone')); this.display(); }).catch(err => this.plugin.report(err)));
-    new Row(lib, t('fontImport'), t('fontHint')).addButton(b => b.setButtonText(t('fontImportBtn')).onClick(() => picker.click()));
-    const mine = section(body, t('fontsInstalled'), t('fontsInstalledDesc'));
-    const list = mine.createDiv('qc-font-files'); const files = fonts.files();
-    if (!files.length) list.createDiv({ text: t('fontEmptyVault'), cls: 'qc-empty-note' });
+    textButton(actions, t('fontImportBtn'), () => picker.click(), '', 'upload');
+    const repair = textButton(bar.action, zh ? '补齐字库' : 'Complete library', () => void fonts.syncLibrary(() => this.plugin.repairOpenCovers()).catch(e => this.plugin.report(e)), 'qc-btn-sm', 'refresh-cw'); repair.toggleClass('qc-hidden', state.ready === state.total);
+    const mine = section(body, zh ? '我添加的字体' : 'My added fonts', zh ? '只显示额外导入或下载到库内的字体。' : 'Only additional imported or downloaded vault fonts.');
+    const list = mine.createDiv('qc-font-files'), files = fonts.files().filter(f => !fonts.hasBundled(f.family));
+    if (!files.length) list.createDiv({ text: zh ? '还没有额外字体，内置字库已足够开始设计。' : 'No additional fonts yet. The built-in library is enough to start.', cls: 'qc-empty-note' });
     for (const f of files) {
-      const row = list.createDiv('qc-font-file'); const sample = row.createSpan({ text: '封面 Aa', cls: 'qc-font-file-sample' }); sample.style.fontFamily = `"${f.family}", sans-serif`;
+      const row = list.createDiv('qc-font-file'), sample = row.createSpan({ text: '封面 Aa', cls: 'qc-font-file-sample' }); sample.style.fontFamily = `"${f.family}", sans-serif`;
       row.createSpan({ text: f.family, cls: 'qc-font-file-name' }); row.createSpan({ text: `${f.ext.toUpperCase()} · ${bytes(f.size)}`, cls: 'qc-hint' });
-      textButton(row, t('remove'), () => void fonts.remove(f.family, doc).then(() => this.display()).catch(err => this.plugin.report(err)), 'qc-btn-sm', 'trash-2');
+      iconButton(row, 'trash-2', t('remove'), () => void fonts.remove(f.family, doc).then(() => this.display()).catch(e => this.plugin.report(e)));
     }
-    this.folderRow(mine, t('fontFolder'), t('fontFolderDesc'), () => s.fontFolder, v => { s.fontFolder = v; void fonts.loadVault(doc).then(() => this.display()); });
-    const sys = section(body, t('fontsSystem'));
-    const state = fonts.state;
-    new Row(sys, t('fontsSystemStatus'), state === 'ok' ? t('fontCount', { n: fonts.system.length, v: fonts.vault.length }) : state === 'idle' ? t('fontScanning') : t('fontLimited'))
-      .addButton(b => b.setButtonText(t('fontRefresh')).onClick(() => void fonts.scanSystem(doc, true).then(() => this.display())));
-    const help = more(body, t('s_fontMore'));
-    help.createDiv({ text: t('fontInstallSteps'), cls: 'qcs-note' }); help.createDiv({ text: t('fontLicense'), cls: 'qcs-note' });
-    const links = help.createDiv('qc-links');
-    for (const [name, url, key] of FONT_SITES) {
-      const row = links.createDiv('qc-link-row'); const a = row.createEl('a', { text: name, href: url }); a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener');
-      row.createSpan({ text: t(key as 'fontsGoogle'), cls: 'qc-hint' });
+    const extraPacks = FONT_PACKS.filter(pk => packMissing(this.plugin, pk.id) > 0);
+    if (extraPacks.length) {
+      const extras = more(body, zh ? '更多可选字体包' : 'Additional font packs');
+      for (const pk of extraPacks) { const left = packMissing(this.plugin, pk.id); new Row(extras, zh ? pk.zh : pk.en, zh ? `${left} 款尚未安装；已有字体不会重复下载。` : `${left} additional fonts; installed ones are skipped.`).addButton(b => b.setButtonText(zh ? '添加缺少的字体' : 'Add missing fonts').onClick(() => { b.setDisabled(true); void installPack(this.plugin, doc, pk.id).then(() => this.display()).catch(e => this.plugin.report(e)); })); }
     }
-    this.off = fonts.onChange(() => { if (this.tab === 'fonts' && this.containerEl.isConnected && !this.containerEl.contains(doc.activeElement)) this.display(); });
+    const maintenance = more(body, zh ? '存储与系统字体' : 'Storage and system fonts');
+    this.folderRow(maintenance, t('fontFolder'), t('fontFolderDesc'), () => s.fontFolder, value => { s.fontFolder = value; void fonts.loadVault(doc).then(() => this.display()); });
+    new Row(maintenance, t('fontsSystemStatus'), fonts.state === 'ok' ? t('fontCount', { n: fonts.system.length, v: fonts.vault.length }) : fonts.state === 'idle' ? t('fontScanning') : t('fontLimited')).addButton(b => b.setButtonText(t('fontRefresh')).onClick(() => void fonts.scanSystem(doc, true).then(() => this.display())));
+    const help = more(body, zh ? '字体来源与许可' : 'Font sources and licensing'); help.createDiv({ text: t('fontLicense'), cls: 'qcs-note' });
+    const links = help.createDiv('qc-links'); for (const [name, url] of FONT_SITES) links.createEl('a', { text: name, href: url, attr: { target: '_blank', rel: 'noopener' } });
+    this.off = fonts.onChange(() => { if (!bar.el.isConnected) return; const state = fonts.libraryState(); bar.el.querySelector('.qcs-status-main')!.setText(zh ? `内置字库 ${state.ready}/${state.total} 款已就绪` : `Built-in library: ${state.ready}/${state.total} ready`); repair.toggleClass('qc-hidden', state.ready === state.total); repair.disabled = state.running; });
   }
 
   /* ---------- AI designer ---------- */
-  private source(): Source { const ai = this.plugin.settings.ai; return !ai.enabled ? 'off' : ai.protocol === 'codex' ? 'codex' : 'api'; }
-  private pickSource(next: Source): void {
-    const ai = this.plugin.settings.ai; this.testLine = undefined;
-    if (next === 'off') ai.enabled = false;
-    else {
-      ai.enabled = true;
-      if (next === 'codex') { ai.preset = 'codex'; ai.protocol = 'codex'; ai.imageEngine = 'codex'; }
-      else if (ai.protocol === 'codex') { const p = PROVIDER_PRESETS.find(x => x.id === 'deepseek')!; ai.preset = p.id; ai.protocol = p.protocol; ai.baseUrl = p.baseUrl; ai.model = p.model; ai.imageEngine = 'api'; }
-    }
-    this.save(); this.display();
-  }
   private detect(): void {
     if (this.codex === 'checking') return; this.codex = 'checking';
-    void detectCodex(this.plugin.settings.ai.codexBin).then(info => { this.codex = info; }, () => { this.codex = 'missing'; }).finally(() => { if (this.tab === 'assistant' && this.containerEl.isConnected) this.display(); });
+    void detectCodex(this.plugin.settings.ai.codexBin).then(info => { this.codex = info; }, () => { this.codex = 'missing'; }).finally(() => { const el = this.containerEl.querySelector('.qcs-cli-status .qcs-desc'); if (el) { const info = this.codex, found = info && info !== 'missing' && info !== 'checking' ? info : undefined; el.setText(found ? this.t('aiS_codexFound', { version: found.version ?? '?', path: found.path }) : this.t('aiS_codexMissing')); } });
   }
 
   private assistantTab(body: HTMLElement): void {
-    const t = this.t; const ai = this.plugin.settings.ai; const source = this.source(); const zh = this.plugin.isZh();
-    if (source === 'codex' && this.codex === undefined) this.detect();
-
-    // Is it working? Answered first, in one line.
-    const ready = this.plugin.ai.ready(); const imgOn = this.plugin.ai.imageReady();
-    const name = source === 'codex' ? 'Codex CLI' : ai.model || ai.preset;
-    const bar = ready ? statusBar(body, 'ok', t('aiS_ok', { name }), t('aiS_okDetail', { image: imgOn ? t('aiS_imgOn') : t('aiS_imgOff') }))
-      : source === 'off' ? statusBar(body, 'off', t('aiS_off'), t('aiS_offDetail'))
-        : source === 'codex' ? statusBar(body, 'warn', this.codex === 'checking' || this.codex === undefined ? t('aiS_checking') : t('aiS_noCodex'), t('aiS_noCodexDetail'))
-          : statusBar(body, 'warn', t('aiS_noKey'), t('aiS_noKeyDetail'));
-    if (source === 'codex' || source === 'api') textButton(bar.action, t('aiTest'), () => this.runTest(bar.el), 'qc-btn-sm', 'plug-zap');
+    const t = this.t, ai = this.plugin.settings.ai, zh = this.plugin.isZh();
+    const toggle = new Row(body, zh ? '启用 AI 功能' : 'Enable AI', zh ? '管理排版和生图模型；关闭后保留所有配置。' : 'Manage layout and image models. Turning this off retains all configurations.');
+    toggle.addToggle(x => x.setValue(ai.enabled).onChange(value => { ai.enabled = value; this.save(); this.display(); }));
+    const bar = statusBar(body, !ai.enabled ? 'off' : this.plugin.ai.ready() ? 'ok' : 'warn', !ai.enabled ? t('aiS_off') : this.plugin.ai.ready() ? (zh ? '默认排版模型已配置' : 'Default layout model configured') : (zh ? '先添加一个排版模型' : 'Add a layout model to get started'), zh ? '配置完成不代表服务已连通；生图需选择已开通的模型。' : 'Configuration is not a connectivity check; image models must be activated by the provider.');
+    if (ai.enabled && this.plugin.ai.ready()) textButton(bar.action, t('aiTest'), () => this.runTest(bar.el), 'qc-btn-sm', 'plug-zap');
     if (this.testLine) bar.el.createDiv({ text: this.testLine.text, cls: `qcs-status-test is-${this.testLine.tone}` });
-
-    // Saved layout models: switch between them here or from the chip above the composer.
-    const saved = section(body, zh ? '排版模型' : 'Layout models', zh ? '可以存多个，随时在设计面板里切换。点“新增”会复制当前这个，改一改就是新的。' : 'Keep several and switch from the designer panel. New copies the current one.');
-    this.profileChips(saved, ai.chats.map(x => ({ id: x.id, label: chatLabel(x.id === ai.chatId ? { preset: ai.preset, protocol: ai.protocol, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model, codexBin: ai.codexBin, codexModel: ai.codexModel } : x.snap) })), ai.chatId,
-      id => { switchChat(ai, id); this.testLine = undefined; this.codex = undefined; this.save(); this.display(); }, () => new ModelDialog(this.plugin, 'chat', () => { this.codex = undefined; this.display(); }).open(), id => { removeChat(ai, id); this.save(); this.display(); },
-      id => { const x = ai.chats.find(c => c.id === id); if (x) new ModelDialog(this.plugin, 'chat', () => { this.codex = undefined; this.display(); }, { id, snap: id === ai.chatId ? { preset: ai.preset, protocol: ai.protocol, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model, codexBin: ai.codexBin, codexModel: ai.codexModel } : x.snap }).open(); });
-
-    // 1 — who designs
-    const pick = section(body, t('aiS_pickTitle'), t('aiS_pickDesc'), 1);
-    choiceCards<Source>(pick, [
-      { value: 'codex', icon: 'terminal', badge: t('aiS_recommended'), title: t('aiS_codex'), desc: t('aiS_codexDesc') },
-      { value: 'api', icon: 'key-round', title: t('aiS_api'), desc: t('aiS_apiDesc') },
-      { value: 'off', icon: 'pencil-ruler', title: t('aiS_none'), desc: t('aiS_noneDesc') },
-    ], source, v => this.pickSource(v));
-
-    // 2 — connect
-    if (source === 'codex') {
-      const conn = section(body, t('aiS_connectTitle'), undefined, 2);
-      const info = this.codex; const found = info && info !== 'missing' && info !== 'checking' ? info : undefined;
-      new Row(conn, t('aiS_codexStatus'), found ? t('aiS_codexFound', { version: found.version ?? '?', path: found.path }) : info === 'checking' || info === undefined ? t('aiS_checking') : t('aiS_codexMissing'))
-        .addButton(b => b.setButtonText(t('aiS_recheck')).onClick(() => { this.codex = undefined; this.display(); }));
-      const adv = more(conn, t('s_advanced'));
-      new Row(adv, t('aiCodexBin'), t('aiCodexBinDesc')).addText(x => x.setPlaceholder('~/.local/bin/codex').setValue(ai.codexBin).onChange(v => { ai.codexBin = v.trim(); this.save(); }));
-      new Row(adv, t('aiCodexModel'), t('aiCodexModelDesc')).addText(x => x.setValue(ai.codexModel).onChange(v => { ai.codexModel = v.trim(); this.save(); }));
-    } else if (source === 'api') {
-      const conn = section(body, t('aiS_connectTitle'), undefined, 2);
-      new Row(conn, t('aiProvider'), t('aiS_providerDesc')).addDropdown(d => {
-        for (const p of PROVIDER_PRESETS.filter(x => x.protocol !== 'codex')) d.addOption(p.id, p.name);
-        d.setValue(ai.preset).onChange(id => {
-          const p = PROVIDER_PRESETS.find(x => x.id === id); if (!p) return;
-          ai.preset = id; ai.protocol = p.protocol; if (p.baseUrl) ai.baseUrl = p.baseUrl; if (p.model) ai.model = p.model; if (p.imageModel) ai.imageModel = p.imageModel; this.testLine = undefined; this.save(); this.display();
-        });
-      });
-      new Row(conn, t('aiKey'), t('aiS_keyDesc')).addText(x => { x.inputEl.type = 'password'; x.inputEl.autocomplete = 'off'; x.setPlaceholder('sk-…').setValue(ai.apiKey).onChange(v => { ai.apiKey = v.trim(); this.save(); }); });
-      const adv = more(conn, t('s_advanced'));
-      new Row(adv, t('aiBase'), t('aiS_baseDesc')).addText(x => x.setPlaceholder('https://api.openai.com/v1').setValue(ai.baseUrl).onChange(v => { ai.baseUrl = v.trim(); this.save(); }));
-      new Row(adv, t('aiModelName'), t('aiModelNameDesc')).addText(x => x.setValue(ai.model).onChange(v => { ai.model = v.trim(); this.save(); }));
+    this.modelList(section(body, zh ? '排版模型' : 'Layout models', zh ? '用于文案、版式和画布编辑。按服务分组，选择一个默认模型。' : 'For copy, layouts and canvas edits. Organized by service; select your default.'), 'chat');
+    const images = section(body, zh ? '生图模型' : 'Image models', zh ? '用于 AI 生图与图片修改，独立于排版模型。' : 'For image generation and editing, independent of layout models.');
+    this.modelList(images, 'image');
+    new Row(images, t('aiS_imageToggle'), zh ? '控制封面设计师的配图能力；直接“AI 生图”仍可选择已配置的模型。' : 'Controls pictures in the cover designer. Direct AI image generation can still use configured models.').addToggle(x => x.setValue(ai.imageOn).onChange(value => { ai.imageOn = value; this.save(); }));
+    if (ai.protocol === 'codex' || ai.images.some(x => x.snap.imageEngine === 'codex')) {
+      const local = more(body, zh ? '本机 Codex CLI' : 'Local Codex CLI');
+      if (this.codex === undefined) this.detect();
+      const info = this.codex, found = info && info !== 'missing' && info !== 'checking' ? info : undefined;
+      const cliRow = new Row(local, t('aiS_codexStatus'), found ? t('aiS_codexFound', { version: found.version ?? '?', path: found.path }) : info === 'checking' || info === undefined ? t('aiS_checking') : t('aiS_codexMissing')).addButton(b => b.setButtonText(t('aiS_recheck')).onClick(() => { this.codex = undefined; this.display(); })); cliRow.el.addClass('qcs-cli-status');
+      new Row(local, t('aiCodexBin'), t('aiCodexBinDesc')).addText(x => x.setPlaceholder('~/.local/bin/codex').setValue(ai.codexBin).onChange(value => { ai.codexBin = value.trim(); this.save(); }));
     }
-
-    // 3 — pictures: any number of saved picture models, each with its own engine
-    if (source !== 'off') {
-      const pics = section(body, t('aiS_imageTitle'), t('aiS_imageDesc'), 3);
-      this.profileChips(pics, ai.images.map(x => ({ id: x.id, label: imageLabel(x.id === ai.imageId ? { imageOn: ai.imageOn, imageEngine: ai.imageEngine, imageBaseUrl: ai.imageBaseUrl, imageKey: ai.imageKey, imageModel: ai.imageModel, imageSize: ai.imageSize } : x.snap) })), ai.imageId,
-        id => { switchImage(ai, id); this.save(); this.display(); }, () => new ModelDialog(this.plugin, 'image', () => this.display()).open(), id => { removeImage(ai, id); this.save(); this.display(); },
-        id => { const x = ai.images.find(c => c.id === id); if (x) new ModelDialog(this.plugin, 'image', () => this.display(), { id, snap: id === ai.imageId ? { imageOn: ai.imageOn, imageEngine: ai.imageEngine, imageBaseUrl: ai.imageBaseUrl, imageKey: ai.imageKey, imageModel: ai.imageModel, imageSize: ai.imageSize } : x.snap }).open(); });
-      new Row(pics, t('aiS_imageToggle'), t('aiS_imageToggleDesc')).addToggle(x => x.setValue(ai.imageOn).onChange(v => { ai.imageOn = v; this.save(); this.display(); }));
-      if (ai.imageOn) {
-        new Row(pics, t('aiImageEngine'), zh ? '用哪家的生图服务。' : 'Which picture service to use.').addDropdown(d => {
-          for (const e of IMAGE_ENGINES) d.addOption(e.id, zh ? e.zh : e.en);
-          d.setValue(ai.imageEngine).onChange(v => {
-            const e = IMAGE_ENGINES.find(x => x.id === v); if (!e) return;
-            ai.imageEngine = e.id; ai.imageBaseUrl = e.id === 'api' ? ai.imageBaseUrl : e.baseUrl; ai.imageModel = e.model || ai.imageModel; this.save(); this.display();
-          });
-        });
-        if (ai.imageEngine !== 'codex') {
-          const e = IMAGE_ENGINES.find(x => x.id === ai.imageEngine);
-          new Row(pics, t('aiKey'), zh ? `这个生图服务的密钥${e?.hint ? `（${e.hint}）` : ''}。只保存在本机。` : 'API key for this service. Stored on this machine only.').addText(x => { x.inputEl.type = 'password'; x.inputEl.autocomplete = 'off'; x.setPlaceholder('API key').setValue(ai.imageKey).onChange(v => { ai.imageKey = v.trim(); this.save(); }); });
-          new Row(pics, t('aiImageModel'), zh ? '模型名可以改成该平台当前可用的任意生图模型。' : 'Any picture model the service offers.').addText(x => x.setValue(ai.imageModel).onChange(v => { ai.imageModel = v.trim(); this.save(); }));
-          const adv = more(pics, t('s_advanced'));
-          new Row(adv, t('aiImageBase'), zh ? '自定义中转或代理时修改；留空用默认地址。' : 'Change for a custom relay.').addText(x => x.setPlaceholder(e?.baseUrl ?? ai.baseUrl).setValue(ai.imageBaseUrl).onChange(v => { ai.imageBaseUrl = v.trim(); this.save(); }));
-          if (ai.imageEngine === 'api') new Row(adv, t('aiImageSize')).addDropdown(d => d.addOptions({ auto: t('aiImageSizeAuto'), '1024x1024': '1024×1024', '1536x1024': '1536×1024', '1024x1536': '1024×1536' }).setValue(ai.imageSize).onChange(v => { ai.imageSize = v as typeof ai.imageSize; this.save(); }));
-        }
-      }
-    }
-
-    // Reassurance and developer notes stay folded
-    const foot = body.createDiv('qcs-foot');
-    const privacy = more(foot, t('aiS_privacyTitle')); privacy.createDiv({ text: t('aiS_privacy'), cls: 'qcs-note' });
-    const dev = more(foot, t('assistantApi'));
-    dev.createDiv({ text: t('assistantApiDesc'), cls: 'qcs-note' });
-    for (const p of this.plugin.assistantList()) new Row(dev, p.name, p.id === 'offline' ? t('assistantOfflineDesc') : p.id === 'ai' ? (zh ? '内置，使用上面的设置。' : 'Built in, uses the settings above.') : t('assistantExternalDesc'));
-    dev.createEl('pre', { cls: 'qc-code', text: "app.plugins.plugins['qiaomu-cover-design'].registerAssistant({\n  id: 'my-model', name: 'My model',\n  async run({ prompt, fonts, size, canvas }) {\n    return { reply: 'Done', ops: [{ op: 'design', platform: 'youtube', template: 'impact', title: 'AI IN 10 MIN', badge: 'NEW' }] };\n  },\n});" });
+    const foot = body.createDiv('qcs-foot'), privacy = more(foot, t('aiS_privacyTitle')); privacy.createDiv({ text: t('aiS_privacy'), cls: 'qcs-note' });
+    const dev = more(foot, t('assistantApi')); dev.createDiv({ text: t('assistantApiDesc'), cls: 'qcs-note' });
+    for (const provider of this.plugin.assistantList()) new Row(dev, provider.name, provider.id === 'offline' ? t('assistantOfflineDesc') : t('assistantExternalDesc'));
   }
 
-  /** A row of saved models as pills: click to use, x to delete, plus a button to add. */
-  private profileChips(parent: HTMLElement, items: { id: string; label: string }[], activeId: string, pick: (id: string) => void, add: () => void, remove: (id: string) => void, edit: (id: string) => void): void {
-    const row = parent.createDiv('qcs-profiles');
-    for (const it of items) {
-      const chip = row.createDiv({ cls: `qcs-profile${it.id === activeId ? ' is-active' : ''}` });
-      const b = chip.createEl('button', { cls: 'qcs-profile-main', text: it.label, attr: { type: 'button' } }); b.addEventListener('click', () => { if (it.id !== activeId) pick(it.id); });
-      const pen = chip.createEl('button', { cls: 'qcs-profile-x', attr: { type: 'button', 'aria-label': 'Edit' } }); setIcon(pen, 'pencil'); pen.addEventListener('click', () => edit(it.id));
-      if (items.length > 1) { const x = chip.createEl('button', { cls: 'qcs-profile-x', attr: { type: 'button', 'aria-label': 'Delete' } }); setIcon(x, 'x'); x.addEventListener('click', () => remove(it.id)); }
-    }
-    const plus = row.createEl('button', { cls: 'qcs-profile-add', attr: { type: 'button' } }); setIcon(plus.createSpan(), 'plus'); plus.createSpan({ text: this.plugin.isZh() ? '添加模型' : 'Add model' }); plus.addEventListener('click', add);
+  private modelList(parent: HTMLElement, kind: 'chat' | 'image'): void {
+    const ai = this.plugin.settings.ai, zh = this.plugin.isZh(), active = kind === 'chat' ? ai.chatId : ai.imageId;
+    const add = (): void => new ModelDialog(this.plugin, kind, () => { this.codex = undefined; this.display(); }).open();
+    const tools = parent.createDiv('qcs-model-toolbar'), search = tools.createEl('input', { cls: 'qcs-model-search', attr: { type: 'search', placeholder: zh ? '查找名称或模型 ID…' : 'Find a name or model ID…' } });
+    textButton(tools, zh ? '添加模型' : 'Add model', add, 'qc-btn-sm', 'plus');
+    const list = parent.createDiv('qcs-model-list');
+    const profiles = kind === 'chat' ? ai.chats : ai.images;
+    const items = profiles.map(profile => {
+      const snap = kind === 'chat' ? profile.id === ai.chatId ? pickChat(ai) : profile.snap as ChatSnap : profile.id === ai.imageId ? pickImage(ai) : profile.snap as ImageSnap;
+      const source = kind === 'chat' ? chatSourceOf(snap as ChatSnap) : imageSourceOf(snap as ImageSnap), local = source.id === 'codex';
+      const base = kind === 'chat' ? (snap as ChatSnap).baseUrl : (snap as ImageSnap).imageBaseUrl || (source.id === 'custom' ? ai.baseUrl : source.baseUrl);
+      let host = ''; try { host = new URL(base).host; } catch { /* incomplete configuration */ }
+      const model = kind === 'chat' ? local ? (snap as ChatSnap).codexModel : (snap as ChatSnap).model : local ? ai.codexModel : (snap as ImageSnap).imageModel;
+      const ready = kind === 'chat' ? aiReady({ ...ai, ...snap as ChatSnap, enabled: true }) : imageReady({ ...ai, ...snap as ImageSnap, imageOn: true, enabled: true });
+      return { id: profile.id, snap, label: kind === 'chat' ? chatLabel(snap as ChatSnap) : imageLabel(snap as ImageSnap), model, service: source.name, host, local, key: `${source.id}|${base}`, ready };
+    }).sort((a, b) => Number(b.id === active) - Number(a.id === active));
+    const draw = (): void => {
+      list.empty(); const q = search.value.trim().toLowerCase(), groups = new Map<string, typeof items>();
+      for (const item of items) if (!q || `${item.label} ${item.model} ${item.service} ${item.host}`.toLowerCase().includes(q)) { const group = groups.get(item.key) ?? []; group.push(item); groups.set(item.key, group); }
+      if (!groups.size) list.createDiv({ text: zh ? '没有匹配的模型。' : 'No matching models.', cls: 'qc-empty-note' });
+      for (const group of groups.values()) {
+        const section = list.createDiv('qcs-model-service'), header = section.createDiv('qcs-model-service-head'), first = group[0]!;
+        setIcon(header.createSpan(), first.local ? 'terminal' : 'cloud'); header.createSpan({ text: first.service }); if (first.host) header.createSpan({ text: first.host, cls: 'qc-hint' });
+        for (const item of group) {
+          const row = section.createDiv({ cls: `qcs-model-row${item.id === active ? ' is-active' : ''}`, attr: { 'data-profile': item.id } }), info = row.createDiv('qcs-model-info');
+          const title = info.createDiv('qcs-model-title'); title.createSpan({ text: item.label }); if (item.id === active) title.createSpan({ text: zh ? '默认' : 'Default', cls: 'qcs-model-default' });
+          info.createDiv({ text: `${item.model || (zh ? '默认模型' : 'Default model')} · ${item.ready ? zh ? '已配置' : 'Configured' : zh ? '待配置' : 'Needs setup'}`, cls: 'qcs-model-meta' });
+          const actions = row.createDiv('qcs-model-actions');
+          if (item.id !== active) textButton(actions, zh ? '设为默认' : 'Set default', () => { if (kind === 'chat') switchChat(ai, item.id); else switchImage(ai, item.id); this.testLine = undefined; this.codex = undefined; this.save(); this.display(); }, 'qc-btn-sm');
+          iconButton(actions, 'pencil', zh ? '编辑模型' : 'Edit model', () => new ModelDialog(this.plugin, kind, () => { this.codex = undefined; this.display(); }, { id: item.id, snap: item.snap }).open());
+          if (profiles.length > 1) iconButton(actions, 'trash-2', zh ? '删除模型' : 'Delete model', () => { if (kind === 'chat') removeChat(ai, item.id); else removeImage(ai, item.id); this.save(); this.display(); });
+        }
+      }
+    }; search.addEventListener('input', draw); draw();
   }
 
   private runTest(bar: HTMLElement): void {

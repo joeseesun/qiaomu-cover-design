@@ -429,7 +429,12 @@ export class CoverView extends FileView implements CoverApi {
     c.requestRenderAll();
   }
   currentDesign(): Design {
-    const canvas = this.canvas!.toObject(PROPS) as Record<string, unknown>;
+    const c = this.canvas!;
+    // Fabric realizes top-level active selections when serializing, but not selected children inside a group.
+    const nested = c.getActiveObjects().filter(o => o.parent && o.group instanceof ActiveSelection).map(o => ({ object: o, original: util.saveObjectTransform(o), matrix: util.multiplyTransformMatrices(util.invertTransform(o.parent!.calcTransformMatrix()), o.calcTransformMatrix()) }));
+    let canvas: Record<string, unknown>;
+    try { for (const n of nested) util.applyTransformToObject(n.object, n.matrix); canvas = c.toObject(PROPS) as Record<string, unknown>; }
+    finally { for (const n of nested) n.object.set(n.original); }
     const bg = this.design!.bg; if (bg) canvas.background = bg.kind === 'solid' ? bg.color : bg.from;
     return { ...this.design!, canvas };
   }

@@ -55,8 +55,8 @@ export class ModelDialog extends Modal {
 
   private form(s: Source): void {
     const z = this.zh; const el = this.contentEl; const snap = this.editing?.snap;
-    const cur = { key: '', baseUrl: s.baseUrl, model: '', bin: '' };
-    if (snap) { if (this.kind === 'chat') { const c = snap as ChatSnap; cur.key = c.apiKey; cur.baseUrl = c.baseUrl || s.baseUrl; cur.model = c.protocol === 'codex' ? c.codexModel : c.model; cur.bin = c.codexBin; } else { const c = snap as ImageSnap; cur.key = c.imageKey; cur.baseUrl = c.imageBaseUrl || s.baseUrl; cur.model = c.imageModel; } }
+    const cur = { key: '', baseUrl: s.baseUrl, model: '', bin: '', alias: '' };
+    if (snap) { if (this.kind === 'chat') { const c = snap as ChatSnap; cur.key = c.apiKey; cur.baseUrl = c.baseUrl || s.baseUrl; cur.model = c.protocol === 'codex' ? c.codexModel : c.model; cur.bin = c.codexBin; cur.alias = c.chatAlias ?? ''; } else { const c = snap as ImageSnap; cur.key = c.imageKey; cur.baseUrl = c.imageBaseUrl || s.baseUrl; cur.model = c.imageModel; cur.alias = c.imageAlias ?? ''; } }
     else cur.model = s.models[0]?.id ?? '';
     const head = el.createDiv('qc-md-head'); tile(head, s, true); head.createEl('strong', { text: s.name }); head.createSpan({ text: s.sub, cls: 'qc-hint' });
     const field = (label: string, build: (box: HTMLElement) => HTMLElement, hint?: string): HTMLElement => { const row = el.createDiv('qc-md-field'); row.createEl('label', { text: label }); const input = build(row); if (hint) row.createDiv({ text: hint, cls: 'qc-hint' }); return input; };
@@ -70,7 +70,7 @@ export class ModelDialog extends Modal {
       }) as HTMLInputElement;
       if (s.keyUrl) { const a = keyInput.closest('.qc-md-field')!.createEl('a', { text: z ? '没有密钥？去获取' : 'Get a key', href: s.keyUrl, cls: 'qc-md-link' }); a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener noreferrer'); }
     }
-    const modelInput = field(z ? '模型' : 'Model', box => { const i = box.createEl('input', { type: 'text', attr: { placeholder: s.models[0]?.id ?? (codex ? (z ? '留空用默认' : 'default') : 'model-id'), spellcheck: 'false' } }); i.value = cur.model; return i; }) as HTMLInputElement;
+    const modelInput = field(z ? '模型' : 'Model', box => { const i = box.createEl('input', { type: 'text', cls: 'qc-md-model-id', attr: { placeholder: s.models[0]?.id ?? (codex ? (z ? '留空用默认' : 'default') : 'model-id'), spellcheck: 'false' } }); i.value = cur.model; return i; }) as HTMLInputElement;
     const listWrap = modelInput.closest('.qc-md-field')!.createDiv('qc-md-models'); let all: PopularModel[] = [...s.models];
     const pickerId = crypto.randomUUID(); listWrap.createEl('label', { cls: 'qc-sr-only', text: z ? '选择模型' : 'Choose a model', attr: { for: pickerId } });
     const picker = listWrap.createEl('select', { cls: 'qc-md-model-picker', attr: { id: pickerId } });
@@ -81,12 +81,14 @@ export class ModelDialog extends Modal {
     };
     picker.addEventListener('change', () => { if (picker.value) modelInput.value = picker.value; });
     modelInput.addEventListener('input', renderModels); renderModels();
+    const alias = field(z ? '显示名称' : 'Display name', box => box.createEl('input', { type: 'text', cls: 'qc-md-alias', attr: { maxlength: '80' } }), z ? '默认使用模型名称。改成好记的别名，模型 ID 和调用方式保持不变。' : 'Defaults to the model name. A nickname changes only its display name.') as HTMLInputElement; alias.value = cur.alias;
+    const aliasHint = (): void => { alias.placeholder = all.find(m => m.id === modelInput.value)?.name ?? (codex ? modelInput.value || 'Codex CLI' : modelInput.value || s.name); }; aliasHint(); modelInput.addEventListener('input', aliasHint); picker.addEventListener('change', aliasHint);
     const status = el.createDiv('qc-md-status');
     if (!codex) {
       const fetchBtn = textButton(listWrap.parentElement!.createDiv('qc-md-fetch'), z ? '获取可用模型' : 'Load models', () => void load(), 'qc-btn-sm', 'refresh-cw');
       const load = async (): Promise<void> => {
         const base = (baseInput.value.trim() || s.baseUrl).replace(/\/+$/, ''); status.setText(z ? '正在获取…' : 'Loading…'); status.removeClass('is-error'); fetchBtn.disabled = true;
-        try { const got = await this.fetchModels(s, base, keyInput?.value.trim() ?? ''); if (got.length) { all = got; status.setText(z ? `获取到 ${got.length} 个模型` : `${got.length} models`); } else { status.setText(z ? '这个服务没有返回模型列表，已显示常用模型，也可以手动输入。' : 'No list returned; showing common ones.'); } renderModels(); }
+        try { const got = await this.fetchModels(s, base, keyInput?.value.trim() ?? ''); if (got.length) { all = got; status.setText(z ? `获取到 ${got.length} 个模型` : `${got.length} models`); } else { status.setText(z ? '这个服务没有返回模型列表，已显示常用模型，也可以手动输入。' : 'No list returned; showing common ones.'); } renderModels(); aliasHint(); }
         catch (e) { status.setText(z ? `没获取到列表（${e instanceof Error ? e.message : String(e)}），已显示常用模型，也可以手动输入。` : 'Could not load the list; type a model id.'); status.addClass('is-error'); }
         finally { fetchBtn.disabled = false; }
       };
@@ -106,9 +108,9 @@ export class ModelDialog extends Modal {
       if (!codex && !s.keyless && !key) { err.setText(z ? '请填写 API 密钥。' : 'Enter the API key.'); keyInput?.focus(); return; }
       if (!codex && !model) { err.setText(z ? '请选择或填写模型。' : 'Choose or type a model.'); modelInput.focus(); return; }
       const cfg = this.plugin.settings.ai;
-      if (this.kind === 'chat') saveChat(cfg, chatSnapFrom(s as ChatSource, { key, baseUrl: codex ? '' : baseUrl, model, codexBin: binInput?.value.trim() ?? '' }), this.editing?.id);
-      else saveImage(cfg, imageSnapFrom(s as ImageSource, { key, baseUrl: (s as ImageSource).engine === 'codex' ? '' : baseUrl, model }), this.editing?.id);
-      cfg.enabled = true; void this.plugin.saveSettings().then(() => { this.close(); this.done(); });
+      if (this.kind === 'chat') saveChat(cfg, { ...chatSnapFrom(s as ChatSource, { key, baseUrl: codex ? '' : baseUrl, model, codexBin: binInput?.value.trim() ?? '' }), chatAlias: alias.value.trim() || undefined }, this.editing?.id);
+      else saveImage(cfg, { ...imageSnapFrom(s as ImageSource, { key, baseUrl: (s as ImageSource).engine === 'codex' ? '' : baseUrl, model }), imageAlias: alias.value.trim() || undefined, ...(snap && model === cur.model ? { imageFamily: (snap as ImageSnap).imageFamily } : {}) }, this.editing?.id);
+      cfg.enabled = true; void this.plugin.saveSettings().then(() => { this.close(); this.done(); }).catch(e => { err.setText(String(e)); });
     }, 'qc-primary');
     window.setTimeout(() => (keyInput ?? modelInput).focus(), 30);
   }

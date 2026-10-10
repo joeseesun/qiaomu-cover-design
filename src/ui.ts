@@ -3,7 +3,7 @@ import { setIcon } from 'obsidian';
 type Opts = DomElementInfo | string;
 /** Icon-only controls carry a visually hidden label instead of aria-label, which Obsidian renders as a tooltip. */
 export function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (event: MouseEvent) => void, cls = ''): HTMLButtonElement {
-  const b = parent.createEl('button', { cls: `qc-icon-btn ${cls}`.trim(), attr: { type: 'button' } });
+  const b = parent.createEl('button', { cls: `qc-icon-btn ${cls}`.trim(), attr: { type: 'button', 'aria-label': label, title: label } });
   setIcon(b, icon); b.createSpan({ text: label, cls: 'qc-sr-only' });
   b.addEventListener('click', onClick); return b;
 }

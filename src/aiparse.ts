@@ -7,6 +7,7 @@ export { sanitizeOps } from './capabilities';
 export type { Catalog } from './valid';
 
 export interface AiConfig {
+  chatAlias?: string; imageAlias?: string;
   /** Master switch: off keeps the plugin fully offline whatever else is filled in. */
   enabled: boolean;
   preset: string; protocol: 'openai' | 'anthropic' | 'codex'; codexBin: string; codexModel: string; imageEngine: ImageEngine; baseUrl: string; apiKey: string; model: string;
@@ -16,8 +17,8 @@ export interface AiConfig {
   chats: ChatProfile[]; chatId: string; images: ImageProfile[]; imageId: string;
 }
 export type ImageEngine = 'api' | 'codex' | 'ark' | 'gemini' | 'openrouter';
-export type ChatSnap = Pick<AiConfig, 'preset' | 'protocol' | 'baseUrl' | 'apiKey' | 'model' | 'codexBin' | 'codexModel'>;
-export type ImageSnap = Pick<AiConfig, 'imageOn' | 'imageEngine' | 'imageBaseUrl' | 'imageKey' | 'imageModel' | 'imageSize' | 'imageFamily'>;
+export type ChatSnap = Pick<AiConfig, 'chatAlias' | 'preset' | 'protocol' | 'baseUrl' | 'apiKey' | 'model' | 'codexBin' | 'codexModel'>;
+export type ImageSnap = Pick<AiConfig, 'imageAlias' | 'imageOn' | 'imageEngine' | 'imageBaseUrl' | 'imageKey' | 'imageModel' | 'imageSize' | 'imageFamily'>;
 export interface ChatProfile { id: string; snap: ChatSnap }
 export interface ImageProfile { id: string; snap: ImageSnap }
 export interface ProviderPreset { id: string; name: string; protocol: 'openai' | 'anthropic' | 'codex'; baseUrl: string; model: string; imageModel?: string; imageBaseUrl?: string }
@@ -54,13 +55,14 @@ export function mergeAi(raw: unknown): AiConfig {
   for (const key of ['preset', 'codexBin', 'codexModel', 'baseUrl', 'apiKey', 'model', 'imageBaseUrl', 'imageKey', 'imageModel'] as const) if (typeof r[key] === 'string') base[key] = r[key] as string;
   if (r.protocol === 'openai' || r.protocol === 'anthropic' || r.protocol === 'codex') base.protocol = r.protocol;
   if (r.imageEngine === 'api' || r.imageEngine === 'codex' || r.imageEngine === 'ark' || r.imageEngine === 'gemini' || r.imageEngine === 'openrouter') base.imageEngine = r.imageEngine;
+  for (const key of ['chatAlias', 'imageAlias'] as const) if (typeof r[key] === 'string') base[key] = (r[key] as string).trim().slice(0, 80);
   const families = ['3.0', '4.0', '4.5', '5.0-lite', '5.0-pro', '5.0-flash'];
   if (typeof r.imageFamily === 'string' && families.includes(r.imageFamily)) base.imageFamily = r.imageFamily as SeedreamFamily;
   if (typeof r.enabled === 'boolean') base.enabled = r.enabled;
   if (typeof r.imageOn === 'boolean') base.imageOn = r.imageOn;
   if (r.imageSize === 'auto' || r.imageSize === '1024x1024' || r.imageSize === '1536x1024' || r.imageSize === '1024x1536') base.imageSize = r.imageSize;
-  const chatSnap = (o: unknown): ChatSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const protocol = q.protocol === 'anthropic' || q.protocol === 'codex' ? q.protocol : 'openai'; return { preset: str('preset') || 'custom', protocol, baseUrl: str('baseUrl'), apiKey: str('apiKey'), model: str('model'), codexBin: str('codexBin'), codexModel: str('codexModel') }; };
-  const imageSnap = (o: unknown): ImageSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const e = q.imageEngine; const sizes = ['auto', '1024x1024', '1536x1024', '1024x1536']; return { ...(families.includes(str('imageFamily')) ? { imageFamily: str('imageFamily') as SeedreamFamily } : {}), imageOn: q.imageOn === true, imageEngine: e === 'codex' || e === 'ark' || e === 'gemini' || e === 'openrouter' ? e : 'api', imageBaseUrl: str('imageBaseUrl'), imageKey: str('imageKey'), imageModel: str('imageModel'), imageSize: (sizes.includes(str('imageSize')) ? str('imageSize') : 'auto') as AiConfig['imageSize'] }; };
+  const chatSnap = (o: unknown): ChatSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const protocol = q.protocol === 'anthropic' || q.protocol === 'codex' ? q.protocol : 'openai'; return { ...(str('chatAlias') ? { chatAlias: str('chatAlias').trim().slice(0,80) } : {}), preset: str('preset') || 'custom', protocol, baseUrl: str('baseUrl'), apiKey: str('apiKey'), model: str('model'), codexBin: str('codexBin'), codexModel: str('codexModel') }; };
+  const imageSnap = (o: unknown): ImageSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const e = q.imageEngine; const sizes = ['auto', '1024x1024', '1536x1024', '1024x1536']; return { ...(str('imageAlias') ? { imageAlias: str('imageAlias').trim().slice(0,80) } : {}), ...(families.includes(str('imageFamily')) ? { imageFamily: str('imageFamily') as SeedreamFamily } : {}), imageOn: q.imageOn === true, imageEngine: e === 'codex' || e === 'ark' || e === 'gemini' || e === 'openrouter' ? e : 'api', imageBaseUrl: str('imageBaseUrl'), imageKey: str('imageKey'), imageModel: str('imageModel'), imageSize: (sizes.includes(str('imageSize')) ? str('imageSize') : 'auto') as AiConfig['imageSize'] }; };
   if (Array.isArray(r.chats)) for (const x of r.chats.slice(0, 64)) { const o = x as { id?: unknown; snap?: unknown }; const snap = chatSnap(o?.snap); if (snap && typeof o.id === 'string') base.chats.push({ id: o.id, snap }); }
   if (Array.isArray(r.images)) for (const x of r.images.slice(0, 64)) { const o = x as { id?: unknown; snap?: unknown }; const snap = imageSnap(o?.snap); if (snap && typeof o.id === 'string') base.images.push({ id: o.id, snap }); }
   if (typeof r.chatId === 'string') base.chatId = r.chatId; if (typeof r.imageId === 'string') base.imageId = r.imageId;
@@ -69,14 +71,14 @@ export function mergeAi(raw: unknown): AiConfig {
 }
 const CHAT_KEYS = ['preset', 'protocol', 'baseUrl', 'apiKey', 'model', 'codexBin', 'codexModel'] as const;
 const IMAGE_KEYS = ['imageFamily', 'imageOn', 'imageEngine', 'imageBaseUrl', 'imageKey', 'imageModel', 'imageSize'] as const;
-const pickChat = (c: AiConfig): ChatSnap => ({ preset: c.preset, protocol: c.protocol, baseUrl: c.baseUrl, apiKey: c.apiKey, model: c.model, codexBin: c.codexBin, codexModel: c.codexModel });
-const pickImage = (c: AiConfig): ImageSnap => ({ imageOn: c.imageOn, imageEngine: c.imageEngine, imageBaseUrl: c.imageBaseUrl, imageKey: c.imageKey, imageModel: c.imageModel, imageSize: c.imageSize, ...(c.imageFamily ? { imageFamily: c.imageFamily } : {}) });
+export const pickChat = (c: AiConfig): ChatSnap => ({ ...(c.chatAlias ? { chatAlias: c.chatAlias } : {}), preset: c.preset, protocol: c.protocol, baseUrl: c.baseUrl, apiKey: c.apiKey, model: c.model, codexBin: c.codexBin, codexModel: c.codexModel });
+export const pickImage = (c: AiConfig): ImageSnap => ({ ...(c.imageAlias ? { imageAlias: c.imageAlias } : {}), imageOn: c.imageOn, imageEngine: c.imageEngine, imageBaseUrl: c.imageBaseUrl, imageKey: c.imageKey, imageModel: c.imageModel, imageSize: c.imageSize, ...(c.imageFamily ? { imageFamily: c.imageFamily } : {}) });
 /** First run and old settings files: the flat fields become the first saved models, so nothing the user configured is lost. */
 export function ensureProfiles(c: AiConfig): void {
   if (!c.chats.length) { c.chats.push({ id: 'chat-1', snap: pickChat(c) }); c.chatId = 'chat-1'; }
   if (!c.images.length) { c.images.push({ id: 'image-1', snap: pickImage(c) }); c.imageId = 'image-1'; }
-  if (!c.chats.some(x => x.id === c.chatId)) { c.chatId = c.chats[0]!.id; Object.assign(c, c.chats[0]!.snap); }
-  if (!c.images.some(x => x.id === c.imageId)) { c.imageId = c.images[0]!.id; c.imageFamily = c.images[0]!.snap.imageFamily; Object.assign(c, c.images[0]!.snap); }
+  if (!c.chats.some(x => x.id === c.chatId)) { c.chatId = c.chats[0]!.id; c.chatAlias = c.chats[0]!.snap.chatAlias; Object.assign(c, c.chats[0]!.snap); }
+  if (!c.images.some(x => x.id === c.imageId)) { c.imageId = c.images[0]!.id; c.imageAlias = c.images[0]!.snap.imageAlias; c.imageFamily = c.images[0]!.snap.imageFamily; Object.assign(c, c.images[0]!.snap); }
 }
 /** Writes the flat (active) fields back into the active saved models. Call before saving settings. */
 export function syncProfiles(c: AiConfig): void {
@@ -84,29 +86,31 @@ export function syncProfiles(c: AiConfig): void {
   const b = c.images.find(x => x.id === c.imageId); if (b) b.snap = pickImage(c);
 }
 let nextId = 0; const fresh = (prefix: string): string => `${prefix}-${Date.now().toString(36)}${(nextId++).toString(36)}`;
-export function switchChat(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.chats.find(x => x.id === id); if (!p) return false; c.chatId = id; Object.assign(c, p.snap); return true; }
-export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.images.find(x => x.id === id); if (!p) return false; c.imageId = id; c.imageFamily = p.snap.imageFamily; Object.assign(c, p.snap); return true; }
+export function switchChat(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.chats.find(x => x.id === id); if (!p) return false; c.chatId = id; c.chatAlias = p.snap.chatAlias; Object.assign(c, p.snap); return true; }
+export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.images.find(x => x.id === id); if (!p) return false; c.imageId = id; c.imageAlias = p.snap.imageAlias; c.imageFamily = p.snap.imageFamily; Object.assign(c, p.snap); return true; }
 /** A new saved model starts as a copy of the active one, which becomes active so it can be edited at once. */
 export function addChat(c: AiConfig): string { syncProfiles(c); const id = fresh('chat'); c.chats.push({ id, snap: { ...pickChat(c), apiKey: '' } }); c.chatId = id; c.apiKey = ''; return id; }
 export function addImage(c: AiConfig): string { syncProfiles(c); const id = fresh('image'); c.images.push({ id, snap: { ...pickImage(c), imageKey: '' } }); c.imageId = id; c.imageKey = ''; return id; }
 /** A new saved model from the add dialog: it is stored and becomes the active one. Editing replaces the saved one in place. */
 export function saveChat(c: AiConfig, snap: ChatSnap, editId?: string): string {
   syncProfiles(c); const id = editId ?? fresh('chat'); const at = c.chats.find(x => x.id === id);
-  if (at) at.snap = snap; else c.chats.push({ id, snap }); c.chatId = id; Object.assign(c, snap); return id;
+  if (at) at.snap = snap; else c.chats.push({ id, snap });
+  if (!editId || editId === c.chatId) { c.chatId = id; c.chatAlias = snap.chatAlias; Object.assign(c, snap); } return id;
 }
 export function saveImage(c: AiConfig, snap: ImageSnap, editId?: string): string {
   syncProfiles(c); const id = editId ?? fresh('image'); const at = c.images.find(x => x.id === id);
-  if (at) at.snap = snap; else c.images.push({ id, snap }); c.imageId = id; c.imageFamily = snap.imageFamily; Object.assign(c, snap); return id;
+  if (at) at.snap = snap; else c.images.push({ id, snap });
+  if (!editId || editId === c.imageId) { c.imageId = id; c.imageAlias = snap.imageAlias; c.imageFamily = snap.imageFamily; Object.assign(c, snap); } return id;
 }
-export function removeChat(c: AiConfig, id: string): void { if (c.chats.length < 2) return; c.chats = c.chats.filter(x => x.id !== id); if (c.chatId === id) { c.chatId = c.chats[0]!.id; Object.assign(c, c.chats[0]!.snap); } }
-export function removeImage(c: AiConfig, id: string): void { if (c.images.length < 2) return; c.images = c.images.filter(x => x.id !== id); if (c.imageId === id) { c.imageId = c.images[0]!.id; c.imageFamily = c.images[0]!.snap.imageFamily; Object.assign(c, c.images[0]!.snap); } }
+export function removeChat(c: AiConfig, id: string): void { if (c.chats.length < 2) return; c.chats = c.chats.filter(x => x.id !== id); if (c.chatId === id) { c.chatId = c.chats[0]!.id; c.chatAlias = c.chats[0]!.snap.chatAlias; Object.assign(c, c.chats[0]!.snap); } }
+export function removeImage(c: AiConfig, id: string): void { if (c.images.length < 2) return; c.images = c.images.filter(x => x.id !== id); if (c.imageId === id) { c.imageId = c.images[0]!.id; c.imageAlias = c.images[0]!.snap.imageAlias; c.imageFamily = c.images[0]!.snap.imageFamily; Object.assign(c, c.images[0]!.snap); } }
 /** Short names for menus and chips. */
-export function chatLabel(s: ChatSnap): string { if (s.protocol === 'codex') return 'Codex CLI'; const p = PROVIDER_PRESETS.find(x => x.id === s.preset); return `${p ? p.name.replace(/ \(.*\)$/, '') : s.preset}${s.model ? ` · ${s.model}` : ''}`; }
+export function chatLabel(s: ChatSnap): string { return s.chatAlias?.trim() || (s.protocol === 'codex' ? s.codexModel.trim() || 'Codex CLI' : s.model.trim() || s.preset); }
 export function imageLabel(s: ImageSnap): string {
-  if (!s.imageOn) return '—'; if (s.imageEngine === 'codex') return 'Codex CLI';
+  if (s.imageAlias?.trim()) return s.imageAlias.trim(); if (s.imageEngine === 'codex') return 'Codex CLI';
   const seedream = s.imageEngine === 'ark' && SEEDREAM_MODELS.find(m => m.id === s.imageModel); if (seedream) return seedream.name;
   if (s.imageEngine === 'api' && /^jimeng-\d\.\d$/.test(s.imageModel)) return `Jimeng ${s.imageModel.slice(7)}`;
-  const e = IMAGE_ENGINES.find(x => x.id === s.imageEngine); return `${e ? e.zh.split('（')[0] : s.imageEngine}${s.imageModel ? ` · ${s.imageModel}` : ''}`;
+  const e = IMAGE_ENGINES.find(x => x.id === s.imageEngine); return s.imageModel.trim() || (e ? e.zh.split('（')[0]! : s.imageEngine);
 }
 void CHAT_KEYS; void IMAGE_KEYS;
 export function aiReady(c: AiConfig): boolean {
@@ -130,7 +134,7 @@ export function directImageConfig(c: AiConfig, id: string): AiConfig | undefined
   const profile = c.images.find(p => p.id === id);
   if (!profile && id !== c.imageId) return undefined;
   const snap = id === c.imageId ? pickImage(c) : profile!.snap;
-  return { ...c, ...snap, imageFamily: snap.imageFamily, imageOn: true, chats: c.chats.map(p => ({ ...p, snap: { ...p.snap } })), images: c.images.map(p => ({ ...p, snap: { ...p.snap } })) };
+  return { ...c, ...snap, imageAlias: snap.imageAlias, imageFamily: snap.imageFamily, imageOn: true, chats: c.chats.map(p => ({ ...p, snap: { ...p.snap } })), images: c.images.map(p => ({ ...p, snap: { ...p.snap } })) };
 }
 export function trimBase(url: string): string { return url.trim().replace(/\/+$/, ''); }
 

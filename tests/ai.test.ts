@@ -234,3 +234,21 @@ test('Seedream family survives opaque endpoint profile persistence without leaki
   const restored = mergeAi(JSON.parse(JSON.stringify(config))); assert.equal(directImageConfig(restored, id)?.imageFamily, '4.5');
   switchImage(restored, old); assert.equal(restored.imageFamily, undefined); assert.equal(directImageConfig(restored, id)?.imageFamily, '4.5');
 });
+
+test('model aliases survive persistence, switch independently and never replace provider model IDs', async () => {
+  const { chatLabel, imageLabel, saveChat, saveImage, switchChat, switchImage, syncProfiles, pickChat, pickImage } = await import('../src/aiparse');
+  const c = mergeAi({});
+  const chat = saveChat(c, { ...pickChat(c), model: 'actual-layout-model', chatAlias: '我的排版助手' });
+  const image = saveImage(c, { ...pickImage(c), imageOn: true, imageEngine: 'ark', imageModel: 'doubao-seedream-5-0-260128', imageKey: 'fixture', imageAlias: '封面插画' });
+  syncProfiles(c); const restored = mergeAi(JSON.parse(JSON.stringify(c)));
+  assert.equal(chatLabel(pickChat(restored)), '我的排版助手'); assert.equal(imageLabel(pickImage(restored)), '封面插画');
+  assert.equal(restored.model, 'actual-layout-model'); assert.equal(restored.imageModel, 'doubao-seedream-5-0-260128');
+  const noAliasChat = saveChat(restored, { ...pickChat(restored), chatAlias: undefined, model: 'second-model' });
+  const noAliasImage = saveImage(restored, { ...pickImage(restored), imageAlias: undefined, imageModel: 'gpt-image-1', imageEngine: 'api' });
+  assert.equal(chatLabel(pickChat(restored)), 'second-model'); assert.equal(imageLabel(pickImage(restored)), 'gpt-image-1');
+  switchChat(restored, chat); switchImage(restored, image); assert.equal(restored.chatAlias, '我的排版助手'); assert.equal(restored.imageAlias, '封面插画');
+  switchChat(restored, noAliasChat); switchImage(restored, noAliasImage); assert.equal(restored.chatAlias, undefined); assert.equal(restored.imageAlias, undefined);
+  assert.equal(directImageConfig(restored, image)!.imageAlias, '封面插画');
+  saveImage(restored, { ...restored.images.find(p => p.id === image)!.snap, imageAlias: '插画改名' }, image); saveChat(restored, { ...restored.chats.find(p => p.id === chat)!.snap, chatAlias: '排版改名' }, chat);
+  assert.equal(restored.chatId, noAliasChat); assert.equal(restored.imageId, noAliasImage); assert.equal(restored.chatAlias, undefined); assert.equal(restored.imageAlias, undefined);
+});
