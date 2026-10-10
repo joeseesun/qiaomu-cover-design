@@ -994,3 +994,29 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
   .qc-gallery-clear { margin-left: 0; }
   .qc-gallery-footer > .qc-primary { margin-left: auto; }
 }
+.qc-gallery-modal .modal-header { height: 0; padding: 0; margin: 0; }
+.qc-gallery-tabs { padding-right: 32px; }
+.qc-gallery-hidden-modal { width: min(540px,90vw); }
+.qc-gallery-hidden-list { max-height: 55vh; overflow: auto; padding: 2px; }
+.qc-gallery-hidden-row { display: flex; align-items: center; gap: 12px; padding: 8px 2px; }
+.qc-gallery-hidden-row > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.qc-header-create .qc-gallery-trigger { margin: 0 0 0 4px; }
+.qc-draw-btn.is-active { background: var(--qc-hover); }
+/* Brush controls occupy their own row; no popup or overlay hides the artboard. */
+.qc-draw-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 16px; background: var(--qc-paper); flex-shrink: 0; }
+.qc-draw-bar[hidden] { display: none; }
+.qc-draw-colors, .qc-draw-widths { display: flex; align-items: center; gap: 6px; }
+.qc-root button.qc-draw-swatch { width: 24px; height: 24px; padding: 0; border-radius: 0; border: 1px solid color-mix(in srgb, var(--qc-ink) 20%, transparent); box-shadow: none; }
+.qc-root button.qc-draw-swatch[aria-pressed="true"] { outline: 2px solid var(--qc-ink); outline-offset: 2px; }
+.qc-draw-custom { width: 28px; margin: 0; }
+.qc-draw-custom > .qc-label, .qc-draw-custom .qc-swatches, .qc-draw-custom .qc-hex { display: none; }
+.qc-draw-custom .qc-color-top { gap: 0; }
+.qc-draw-custom .qc-color-trigger { width: 24px; height: 24px; position: relative; }
+.qc-draw-custom .qc-color-trigger::after { content: '+'; position: absolute; inset: 0; color: white; mix-blend-mode: difference; font-size: 18px; text-align: center; line-height: 22px; }
+.qc-root .qc-draw-widths input[type=number] { width: 56px; min-width: 56px; height: 28px; padding: 4px 6px; order: 1; }
+.qc-draw-unit { order: 2; font-size: 11px; color: var(--qc-muted); }
+.qc-root button.qc-draw-size { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.qc-draw-size > span:not(.qc-sr-only) { display: block; border-radius: 50%; background: var(--qc-ink); }
+.qc-root button.qc-draw-size[aria-pressed="true"] { background: var(--qc-hover); box-shadow: inset 0 0 0 1px var(--qc-line); }
+.qc-draw-done { margin-left: auto; }
+.qc-ink-preview { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }

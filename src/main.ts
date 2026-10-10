@@ -1,3 +1,4 @@
+import { COVER_ICON, registerCoverIcon } from './cover-icon';
 import { GalleryStore } from './gallery-store';
 import { GalleryDialog, type GalleryTab } from './gallery';
 import { ImageJobs } from './imagejobs';
@@ -59,6 +60,7 @@ export default class CoverPlugin extends Plugin {
   /** Deferred tabs (not opened since launch) hold a placeholder view, so only real cover views are touched. */
   repairOpenCovers(): void { for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) if (leaf.view instanceof CoverView) leaf.view.repairFonts(); }
   async onload(): Promise<void> {
+    registerCoverIcon();
     this.settings = mergeSettings(await this.loadData());
     this.gallery = new GalleryStore(this.app.vault.adapter, `${this.manifest.dir}/gallery`);
     this.imageJobs = new ImageJobs(new VaultImageJobStore(this.app.vault.adapter, `${this.manifest.dir}/image-jobs`), job => {
@@ -126,7 +128,7 @@ export default class CoverPlugin extends Plugin {
       if (!checking) { const s = view.saveSeries(); if (s) new Notice(this.t('seriesSaved', { name: s.name })); view.refreshDrawer(); }
       return true;
     } });
-    this.addRibbonIcon('image', this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
+    this.addRibbonIcon(COVER_ICON, this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
     this.settingsTab = new CoverSettings(this.app, this); this.addSettingTab(this.settingsTab);
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (file instanceof TFile && file.extension === 'md') menu.addItem(item => item.setTitle(this.t('fromNote')).setIcon('image').onClick(() => new NewCoverModal(this, file, file.basename).open()));

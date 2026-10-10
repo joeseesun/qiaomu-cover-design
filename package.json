@@ -18,7 +18,8 @@
     "package": "npm run build && node scripts/package.mjs"
   },
   "dependencies": {
-    "fabric": "7.4.0"
+    "fabric": "7.4.0",
+    "perfect-freehand": "1.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

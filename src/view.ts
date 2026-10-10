@@ -1,3 +1,5 @@
+import { COVER_ICON } from './cover-icon';
+import { bindDrawing, type DrawingInput } from './drawing';
 import { snapAxis, type SnapHit } from './snapping';
 import { bindMarquee } from './marquee';
 import { imageHash, type ImageSelection } from './imagejobs';
@@ -40,7 +42,7 @@ import { runOps } from './capabilities';
 import { Key } from './i18n';
 import type CoverPlugin from './main';
 import { renderDrawer, renderInspector, renderLayers, renameLayersDialog } from './panels';
-import { iconButton, textButton, toggleButton } from './ui';
+import { colorControl, quietName, iconButton, textButton, toggleButton } from './ui';
 import { ExportModal, RenameModal, SizeModal, ShortcutsModal, PickFile } from './modals';
 
 export const VIEW = 'qiaomu-cover-design';
@@ -74,6 +76,7 @@ export class CoverView extends FileView implements CoverApi {
   /** Conversation with the designer. It lives on the view so it survives drawer redraws. */
   pictureRequested = false;
   chatDraft = '';
+  private drawButton?: HTMLButtonElement; private drawBar?: HTMLElement; private drawing?: DrawingInput; private drawColor = '#111111'; private drawWidth = 8;
   imageDraft = ''; imageModelId = ''; directImageBusy = false;
   private imageDialog?: ImageGenerateDialog;
   chat: ChatMessage[] = []; busy = false; progress = ''; private centerEl?: HTMLElement; private progressEl?: HTMLElement; onChat?: () => void; /** Redraws the composer chip when the canvas pick changes. */ onSelection?: () => void; private lastPrompt = ''; currentPattern?: string; private lastSpec?: DesignSpec; palette?: import('./templates').Palette; private templateId?: string;
@@ -81,7 +84,7 @@ export class CoverView extends FileView implements CoverApi {
   constructor(leaf: WorkspaceLeaf, public plugin: CoverPlugin) { super(leaf); }
   getViewType(): string { return VIEW; }
   getDisplayText(): string { return this.file?.basename || this.plugin.t('open'); }
-  getIcon(): string { return 'image'; }
+  getIcon(): string { return COVER_ICON; }
   get doc(): Document { return this.contentEl.ownerDocument; }
   get win(): Window & typeof globalThis { return this.doc.defaultView as Window & typeof globalThis; }
   t(key: Key, params?: Record<string, string | number>): string { return this.plugin.t(key, params); }
@@ -90,6 +93,7 @@ export class CoverView extends FileView implements CoverApi {
 
   /* ---------- lifecycle ---------- */
   async onLoadFile(file: TFile): Promise<void> {
+    this.drawing?.dispose(); this.drawing = undefined;
     this.imageDialog?.close();
     const generation = ++this.generation; this.closingView = false; this.restoring = true; this.dirty = false;
     try {
@@ -113,6 +117,7 @@ export class CoverView extends FileView implements CoverApi {
     }
   }
   async onUnloadFile(): Promise<void> {
+    this.drawing?.dispose(); this.drawing = undefined;
     this.imageDialog?.close();
     this.closingView = true; this.clearTimers(); this.unsubscribeFonts?.(); this.unsubscribeFonts = undefined;
     const untouched = !!this.file && this.plugin.scratch.has(this.file.path) && this.revision === this.baseRevision;
@@ -166,6 +171,7 @@ export class CoverView extends FileView implements CoverApi {
 
   /* ---------- layout ---------- */
   private build(): void {
+    this.drawing?.dispose(); this.drawing = undefined;
     if (this.canvas) void this.canvas.dispose();
     if (this.resizeFrame !== undefined) this.win.cancelAnimationFrame(this.resizeFrame); this.resizeFrame = undefined;
     this.observer?.disconnect(); this.contentEl.empty();
@@ -182,9 +188,12 @@ export class CoverView extends FileView implements CoverApi {
     setIcon(imageIcon.createSpan('qc-image-sparkles-icon'), 'sparkles');
     generate.setAttribute('aria-label', this.t('aiGenerateImage'));
     for (const [category, zh, en, icon] of [['text', '文字', 'Text', 'type'], ['asset', '素材', 'Assets', 'smile-plus'], ['shape', '形状', 'Shapes', 'shapes']] as const) {
-      const button = textButton(create, this.zh ? zh : en, () => openInsertPopover(this, button, category), `qc-btn-sm qc-insert-btn qc-insert-${category}`, icon);
+      const button = textButton(create, this.zh ? zh : en, () => { this.setDrawing(false); openInsertPopover(this, button, category); }, `qc-btn-sm qc-insert-btn qc-insert-${category}`, icon);
       button.setAttribute('aria-label', this.zh ? zh : en);
     }
+    this.drawButton = textButton(create, this.zh ? '画笔' : 'Draw', () => this.setDrawing(!this.canvas?.isDrawingMode), 'qc-btn-sm qc-draw-btn', 'pen-tool');
+    this.drawButton.setAttribute('aria-pressed','false');
+    textButton(create,this.zh?'图库':'Image library',()=>{this.setDrawing(false);this.plugin.openGallery('images',this);},'qc-btn-sm qc-gallery-trigger','gallery-horizontal-end');
     const mid = tools.createDiv('qc-header-mid');
     this.undoBtn = iconButton(mid, 'undo-2', this.t('undo'), () => void this.action(() => this.travel(-1)));
     this.redoBtn = iconButton(mid, 'redo-2', this.t('redo'), () => void this.action(() => this.travel(1)));
@@ -196,7 +205,6 @@ export class CoverView extends FileView implements CoverApi {
     toggleButton(mid, 'magnet', this.t('snap'), g.snap, v => { g.snap = v; this.guidesChanged(); });
     const right = header.createDiv('qc-header-right');
     this.statusEl = right.createSpan({ cls: 'qc-status' });
-    iconButton(right, 'gallery-horizontal-end', this.zh ? '图库' : 'Image library', () => this.plugin.openGallery('images',this), 'qc-gallery-trigger');
     iconButton(right, 'more-horizontal', this.t('more'), e => this.moreMenu(e));
     const copyBtn = textButton(right, this.zh ? '复制' : 'Copy', () => void this.copyToClipboard(copyBtn), 'qc-btn-sm', 'copy');
     copyBtn.setAttribute('aria-label', this.zh ? '复制图片到剪贴板，可直接粘贴到别的应用（⌘⇧C）' : 'Copy the image to the clipboard (⌘⇧C)');
@@ -207,6 +215,7 @@ export class CoverView extends FileView implements CoverApi {
     const main = root.createDiv('qc-main');
     this.drawerEl = main.createDiv('qc-drawer');
     const center = main.createDiv('qc-center'); this.centerEl = center;
+    this.drawBar = center.createDiv('qc-draw-bar'); this.drawBar.hidden = true; this.drawingOptions();
     this.stage = center.createDiv('qc-stage'); this.stage.tabIndex = 0;
     const element = this.stage.createEl('canvas');
     const win = this.win;
@@ -214,6 +223,7 @@ export class CoverView extends FileView implements CoverApi {
     this.canvas = new Canvas(element, { width: design.width, height: design.height, backgroundColor: '#ffffff', preserveObjectStacking: true, selectionColor: 'rgba(13,153,255,0.10)', selectionBorderColor: '#0d99ff', selectionLineWidth: 1, uniformScaling: true });
     Object.assign(FabricObject.ownDefaults, { cornerStyle: 'circle', cornerColor: '#ffffff', cornerStrokeColor: '#0d99ff', borderColor: '#0d99ff', transparentCorners: false, cornerSize: 10, touchCornerSize: 24, padding: 3, borderScaleFactor: 1.5, originX: 'left', originY: 'top' });
     this.bindCanvas();
+    this.drawing = bindDrawing(this.stage, this.canvas, () => ({ color: this.drawColor, width: this.drawWidth }));
     const wrapper = this.canvas.wrapperEl;
     // Clicking the grey area around the artboard deselects, like every design tool. Panels on either side keep the selection because they edit it.
     this.register(bindMarquee(this.stage, this.canvas, design.width, design.height));
@@ -313,12 +323,40 @@ export class CoverView extends FileView implements CoverApi {
   /* ---------- canvas events ---------- */
   private bindCanvas(): void {
     const c = this.canvas!;
+    c.on('before:path:created',()=>this.commitHistory());
+    c.on('path:created',e=>{(e.path as QObject).qcName=this.zh?'笔迹':'Brush stroke';this.changed();this.commitHistory();void this.flush();});
     c.on('object:modified', () => this.changed()); c.on('object:added', () => this.changed()); c.on('object:removed', () => this.changed());
     c.on('text:changed', e => { const t = e.target as (Textbox & QObject) | undefined; if (t) { t.splitByGrapheme = hasCjk(t.text); this.rehug(t); } this.changed(); });
     for (const ev of ['selection:created', 'selection:updated', 'selection:cleared'] as const) c.on(ev, () => { this.refreshInspector(true); this.onSelection?.(); });
     c.on('object:moving', e => { if (this.plugin.settings.guides.snap && e.target) this.snapMove(e.target); });
     c.on('mouse:up', () => this.clearSnap()); c.on('mouse:down', () => this.clearSnap());
     c.on('text:editing:exited', () => this.refreshInspector(true));
+  }
+  private setDrawing(active: boolean): void {
+    const c = this.canvas; if (!c || !this.drawing || c.isDrawingMode === active) return;
+    this.drawing.setActive(active);
+    this.drawButton?.setAttribute('aria-pressed', String(active)); this.drawButton?.classList.toggle('is-active', active);
+    if (this.drawBar) this.drawBar.hidden = !active;
+    if (active) { this.commitHistory(); c.discardActiveObject(); this.clearSnap(); }
+    else this.drawBar?.querySelectorAll('.qc-color-trigger[aria-expanded="true"]').forEach(() => this.doc.querySelector('.qc-color-popover')?.dispatchEvent(new this.win.Event('qc-close')));
+    c.requestRenderAll(); if (this.zoom === 'fit') this.applyZoom(); this.stage?.focus({ preventScroll: true });
+  }
+  private drawingOptions(): void {
+    const bar = this.drawBar; if (!bar) return;
+    bar.empty(); bar.setAttribute('role', 'toolbar'); quietName(bar, this.zh ? '画笔设置' : 'Brush settings');
+    const colors = bar.createDiv('qc-draw-colors'); quietName(colors, this.zh ? '画笔颜色' : 'Brush color');
+    const sync = (): void => { for (const el of Array.from(colors.querySelectorAll<HTMLButtonElement>('[data-color]'))) el.setAttribute('aria-pressed', String(el.dataset.color === this.drawColor)); };
+    for (const [color, zh, en] of [['#111111', '黑色', 'Black'], ['#ffffff', '白色', 'White'], ['#e11d2e', '红色', 'Red'], ['#f97316', '橙色', 'Orange'], ['#ffe04b', '黄色', 'Yellow'], ['#16a34a', '绿色', 'Green'], ['#2563eb', '蓝色', 'Blue'], ['#7c3aed', '紫色', 'Purple']]) {
+      const b = colors.createEl('button', { cls: 'qc-draw-swatch', attr: { type: 'button', 'data-color': color! } }); b.style.backgroundColor = color!; quietName(b, this.zh ? zh! : en!); b.addEventListener('click', () => { this.drawColor = color!; sync(); });
+    }
+    const custom = colorControl(bar, this.zh ? '自定义颜色' : 'Custom color', this.drawColor, color => { this.drawColor = color; sync(); }, { zh: this.zh, doc: this.doc }); custom.addClass('qc-draw-custom');
+    const widths = bar.createDiv('qc-draw-widths'); quietName(widths, this.zh ? '画笔粗细' : 'Brush width');
+    const input = widths.createEl('input', { type: 'number', attr: { min: '1', max: '100', step: '1' } }); input.value = String(this.drawWidth); quietName(input, this.zh ? '粗细（画布像素）' : 'Width in canvas pixels', widths);
+    const syncWidth = (): void => { input.value = String(this.drawWidth); for (const el of Array.from(widths.querySelectorAll<HTMLButtonElement>('[data-width]'))) el.setAttribute('aria-pressed', String(Number(el.dataset.width) === this.drawWidth)); };
+    for (const width of [3, 8, 16]) { const b = widths.createEl('button', { cls: 'qc-draw-size', attr: { type: 'button', 'data-width': String(width) } }); const dot = b.createSpan(); dot.style.width = `${width}px`; dot.style.height = `${width}px`; quietName(b, `${width} px`); b.addEventListener('click', () => { this.drawWidth = width; syncWidth(); }); }
+    widths.createSpan({ text: 'px', cls: 'qc-draw-unit' });
+    input.addEventListener('input', () => { const n = Number(input.value); if (input.value && Number.isFinite(n) && n >= 1 && n <= 100) { this.drawWidth = n; for (const el of Array.from(widths.querySelectorAll<HTMLButtonElement>('[data-width]'))) el.setAttribute('aria-pressed', String(Number(el.dataset.width) === n)); } });
+    textButton(bar, this.zh ? '完成' : 'Done', () => this.setDrawing(false), 'qc-btn-sm qc-draw-done', 'check'); sync(); syncWidth();
   }
   private registerStageEvents(): void {
     const stage = this.stage!;
@@ -345,6 +383,7 @@ export class CoverView extends FileView implements CoverApi {
     if (image) void this.action(() => this.importImage(image)); else void this.action(() => this.pasteObjects());
   }
   private contextMenu(e: MouseEvent): void {
+    this.setDrawing(false);
     const c = this.canvas; if (!c || this.restoring) return;
     const hit = c.findTarget(e).target;
     if (hit && hit !== c.getActiveObject() && !c.getActiveObjects().includes(hit)) { c.setActiveObject(hit); c.requestRenderAll(); }
@@ -493,6 +532,7 @@ export class CoverView extends FileView implements CoverApi {
     });
   }
   async travel(direction: -1 | 1): Promise<void> {
+    this.drawing?.finish();
     this.commitHistory();
     const snapshot = this.history.step(direction); if (!snapshot || !this.canvas) return;
     const d = this.codec.decode(snapshot); this.restoring = true;
@@ -1833,6 +1873,7 @@ export class CoverView extends FileView implements CoverApi {
     } finally { bitmap.close(); }
   }
   openImageGenerator(target?: FabricImage, context?: ImageGenerationContext): void {
+    this.setDrawing(false);
     if (this.imageDialog) return;
     const dialog = new ImageGenerateDialog(this, () => { if (this.imageDialog === dialog) this.imageDialog = undefined; }, target, context);
     this.imageDialog = dialog; dialog.open();
@@ -1994,8 +2035,9 @@ export class CoverView extends FileView implements CoverApi {
     else if (mod && k === ']') run = () => this.order(event.shiftKey ? 'front' : 'forward');
     else if (mod && k === '[') run = () => this.order(event.shiftKey ? 'back' : 'backward');
     else if (mod && k === 'l') run = () => this.toggleLock();
-    else if (!mod && event.key === 'Escape') run = () => { this.canvas?.discardActiveObject(); this.canvas?.requestRenderAll(); };
+    else if (!mod && event.key === 'Escape') run = () => { this.setDrawing(false); this.canvas?.discardActiveObject(); this.canvas?.requestRenderAll(); };
     else if (!mod && event.key === 'Delete' || event.key === 'Backspace') run = () => this.removeSelection();
+    else if (!mod && !event.altKey && k === 'b') run=()=>this.setDrawing(!this.canvas?.isDrawingMode);
     else if (!mod && !event.altKey && k === 't') run = () => { this.addText(); };
     else if (!mod && !event.altKey && k === 'r') run = () => { this.addShape('rect'); };
     else if (!mod && !event.altKey && k === 'o') run = () => { this.addShape('circle'); };
