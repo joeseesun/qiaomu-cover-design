@@ -1,6 +1,16 @@
-# Qiaomu Cover Design · 乔木封面设计
+# Qiaomu Design · 乔木设计
 
-在 Obsidian 中，把笔记标题和选文做成封面。离线编辑，设计文件与 PNG 都保存在你的库内。
+Previously Qiaomu Cover Design. The plugin ID and `.qcover` format stay the same, so existing designs, model settings and image history continue to work.
+
+Create editable covers and posters inside Obsidian. Use platform presets for Xiaohongshu, YouTube, Bilibili, WeChat, X and more; add text, shapes, offline stickers and icons, draw smooth strokes, and export PNG/JPEG/WebP. Designs are saved as `.qcover` files in your vault, with undo/redo, named layers, groups and selection tools.
+
+Optional AI tools compose copy and layouts, generate images, or edit selected images/elements. Configure your own Codex CLI or supported cloud provider (including Seedream and Jimeng); generation stays visible until you choose to send it to the background. Review results before inserting or replacing anything. Gallery combines generated/uploaded pictures, image jobs, local-folder references and Unsplash photos. Bulk deletion asks for confirmation; local-folder pictures are only hidden from Gallery.
+
+**Desktop only; Obsidian 1.11.4 or newer.** Offline editing needs no account. Cloud AI requires your own provider account and may incur charges. Unsplash requires your own Access Key or proxy. The plugin is free; optional donations do not unlock features. Opening About loads the author’s follow/donation QR images from radio.qiaomu.ai. No client telemetry is collected. Network requests occur for the default font library (GitHub/jsDelivr), configured AI providers (prompts and selected reference images), and Unsplash (search, photos and required download tracking). Custom endpoints/proxies are user supplied. Codex CLI runs a local process using your configured account. Local-folder browsing, system export and CLI work may access files outside the vault; folder browsing is shallow, ignores symlinks and never deletes originals.
+
+Install from the [GitHub release](https://github.com/joeseesun/qiaomu-cover-design/releases/tag/0.2.1), or use the official directory once its review and listing are available. For manual installation, extract the complete ZIP into `.obsidian/plugins/`; preserve `data.json`, `gallery/`, `image-jobs/`, custom fonts and caches when upgrading. The official installer needs only the three root plugin assets; stickers/icons are embedded in `main.js`, and fonts are fetched with SHA-256 verification on first use.
+
+在 Obsidian 中，把笔记标题和选文做成封面。离线编辑，设计文件与导出图片都保存在你的库内。
 
 基于 [cover4xiaohongshu](https://github.com/joeseesun/cover4xiaohongshu) 改造，保留上游 Git 历史；插件代码采用原生 Obsidian FileView 与 Fabric.js 7 重新实现。[原项目分析与功能映射](docs/ANALYSIS.md)。
 
@@ -10,7 +20,7 @@
 
 - **平台预设**：小红书 3:4 / 1:1、YouTube 缩略图、B 站、抖音 / 视频号、公众号头图、X 封面等；切换平台时内容按比例适配，并可显示平台安全区（时长标签、数据条等会遮挡的区域）。
 - **默认字库**：随插件提供 34 个精选开源字体（思源黑体 / 宋体三字重、朱雀仿宋、霞鹜文楷、得意黑、抖音美好体、未来荧黑、江城圆体等中文字体，以及 Inter、Fraunces、Instrument Serif 等英文字体），覆盖《通用规范汉字表》8105 字，全部 SIL OFL 授权，装好即用，不需要装进电脑系统。模板与 AI 以 12 套「字体搭配」排版。也能使用本机字体、导入 TTF / OTF / WOFF / WOFF2，或在字体库一键下载更多。
-- **10 个模板**，套用时保留你的标题与副标题；文字预设（荧光笔、描边、投影、标签）、形状、本地 / 库内 / 粘贴 / 拖入图片（超大图自动压缩）。
+- **多种模板**，套用时保留你的标题与副标题；文字预设（荧光笔、描边、投影、标签）、形状、本地 / 库内 / 粘贴 / 拖入图片（超大图自动压缩）。
 - 文字：字重、斜体、行高、字距、描边、阴影、底色；图片圆角、翻转、铺满；纯色与渐变背景；吸附参考线、对齐、图层拖拽排序、锁定、复制粘贴、右键菜单。
 - **导出**：PNG / JPEG / WebP，1–3 倍，超出平台限制（如 YouTube 2MB）自动压缩；位置可选库内文件夹、笔记所在文件夹或系统文件夹；文件名模板；导出后可插入笔记、写入 `cover` 属性、复制到剪贴板。
 - **对话面板**：所有操作已抽象为指令协议，当前提供离线中文 / 英文指令；其他插件可通过 `registerAssistant` 接入模型。
@@ -18,7 +28,7 @@
 
 ## 安装与使用
 
-开发源码在 `main`；测试候选安装包保留为草稿 Release，官方预扫描完成后才公开。
+开发源码在 `main`；发布经过官方预扫描与安装验收，GitHub Release 和官方目录审核状态分别核验。
 
 开发版本安装：检出 `main` 分支，运行 `npm ci && npm run build`，将根目录的 `main.js`、`manifest.json`、`styles.css` 放入库的 `.obsidian/plugins/qiaomu-cover-design/`，在第三方插件中启用。
 
@@ -32,9 +42,9 @@
 
 不收集遥测。离线编辑不上传画布；字体库下载、Unsplash 搜索与用户主动提交的 AI 请求会联网。图片编辑会将所选参考图片发送给指定模型。只接受 PNG/JPEG/WebP，导入单张不超过 25MB，图片内嵌于设计文件，可随库同步。设计中远程图片和 SVG 地址会被拒绝。系统文件夹导出与 Codex CLI 使用桌面端本机能力。
 
-默认字库首次打开时在后台静默下载（约 31 MB，来自 [qiaomu-cover-fonts](https://github.com/joeseesun/qiaomu-cover-fonts) 经 jsDelivr 分发，GitHub 兜底），逐个校验 SHA-256 后存入插件目录，之后离线可用；下载失败的字体下次打开自动补，期间用系统字体兜底。完整安装包已自带字库，无需下载。导入的字体存在库内并随库同步，系统字体换设备时可能不同。首版仅支持桌面端，最低 Obsidian 1.8.7。语言设置在重新打开设计标签页后生效。剪贴板取决于系统权限，失败时可使用 PNG 导出。
+默认字库首次打开时在后台静默下载（约 31 MB，来自 [qiaomu-cover-fonts](https://github.com/joeseesun/qiaomu-cover-fonts) 经 jsDelivr 分发，GitHub 兜底），逐个校验 SHA-256 后存入插件目录，之后离线可用；下载失败的字体下次打开自动补，期间用系统字体兜底。完整安装包已自带字库，无需下载。导入的字体存在库内并随库同步，系统字体换设备时可能不同。首版仅支持桌面端，最低 Obsidian 1.11.4。语言设置在重新打开设计标签页后生效。剪贴板取决于系统权限，失败时可使用 PNG 导出。
 
-支持 AI 文案与版式候选、按需生成主体/背景图、Unsplash 搜索及内置字体；未移植网页的公开分享、手绘和路径编辑等全部能力。当前仍处于开发候选阶段，未提交或通过 Obsidian 官方目录审核。
+支持 AI 文案与版式候选、独立生图与选区改图、图库、自由绘制及内置字体。未提供公开分享或矢量路径节点编辑。官方审核状态以社区目录为准；本地安装或 GitHub 发布不代表已经进入客户端目录。
 
 ## 开发
 
@@ -53,14 +63,14 @@ MIT © 向阳乔木。
 
 ## AI 设计师（一句话出整版封面）
 
-设置 → AI 设计师里填入 OpenAI 兼容接口或 Claude 的地址、密钥和模型名，即可在左侧「AI 设计」里粘贴一段话：模型会选平台、模板、文案和配色并自动排版；开启生图后还会生成背景或图位配图。内置 18 个模板（含数字干货、油管冲击、B 站热血、对比、金句卡、新粗野等）和按平台分组的起手提示词。命令「用 AI 把当前笔记 / 选中文字做成封面」可直接从笔记生成。
+设置 → AI 设计师里填入 OpenAI 兼容接口或 Claude 的地址、密钥和模型名，即可在左侧「AI 设计」里粘贴一段话：模型会选平台、模板、文案和配色并自动排版；开启生图后还会生成背景或图位配图。内置多种模板（含数字干货、油管冲击、B 站热血、对比、金句卡、新粗野等）和按平台分组的起手提示词。命令「用 AI 把当前笔记 / 选中文字做成封面」可直接从笔记生成。
 
 模型只能返回有限的画布指令（不能导出、读写文件）；文字与画布摘要只会发送到你填写的地址。不接入模型时插件完全离线。
 
 
 ## Offline asset pack
 
-`assets/pack.json.gz` (Fluent Emoji Flat stickers, MIT, and Lucide line icons, ISC) must be installed beside `main.js` as `assets-pack.json.gz`. Rebuild it with `python3 scripts/build-asset-pack.py`.
+`assets/pack.json.gz` (Fluent Emoji Flat stickers, MIT, and Lucide line icons, ISC/MIT) is embedded in `main.js` for official installs. The full ZIP also contains `assets-pack.json.gz`. Insertion works offline; full license notices are included in the production bundle and `asset-licenses/`. Rebuild the pack with `python3 scripts/build-asset-pack.py`.
 
 
 ## Bundled fonts

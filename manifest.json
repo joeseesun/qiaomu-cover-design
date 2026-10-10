@@ -1,9 +1,9 @@
 {
   "id": "qiaomu-cover-design",
-  "name": "Qiaomu Cover Design",
+  "name": "Qiaomu Design",
   "version": "0.2.1",
-  "minAppVersion": "1.8.7",
-  "description": "Design covers for Xiaohongshu, YouTube and Bilibili with platform presets, local fonts and flexible export.",
+  "minAppVersion": "1.11.4",
+  "description": "Create editable covers and posters with AI image tools, an image gallery, freehand drawing, local fonts and flexible export.",
   "author": "向阳乔木",
   "authorUrl": "https://github.com/joeseesun",
   "isDesktopOnly": true

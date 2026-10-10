@@ -223,7 +223,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
   const syncInput = (): void => {
     if (!input.isConnected) return;
     view.chatDraft = input.value;
-    input.style.height = 'auto';
+    input.style.removeProperty('height');
     input.style.height = `${Math.min(180, input.scrollHeight)}px`;
     send.disabled = view.busy || view.restoring || !input.value.trim();
   };
@@ -305,7 +305,7 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
         view.win.requestAnimationFrame(() => { strip.scrollLeft = m.variantScroll ?? 0; });
         for (const v of m.variants) {
           const card = strip.createEl('button', { cls: 'qc-variant', attr: { type: 'button' } }); const image = card.createEl('img', { attr: { src: v.url, alt: v.label, draggable: 'false' } });
-          image.addEventListener('load', () => { if (image.naturalWidth > image.naturalHeight) card.style.flexBasis = '176px'; }); card.createSpan({ text: v.label });
+          image.addEventListener('load', () => { card.toggleClass('qc-variant-landscape', image.naturalWidth > image.naturalHeight); }); card.createSpan({ text: v.label });
           card.classList.toggle('is-active', !!v.selected); card.setAttribute('aria-pressed', String(!!v.selected)); card.disabled = view.busy;
           card.addEventListener('click', () => void view.chooseVariant(m, v));
         }

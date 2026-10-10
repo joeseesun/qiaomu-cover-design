@@ -26,7 +26,7 @@ export class CoverSettings extends PluginSettingTab {
   display(): void {
     const el = this.containerEl; el.empty(); el.addClass('qc-settings'); this.off?.();
     const head = el.createDiv('qc-settings-head'); const id = head.createDiv('qc-settings-identity');
-    setIcon(id.createSpan(), 'image'); id.createSpan({ text: 'Qiaomu Cover Design', cls: 'qc-settings-name' }); id.createSpan({ text: `v${this.plugin.manifest.version}`, cls: 'qc-settings-version' });
+    setIcon(id.createSpan(), 'image'); id.createSpan({ text: this.plugin.manifest.name, cls: 'qc-settings-name' }); id.createSpan({ text: `v${this.plugin.manifest.version}`, cls: 'qc-settings-version' });
     const tabs = head.createDiv('qc-settings-tabs'); tabs.setAttribute('role', 'tablist');
     for (const { id: tab, icon } of TABS) {
       const b = tabs.createEl('button', { cls: 'qc-settings-tab', attr: { type: 'button', role: 'tab', 'aria-selected': String(this.tab === tab) } });
@@ -55,7 +55,7 @@ export class CoverSettings extends PluginSettingTab {
     this.folderRow(basics, t('designFolder'), t('designFolderDesc'), () => s.designFolder, v => { s.designFolder = v; });
     const ui = section(body, zh ? '界面' : 'Interface');
     new Row(ui, zh ? '顶部插入工具' : 'Top insertion tools', zh ? '仅图标更简洁；悬停查看名称。图标和文字更适合初次使用。' : 'Icons keep the toolbar compact; hover for labels. Text labels help you learn the tools.').addDropdown(d => d.addOptions(zh ? { icons: '仅图标', labels: '图标和文字' } : { icons: 'Icons only', labels: 'Icons and text' }).setValue(s.toolbarLabels ? 'labels' : 'icons').onChange(value => { s.toolbarLabels = value === 'labels'; this.save(); for (const leaf of this.app.workspace.getLeavesOfType('qiaomu-cover-design')) (leaf.view as { refreshToolbar?: () => void }).refreshToolbar?.(); }));
-    const photos = section(body, zh ? '背景图素材' : 'Background photos', zh ? '在顶部“插入其他 → 背景图”里搜索 Unsplash 的免费摄影。需要你自己的免费 Access Key。' : 'Search Unsplash photos from More → Photos. Needs your own free Access Key.');
+    const photos = section(body, zh ? '图库照片' : 'Gallery photos', zh ? '在图库的 Unsplash 页签浏览推荐照片或搜索。使用自己的免费 Access Key 或代理。' : 'Browse recommended photos or search in Gallery → Unsplash. Use your own free Access Key or proxy.');
     const keyRow = new Row(photos, 'Unsplash Access Key', zh ? '在 unsplash.com/developers 免费申请；只保存在 Obsidian 密钥库中。' : 'Get one free at unsplash.com/developers; stored in Obsidian\'s secret storage.');
     try { new SecretComponent(this.app, keyRow.control).setValue(s.unsplashSecret).onChange(v => { s.unsplashSecret = v; this.save(); }); } catch { keyRow.setDesc(zh ? '当前 Obsidian 版本不支持密钥库（需要 1.11.4+）。' : 'Needs Obsidian 1.11.4 or newer.'); }
     new Row(photos, zh ? 'Unsplash 代理地址（可选）' : 'Unsplash proxy (optional)', zh ? '填了就不需要密钥：由你部署的代理（见 server/unsplash-proxy.js）持有密钥，适合团队或公开分发。' : 'Set this instead of a key: your own proxy holds the key (see server/unsplash-proxy.js).').addText(x => x.setPlaceholder('https://…workers.dev').setValue(s.unsplashProxy).onChange(v => { const u = v.trim(); if (!u || /^https:\/\//.test(u)) { s.unsplashProxy = u; this.save(); x.inputEl.removeClass('qc-invalid'); } else x.inputEl.addClass('qc-invalid'); }));
@@ -204,7 +204,7 @@ export class CoverSettings extends PluginSettingTab {
       if (icon) setIcon(a.createSpan({ attr: { 'aria-hidden': 'true' } }), icon); a.createSpan({ text: label }); return a;
     };
     const hero = body.createDiv('qcs-about-hero'); const rel = hero.createDiv('qcs-about-release');
-    rel.createSpan({ text: zh ? '当前版本' : 'Version', cls: 'qcs-about-label' }); rel.createSpan({ text: `Qiaomu Cover Design  v${this.plugin.manifest.version}`, cls: 'qcs-about-version' });
+    rel.createSpan({ text: zh ? '当前版本' : 'Version', cls: 'qcs-about-label' }); rel.createSpan({ text: `${this.plugin.manifest.name}  v${this.plugin.manifest.version}`, cls: 'qcs-about-version' });
     const actions = hero.createDiv('qcs-about-actions');
     link(actions, zh ? '更新日志' : 'Changelog', `${repo}/releases`, 'history'); link(actions, zh ? '反馈问题' : 'Report a bug', `${repo}/issues/new`, 'bug'); link(actions, zh ? '使用说明' : 'Readme', `${repo}#readme`, 'book-open');
     const help = section(body, t('s_help'));

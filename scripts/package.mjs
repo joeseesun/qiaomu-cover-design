@@ -12,6 +12,7 @@ try {
   for (const file of ['main.js', 'manifest.json', 'styles.css', 'LICENSE', 'THIRD_PARTY.md']) cpSync(file, join(folder, file));
   cpSync('assets/fonts', join(folder, 'fonts'), { recursive: true });
   cpSync('assets/pack.json.gz', join(folder, 'assets-pack.json.gz'));
+  cpSync('assets/licenses', join(folder, 'asset-licenses'), { recursive: true });
   rmSync(output, { force: true });
   execFileSync('zip', ['-qr', output, id], { cwd: staging });
   console.log(output);

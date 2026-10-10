@@ -246,7 +246,7 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-empty-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--qc-surface); box-shadow: 0 0 0 1px var(--qc-line); color: var(--qc-muted); margin-bottom: 6px; }
 .qc-empty-icon svg { width: 17px; height: 17px; }
 .qc-chat-empty h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; } .qc-chat-empty p { margin: 0 0 8px; color: var(--qc-muted); line-height: 1.6; font-size: 12.5px; }
-.qc-chip { width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; color: var(--qc-muted); font-size: 12.5px; box-shadow: 0 0 0 1px var(--qc-line) !important; white-space: normal; }
+.qc-chip { width: 100%; padding: 8px 10px; border-radius: 8px; color: var(--qc-muted); font-size: 12.5px; box-shadow: 0 0 0 1px var(--qc-line) !important; white-space: normal; }
 .qc-chip:hover { color: var(--qc-ink); background: var(--qc-hover); }
 .qc-msg { max-width: 92%; line-height: 1.6; font-size: 13px; }
 .qc-msg-user { align-self: flex-end; background: var(--qc-surface); padding: 8px 12px; border-radius: 14px; }
@@ -275,7 +275,7 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-starter-tab { padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--qc-muted); box-shadow: 0 0 0 1px var(--qc-line) !important; }
 .qc-starter-tab.is-active { background: var(--qc-ink) !important; color: var(--qc-paper) !important; box-shadow: none !important; }
 .qc-starter-list { display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.qc-starter { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; white-space: normal; box-shadow: 0 0 0 1px var(--qc-line) !important; }
+.qc-starter { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; width: 100%; padding: 8px 10px; border-radius: 8px; white-space: normal; box-shadow: 0 0 0 1px var(--qc-line) !important; }
 .qc-starter:hover { background: var(--qc-hover); }
 .qc-starter-name { font-weight: 600; font-size: 12.5px; }
 .qc-starter-text { color: var(--qc-muted); font-size: 11.5px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1022,3 +1022,7 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-ink-preview { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 .qc-modal button.qc-gallery-delete { width: 30px; height: 30px; min-height: 30px; padding: 6px; flex: 0 0 auto; }
+
+/* Runtime state for preview orientation and native screen sampling. */
+.qc-variant.qc-variant-landscape { flex-basis: 176px; }
+.qc-color-popover.qc-color-sampling { visibility: hidden; }
