@@ -164,7 +164,7 @@ const T = {
   chatChanges: ['已完成 {n} 项调整', '{n} changes applied'],
   thinking: ['正在设计…', 'Designing…'], retry: ['换一版', 'Another take'], retryHint: ['请换一个不同的模板和配色再设计一版。', 'Design another version with a different template and palette.'], exportShort: ['导出', 'Export'],
   briefPrefix: ['把下面这段内容做成封面，标题、模板和配色都由你决定：', 'Turn the following into a cover. You decide the headline, template and colours:'],
-  imageStyle: ['配图风格', 'Picture style'], imageSkipped: ['配图已跳过：还没开启 AI 配图。到设置里打开“让 AI 给封面配图”。', 'Picture skipped: AI pictures are off. Turn on “Let AI add pictures” in settings.'], imageFailed: ['配图没成功：{message}。版面已完成，可以稍后再试。', 'The picture did not work: {message}. The layout is done; try again later.'], imageDropped: ['封面已关闭，配图已丢弃。', 'The cover was closed; the picture was discarded.'],
+  imageStyle: ['配图风格', 'Picture style'], imageSkipped: ['配图已跳过：请先在设置里添加生图模型，并在本次请求中选择配图。', 'Picture skipped: add an image model in settings and opt into pictures for this request.'], imageFailed: ['配图没成功：{message}。版面已完成，可以稍后再试。', 'The picture did not work: {message}. The layout is done; try again later.'], imageDropped: ['封面已关闭，配图已丢弃。', 'The cover was closed; the picture was discarded.'],
   recommended: ['推荐', 'fits'], renameDesign: ['重命名设计…', 'Rename design…'],
   aiModel: ['对话模型', 'Chat model'], aiModelDesc: ['负责理解你的话并决定排版。任何 OpenAI 兼容服务或 Claude 都可以。', 'Understands your request and decides the layout. Any OpenAI-compatible service or Claude works.'],
   aiProvider: ['服务商', 'Provider'], aiBase: ['API 地址', 'API address'], aiKey: ['API 密钥', 'API key'], aiKeyDesc: ['保存在本插件的本地数据里（.obsidian/plugins 下），不会写入设计文件。若同步 .obsidian 目录请留意。', 'Stored in this plugin’s local data (under .obsidian/plugins), never in design files. Mind it if you sync the .obsidian folder.'],

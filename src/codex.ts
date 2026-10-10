@@ -158,3 +158,42 @@ export async function detectCodex(custom: string): Promise<CodexInfo> {
   const version = await new Promise<string | undefined>(resolve => { cp.execFile(path, ['--version'], { timeout: 6000 }, (err, out) => resolve(err ? undefined : String(out).trim().replace(/^codex(-cli)?\s*/i, ''))); });
   return { path, version };
 }
+
+/** Account state comes from the CLI, which owns OAuth credentials and refreshes them. */
+async function accountRequest(custom: string, method: string, params: unknown): Promise<Record<string, unknown>> {
+  const sess = session(findCodex(custom)); clearTimeout(sess.idle); sess.busy++;
+  try { await sess.ready; return await sess.rpc.request(method, params); }
+  finally { if (--sess.busy <= 0 && shared === sess) sess.idle = setTimeout(shutdownCodex, IDLE_MS); }
+}
+export async function codexAccount(custom: string): Promise<{ signedIn: boolean; label: string }> {
+  const reply = await accountRequest(custom, 'account/read', { refreshToken: false });
+  const account = reply.account as { type?: string; email?: string } | null;
+  return { signedIn: !!account, label: account?.type === 'chatgpt' ? account.email || 'ChatGPT' : account?.type === 'apiKey' ? 'API key' : '' };
+}
+export async function codexModels(custom: string): Promise<{ id: string; name?: string }[]> {
+  const reply = await accountRequest(custom, 'model/list', { limit: 100 });
+  return ((reply.data ?? []) as { model: string; displayName?: string; hidden?: boolean }[]).filter(m => !m.hidden).map(m => ({ id: m.model, name: m.displayName }));
+}
+const loginCancels = new Set<() => void>();
+export function cancelCodexLogins(): void { for (const cancel of loginCancels) cancel(); }
+/** A separate process keeps cancelling a login from interrupting an active design turn. */
+export async function startCodexLogin(custom: string): Promise<import('./authflow').LoginHandle<void>> {
+  const os = nodeRequire()('os') as typeof import('os'); const rpc = new Rpc(findCodex(custom), os.tmpdir());
+  let loginId = ''; let settled = false; let timer: ReturnType<typeof setTimeout> | undefined;
+  let resolve!: () => void; let reject!: (e: Error) => void;
+  const result = new Promise<void>((ok, fail) => { resolve = ok; reject = fail; }); void result.catch(() => undefined);
+  const clean = (): void => { clearTimeout(timer); offNote(); offClose(); loginCancels.delete(cancel); rpc.stop(); };
+  const finish = (error?: string): void => { if (settled) return; settled = true; clean(); if (error) reject(new Error(error)); else resolve(); };
+  const cancel = (): void => { if (settled) return; if (loginId) void rpc.request('account/login/cancel', { loginId }, 1000).catch(() => undefined); finish('login-cancelled'); };
+  const offNote = rpc.listen((method, params) => { if (method === 'account/login/completed' && params.loginId === loginId) finish(params.success ? undefined : 'login-failed'); });
+  const offClose = rpc.whenClosed(() => finish('login-process-closed'));
+  loginCancels.add(cancel);
+  try {
+    await rpc.request('initialize', { clientInfo: { name: 'qiaomu_cover_design', title: 'Qiaomu Cover Design', version: '0.2.1' } }); rpc.notify('initialized');
+    const started = await rpc.request('account/login/start', { type: 'chatgpt' });
+    loginId = String(started.loginId ?? ''); const url = String(started.authUrl ?? '');
+    if (!loginId || !url.startsWith('https://auth.openai.com/')) throw new Error('login-invalid-url');
+    timer = setTimeout(() => finish('login-timeout'), 5 * 60_000);
+    return { url, result, cancel };
+  } catch (error) { finish('login-failed'); throw error; }
+}

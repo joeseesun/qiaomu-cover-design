@@ -167,7 +167,7 @@ test('old flat settings become the first saved models, and models can be added, 
   switchChat(c, first); assert.equal(c.model, 'deepseek-chat'); assert.equal(c.apiKey, 'k1');
   switchChat(c, second); assert.equal(c.model, 'other'); assert.equal(c.apiKey, 'k2');
   removeChat(c, second); assert.equal(c.chats.length, 1); assert.equal(c.model, 'deepseek-chat');
-  removeChat(c, c.chatId); assert.equal(c.chats.length, 1); // the last one stays
+  removeChat(c, c.chatId); assert.equal(c.chats.length, 0); assert.equal(c.chatId, ''); assert.equal(aiReady(c), false); // removing the last model clears its credentials
   const img = addImage(c); c.imageEngine = 'ark'; c.imageModel = 'doubao-seedream-4-0-250828'; c.imageKey = 'ak'; syncProfiles(c); switchImage(c, c.images[0]!.id); assert.equal(c.imageEngine, 'codex'); switchImage(c, img); assert.equal(c.imageEngine, 'ark');
 });
 
@@ -229,7 +229,7 @@ test('a headline the writer broke into lines keeps one line per paragraph', () =
 
 test('Seedream family survives opaque endpoint profile persistence without leaking to other models', async () => {
   const { AI_DEFAULTS, mergeAi, saveImage, switchImage, directImageConfig } = await import('../src/aiparse');
-  const config = mergeAi(AI_DEFAULTS); const old = config.imageId;
+  const config = mergeAi(AI_DEFAULTS); const old = saveImage(config, { imageOn: true, imageEngine: 'api', imageBaseUrl: 'https://example.com/v1', imageKey: 'fixture', imageModel: 'image', imageSize: 'auto' });
   const id = saveImage(config, { imageOn: true, imageEngine: 'ark', imageBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', imageKey: 'fixture', imageModel: 'ep-custom', imageSize: 'auto', imageFamily: '4.5' });
   const restored = mergeAi(JSON.parse(JSON.stringify(config))); assert.equal(directImageConfig(restored, id)?.imageFamily, '4.5');
   switchImage(restored, old); assert.equal(restored.imageFamily, undefined); assert.equal(directImageConfig(restored, id)?.imageFamily, '4.5');

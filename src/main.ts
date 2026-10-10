@@ -1,3 +1,5 @@
+import { cancelKeyLogins } from './authflow';
+import { cancelCodexLogins } from './codex';
 import { COVER_ICON, registerCoverIcon } from './cover-icon';
 import { GalleryStore } from './gallery-store';
 import { GalleryDialog, type GalleryTab } from './gallery';
@@ -149,7 +151,7 @@ export default class CoverPlugin extends Plugin {
     // Hide the host status bar only while a cover tab is in front.
     this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => { document.body.toggleClass('qc-cover-active', leaf?.view.getViewType() === VIEW); }));
   }
-  onunload(): void { this.galleryDialog?.close(); this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
+  onunload(): void { cancelKeyLogins(); cancelCodexLogins(); this.galleryDialog?.close(); this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
 
   /** Covers opened with one click and not yet touched. They vanish again if closed untouched, so trying the designer leaves no clutter. */
   scratch = new Set<string>();

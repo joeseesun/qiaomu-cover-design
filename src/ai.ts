@@ -81,7 +81,7 @@ export class AiService {
     if (c.imageEngine === 'ark') return seedreamGenerate(c, prompt, width, height, options);
     if (options.references?.length) {
       if (c.imageEngine !== 'codex') throw new Error('image editing requires Seedream or Codex CLI');
-      const pic = await codexImage({ bin: findCodex(c.codexBin), model: c.codexModel.trim() || undefined }, prompt, options.references.map(r => r.url));
+      const pic = await codexImage({ bin: findCodex(c.codexBin), model: c.imageModel.trim() || undefined }, prompt, options.references.map(r => r.url));
       return { pictures: [pic], warnings: [] };
     }
     return { pictures: [await this.image(prompt, width, height, '', false, 'direct')], warnings: [] };
@@ -94,7 +94,7 @@ export class AiService {
     if (c.imageEngine === 'codex') {
       const ratio = `${width}x${height} pixels (aspect ratio ${(width / height).toFixed(2)}:1)`;
       const instructions = mode === 'direct' ? `${text}\nRequested image size: ${ratio}` : [prompt.trim(), style, subject ? SUBJECT_RULES : `Compose for a ${ratio} canvas`, subject ? '' : IMAGE_RULES].filter(Boolean).join('. ');
-      return codexImage({ bin: findCodex(c.codexBin), model: c.codexModel.trim() || undefined }, instructions);
+      return codexImage({ bin: findCodex(c.codexBin), model: c.imageModel.trim() || undefined }, instructions);
     }
     const fromB64 = (b64: string, type = 'image/png'): { data: ArrayBuffer; type: string } => { const bin = atob(b64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return { data: bytes.buffer, type: ['image/png', 'image/jpeg', 'image/webp'].includes(type) ? type : 'image/png' }; };
     const fromUrl = async (url: string): Promise<{ data: ArrayBuffer; type: string }> => {
