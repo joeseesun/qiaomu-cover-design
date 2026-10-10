@@ -1,3 +1,4 @@
+import { signOutAccount } from './model-access/services/provider-auth';
 import { App, Notice, PluginSettingTab, SecretComponent, TextComponent, setIcon } from 'obsidian';
 import type CoverPlugin from './main';
 import { folderPath } from './model';
@@ -141,7 +142,16 @@ export class CoverSettings extends PluginSettingTab {
     this.modelList(layouts, ai.chats.map(p => ({ id: p.id, label: chatLabel(p.snap), provider: chatSourceOf(p.snap).name, endpoint: p.snap.baseUrl })), ai.chatId,
       id => { switchChat(ai, id); this.save(); changed(); },
       () => new ModelDialog(this.plugin, 'chat', changed).open(),
-      id => { removeChat(ai, id); this.save(); changed(); },
+      id => { void (async () => {
+        const removed = ai.chats.find(p => p.id === id), previous = structuredClone(ai); removeChat(ai, id);
+        try { await this.plugin.saveSettings(); }
+        catch (e) { Object.assign(ai, previous); this.plugin.report(e); return; }
+        changed();
+        if (removed?.snap.preset === 'chatgpt' && !ai.chats.some(p => p.snap.apiKey === removed.snap.apiKey)) {
+          try { const revoked = await signOutAccount(removed.snap.apiKey, this.app.secretStorage); if (!revoked) new Notice(zh ? '已退出本机账号，请在 ChatGPT 设置中断开应用。' : 'Signed out locally. Disconnect this app in ChatGPT settings.'); }
+          catch (e) { this.plugin.report(e); }
+        }
+      })(); },
       id => { const p = ai.chats.find(p => p.id === id); if (p) new ModelDialog(this.plugin, 'chat', changed, p).open(); });
     const images = section(body, zh ? '生图模型' : 'Image models', zh ? '用于顶部“AI 生图”和图片修改。添加模型不会自动生成图片。' : 'For AI images and image edits. Adding a model does not generate an image.');
     this.modelList(images, ai.images.map(p => { const snap = imageConnection(ai, p.snap); return { id: p.id, label: imageLabel(snap), provider: imageSourceOf(snap).name, endpoint: snap.imageBaseUrl }; }), ai.imageId,
@@ -151,7 +161,7 @@ export class CoverSettings extends PluginSettingTab {
       id => { const p = ai.images.find(p => p.id === id); if (p) new ModelDialog(this.plugin, 'image', changed, p).open(); });
     const foot = body.createDiv('qcs-foot');
     const privacy = more(foot, t('aiS_privacyTitle'));
-    privacy.createDiv({ text: zh ? 'API 密钥与模型配置保存在此库的插件设置中；同步或备份插件设置时也可能一并复制。ChatGPT 登录由本机 Codex 管理。云服务按各自规则计费，账号登录不代表免费。' : 'API keys and model settings are stored in this vault’s plugin data and may be copied by sync or backups. Codex manages ChatGPT credentials. Account sign-in does not imply free usage.', cls: 'qcs-note' });
+    privacy.createDiv({ text: zh ? 'API 密钥与模型配置保存在此库的插件设置中；同步或备份插件设置时也可能一并复制。ChatGPT 直接登录凭据存于 Obsidian 密钥库，插件设置只保存引用；Codex CLI 的登录由 Codex 管理。云服务按各自规则计费，账号登录不代表免费。' : 'API keys and model settings are stored in this vault’s plugin data and may be copied by sync or backups. Codex manages ChatGPT credentials. Account sign-in does not imply free usage.', cls: 'qcs-note' });
     const dev = more(foot, t('assistantApi'));
     dev.createDiv({ text: t('assistantApiDesc'), cls: 'qcs-note' });
     for (const p of this.plugin.assistantList()) new Row(dev, p.name, p.id === 'offline' ? t('assistantOfflineDesc') : p.id === 'ai' ? (zh ? '内置，使用上面的设置。' : 'Built in, uses the settings above.') : t('assistantExternalDesc'));

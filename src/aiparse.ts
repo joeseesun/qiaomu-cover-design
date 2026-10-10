@@ -7,21 +7,21 @@ export { sanitizeOps } from './capabilities';
 export type { Catalog } from './valid';
 
 export interface AiConfig {
-  chatAlias?: string; imageAlias?: string;
+  chatAlias?: string; imageAlias?: string; chatEffort?: string; chatEfforts?: string[];
   /** Master switch: off keeps the plugin fully offline whatever else is filled in. */
   enabled: boolean;
-  preset: string; protocol: 'openai' | 'anthropic' | 'codex'; codexBin: string; codexModel: string; imageEngine: ImageEngine; baseUrl: string; apiKey: string; model: string;
+  preset: string; protocol: 'openai' | 'anthropic' | 'codex' | 'openai-responses'; codexBin: string; codexModel: string; imageEngine: ImageEngine; baseUrl: string; apiKey: string; model: string;
   imageFamily?: SeedreamFamily;
   imageOn: boolean; imageBaseUrl: string; imageKey: string; imageModel: string; imageSize: 'auto' | '1024x1024' | '1536x1024' | '1024x1536';
   /** Saved layout (chat) models and picture models. The flat fields above always hold the active ones, so the rest of the code never has to look here. */
   chats: ChatProfile[]; chatId: string; images: ImageProfile[]; imageId: string;
 }
 export type ImageEngine = 'api' | 'codex' | 'ark' | 'gemini' | 'openrouter';
-export type ChatSnap = Pick<AiConfig, 'chatAlias' | 'preset' | 'protocol' | 'baseUrl' | 'apiKey' | 'model' | 'codexBin' | 'codexModel'>;
+export type ChatSnap = Pick<AiConfig, 'chatEffort' | 'chatEfforts' | 'chatAlias' | 'preset' | 'protocol' | 'baseUrl' | 'apiKey' | 'model' | 'codexBin' | 'codexModel'>;
 export type ImageSnap = Pick<AiConfig, 'imageAlias' | 'imageOn' | 'imageEngine' | 'imageBaseUrl' | 'imageKey' | 'imageModel' | 'imageSize' | 'imageFamily'>;
 export interface ChatProfile { id: string; snap: ChatSnap }
 export interface ImageProfile { id: string; snap: ImageSnap }
-export interface ProviderPreset { id: string; name: string; protocol: 'openai' | 'anthropic' | 'codex'; baseUrl: string; model: string; imageModel?: string; imageBaseUrl?: string }
+export interface ProviderPreset { id: string; name: string; protocol: 'openai' | 'anthropic' | 'codex' | 'openai-responses'; baseUrl: string; model: string; imageModel?: string; imageBaseUrl?: string }
 
 /** Starting points only. Every field stays editable because model names change faster than a plugin ships. */
 export const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -53,7 +53,7 @@ export function mergeAi(raw: unknown): AiConfig {
   const base: AiConfig = { ...AI_DEFAULTS, chats: [], images: [] }; if (!raw || typeof raw !== 'object') { ensureProfiles(base); return base; }
   const r = raw as Record<string, unknown>;
   for (const key of ['preset', 'codexBin', 'codexModel', 'baseUrl', 'apiKey', 'model', 'imageBaseUrl', 'imageKey', 'imageModel'] as const) if (typeof r[key] === 'string') base[key] = r[key] as string;
-  if (r.protocol === 'openai' || r.protocol === 'anthropic' || r.protocol === 'codex') base.protocol = r.protocol;
+  if (r.protocol === 'openai' || r.protocol === 'anthropic' || r.protocol === 'codex' || r.protocol === 'openai-responses') base.protocol = r.protocol;
   if (r.imageEngine === 'api' || r.imageEngine === 'codex' || r.imageEngine === 'ark' || r.imageEngine === 'gemini' || r.imageEngine === 'openrouter') base.imageEngine = r.imageEngine;
   for (const key of ['chatAlias', 'imageAlias'] as const) if (typeof r[key] === 'string') base[key] = (r[key] as string).trim().slice(0, 80);
   const families = ['3.0', '4.0', '4.5', '5.0-lite', '5.0-pro', '5.0-flash'];
@@ -61,7 +61,7 @@ export function mergeAi(raw: unknown): AiConfig {
   if (typeof r.enabled === 'boolean') base.enabled = r.enabled;
   if (typeof r.imageOn === 'boolean') base.imageOn = r.imageOn;
   if (r.imageSize === 'auto' || r.imageSize === '1024x1024' || r.imageSize === '1536x1024' || r.imageSize === '1024x1536') base.imageSize = r.imageSize;
-  const chatSnap = (o: unknown): ChatSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const protocol = q.protocol === 'anthropic' || q.protocol === 'codex' ? q.protocol : 'openai'; return { ...(str('chatAlias') ? { chatAlias: str('chatAlias').trim().slice(0,80) } : {}), preset: str('preset') || 'custom', protocol, baseUrl: str('baseUrl'), apiKey: str('apiKey'), model: str('model'), codexBin: str('codexBin'), codexModel: str('codexModel') }; };
+  const chatSnap = (o: unknown): ChatSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const protocol = q.protocol === 'anthropic' || q.protocol === 'codex' || q.protocol === 'openai-responses' ? q.protocol : 'openai'; return { chatEffort: str('chatEffort') || undefined, chatEfforts: Array.isArray(q.chatEfforts) ? q.chatEfforts.filter((v): v is string => typeof v === 'string' && /^[a-z0-9_-]{1,32}$/i.test(v)) : undefined, ...(str('chatAlias') ? { chatAlias: str('chatAlias').trim().slice(0,80) } : {}), preset: str('preset') || 'custom', protocol, baseUrl: str('baseUrl'), apiKey: str('apiKey'), model: str('model'), codexBin: str('codexBin'), codexModel: str('codexModel') }; };
   const imageSnap = (o: unknown): ImageSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const e = q.imageEngine; const sizes = ['auto', '1024x1024', '1536x1024', '1024x1536']; return { ...(str('imageAlias') ? { imageAlias: str('imageAlias').trim().slice(0,80) } : {}), ...(families.includes(str('imageFamily')) ? { imageFamily: str('imageFamily') as SeedreamFamily } : {}), imageOn: q.imageOn === true, imageEngine: e === 'codex' || e === 'ark' || e === 'gemini' || e === 'openrouter' ? e : 'api', imageBaseUrl: str('imageBaseUrl'), imageKey: str('imageKey'), imageModel: str('imageModel'), imageSize: (sizes.includes(str('imageSize')) ? str('imageSize') : 'auto') as AiConfig['imageSize'] }; };
   if (Array.isArray(r.chats)) for (const x of r.chats.slice(0, 100)) { const o = x as { id?: unknown; snap?: unknown }; const snap = chatSnap(o?.snap); if (snap && typeof o.id === 'string') base.chats.push({ id: o.id, snap }); }
   if (Array.isArray(r.images)) for (const x of r.images.slice(0, 100)) { const o = x as { id?: unknown; snap?: unknown }; const snap = imageSnap(o?.snap); if (snap && typeof o.id === 'string') base.images.push({ id: o.id, snap }); }
@@ -69,12 +69,14 @@ export function mergeAi(raw: unknown): AiConfig {
   // Older Codex image settings inherited the API image default, which is not a Codex text model.
   if (base.imageEngine === 'codex' && base.imageModel === 'gpt-image-1') base.imageModel = '';
   for (const p of base.images) if (p.snap.imageEngine === 'codex' && p.snap.imageModel === 'gpt-image-1') p.snap.imageModel = '';
+  if (typeof r.chatEffort === 'string') base.chatEffort = r.chatEffort;
+  if (Array.isArray(r.chatEfforts)) base.chatEfforts = r.chatEfforts.filter((v): v is string => typeof v === 'string');
   ensureProfiles(base);
   return base;
 }
 const CHAT_KEYS = ['preset', 'protocol', 'baseUrl', 'apiKey', 'model', 'codexBin', 'codexModel'] as const;
 const IMAGE_KEYS = ['imageFamily', 'imageOn', 'imageEngine', 'imageBaseUrl', 'imageKey', 'imageModel', 'imageSize'] as const;
-export const pickChat = (c: AiConfig): ChatSnap => ({ ...(c.chatAlias ? { chatAlias: c.chatAlias } : {}), preset: c.preset, protocol: c.protocol, baseUrl: c.baseUrl, apiKey: c.apiKey, model: c.model, codexBin: c.codexBin, codexModel: c.codexModel });
+export const pickChat = (c: AiConfig): ChatSnap => ({ chatEffort: c.chatEffort, chatEfforts: c.chatEfforts, ...(c.chatAlias ? { chatAlias: c.chatAlias } : {}), preset: c.preset, protocol: c.protocol, baseUrl: c.baseUrl, apiKey: c.apiKey, model: c.model, codexBin: c.codexBin, codexModel: c.codexModel });
 export const pickImage = (c: AiConfig): ImageSnap => ({ ...(c.imageAlias ? { imageAlias: c.imageAlias } : {}), imageOn: c.imageOn, imageEngine: c.imageEngine, imageBaseUrl: c.imageBaseUrl, imageKey: c.imageKey, imageModel: c.imageModel, imageSize: c.imageSize, ...(c.imageFamily ? { imageFamily: c.imageFamily } : {}) });
 /** First run and old settings files: the flat fields become the first saved models, so nothing the user configured is lost. */
 export function ensureProfiles(c: AiConfig): void {
@@ -89,8 +91,8 @@ export function syncProfiles(c: AiConfig): void {
   const b = c.images.find(x => x.id === c.imageId); if (b) b.snap = pickImage(c);
 }
 let nextId = 0; const fresh = (prefix: string): string => `${prefix}-${Date.now().toString(36)}${(nextId++).toString(36)}`;
-export function switchChat(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.chats.find(x => x.id === id); if (!p) return false; c.chatId = id; c.chatAlias = p.snap.chatAlias; Object.assign(c, p.snap); return true; }
-export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.images.find(x => x.id === id); if (!p) return false; c.imageId = id; c.imageAlias = p.snap.imageAlias; c.imageFamily = p.snap.imageFamily; Object.assign(c, p.snap); return true; }
+export function switchChat(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.chats.find(x => x.id === id); if (!p) return false; c.chatId = id; c.chatAlias = p.snap.chatAlias; Object.assign(c, { chatEffort: undefined, chatEfforts: undefined }, p.snap); return true; }
+export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.images.find(x => x.id === id); if (!p) return false; c.imageId = id; c.imageAlias = p.snap.imageAlias; c.imageFamily = p.snap.imageFamily; Object.assign(c, { chatEffort: undefined, chatEfforts: undefined }, p.snap); return true; }
 /** A new saved model starts as a copy of the active one, which becomes active so it can be edited at once. */
 export function addChat(c: AiConfig): string { syncProfiles(c); const id = fresh('chat'); c.chats.push({ id, snap: { ...pickChat(c), apiKey: '' } }); c.chatId = id; c.apiKey = ''; return id; }
 export function addImage(c: AiConfig): string { syncProfiles(c); const id = fresh('image'); c.images.push({ id, snap: { ...pickImage(c), imageKey: '' } }); c.imageId = id; c.imageKey = ''; return id; }
