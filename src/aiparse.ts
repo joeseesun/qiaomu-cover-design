@@ -1,3 +1,4 @@
+import { SEEDREAM_MODELS, type SeedreamFamily } from './seedream';
 /**
  * Pure helpers for the model-backed designer: provider presets, JSON extraction and validation of whatever a model
  * returns. Nothing here touches Obsidian or fabric, so it can be unit tested in plain Node.
@@ -9,13 +10,14 @@ export interface AiConfig {
   /** Master switch: off keeps the plugin fully offline whatever else is filled in. */
   enabled: boolean;
   preset: string; protocol: 'openai' | 'anthropic' | 'codex'; codexBin: string; codexModel: string; imageEngine: ImageEngine; baseUrl: string; apiKey: string; model: string;
+  imageFamily?: SeedreamFamily;
   imageOn: boolean; imageBaseUrl: string; imageKey: string; imageModel: string; imageSize: 'auto' | '1024x1024' | '1536x1024' | '1024x1536';
   /** Saved layout (chat) models and picture models. The flat fields above always hold the active ones, so the rest of the code never has to look here. */
   chats: ChatProfile[]; chatId: string; images: ImageProfile[]; imageId: string;
 }
 export type ImageEngine = 'api' | 'codex' | 'ark' | 'gemini' | 'openrouter';
 export type ChatSnap = Pick<AiConfig, 'preset' | 'protocol' | 'baseUrl' | 'apiKey' | 'model' | 'codexBin' | 'codexModel'>;
-export type ImageSnap = Pick<AiConfig, 'imageOn' | 'imageEngine' | 'imageBaseUrl' | 'imageKey' | 'imageModel' | 'imageSize'>;
+export type ImageSnap = Pick<AiConfig, 'imageOn' | 'imageEngine' | 'imageBaseUrl' | 'imageKey' | 'imageModel' | 'imageSize' | 'imageFamily'>;
 export interface ChatProfile { id: string; snap: ChatSnap }
 export interface ImageProfile { id: string; snap: ImageSnap }
 export interface ProviderPreset { id: string; name: string; protocol: 'openai' | 'anthropic' | 'codex'; baseUrl: string; model: string; imageModel?: string; imageBaseUrl?: string }
@@ -39,7 +41,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
 /** Picture engines. Model names change fast, so the values are starting points and stay editable. */
 export const IMAGE_ENGINES: { id: ImageEngine; zh: string; en: string; baseUrl: string; model: string; hint: string }[] = [
   { id: 'codex', zh: 'Codex CLI（ChatGPT 账号，免密钥）', en: 'Codex CLI (ChatGPT login)', baseUrl: '', model: '', hint: '' },
-  { id: 'ark', zh: '豆包 Seedream（火山方舟）', en: 'Doubao Seedream (Volcengine Ark)', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seedream-4-0-250828', hint: 'ark.cn-beijing.volces.com' },
+  { id: 'ark', zh: '豆包 Seedream（火山方舟）', en: 'Doubao Seedream (Volcengine Ark)', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seedream-5-0-pro-260628', hint: 'ark.cn-beijing.volces.com' },
   { id: 'gemini', zh: 'Google Gemini 生图（Nano Banana）', en: 'Google Gemini image', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.5-flash-image', hint: 'aistudio.google.com' },
   { id: 'openrouter', zh: 'OpenRouter 中转', en: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.5-flash-image', hint: 'openrouter.ai' },
   { id: 'api', zh: 'OpenAI 兼容接口（OpenAI / 自定义中转）', en: 'OpenAI-compatible / custom', baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-1', hint: '/images/generations' },
@@ -52,27 +54,29 @@ export function mergeAi(raw: unknown): AiConfig {
   for (const key of ['preset', 'codexBin', 'codexModel', 'baseUrl', 'apiKey', 'model', 'imageBaseUrl', 'imageKey', 'imageModel'] as const) if (typeof r[key] === 'string') base[key] = r[key] as string;
   if (r.protocol === 'openai' || r.protocol === 'anthropic' || r.protocol === 'codex') base.protocol = r.protocol;
   if (r.imageEngine === 'api' || r.imageEngine === 'codex' || r.imageEngine === 'ark' || r.imageEngine === 'gemini' || r.imageEngine === 'openrouter') base.imageEngine = r.imageEngine;
+  const families = ['3.0', '4.0', '4.5', '5.0-lite', '5.0-pro', '5.0-flash'];
+  if (typeof r.imageFamily === 'string' && families.includes(r.imageFamily)) base.imageFamily = r.imageFamily as SeedreamFamily;
   if (typeof r.enabled === 'boolean') base.enabled = r.enabled;
   if (typeof r.imageOn === 'boolean') base.imageOn = r.imageOn;
   if (r.imageSize === 'auto' || r.imageSize === '1024x1024' || r.imageSize === '1536x1024' || r.imageSize === '1024x1536') base.imageSize = r.imageSize;
   const chatSnap = (o: unknown): ChatSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const protocol = q.protocol === 'anthropic' || q.protocol === 'codex' ? q.protocol : 'openai'; return { preset: str('preset') || 'custom', protocol, baseUrl: str('baseUrl'), apiKey: str('apiKey'), model: str('model'), codexBin: str('codexBin'), codexModel: str('codexModel') }; };
-  const imageSnap = (o: unknown): ImageSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const e = q.imageEngine; const sizes = ['auto', '1024x1024', '1536x1024', '1024x1536']; return { imageOn: q.imageOn === true, imageEngine: e === 'codex' || e === 'ark' || e === 'gemini' || e === 'openrouter' ? e : 'api', imageBaseUrl: str('imageBaseUrl'), imageKey: str('imageKey'), imageModel: str('imageModel'), imageSize: (sizes.includes(str('imageSize')) ? str('imageSize') : 'auto') as AiConfig['imageSize'] }; };
-  if (Array.isArray(r.chats)) for (const x of r.chats.slice(0, 12)) { const o = x as { id?: unknown; snap?: unknown }; const snap = chatSnap(o?.snap); if (snap && typeof o.id === 'string') base.chats.push({ id: o.id, snap }); }
-  if (Array.isArray(r.images)) for (const x of r.images.slice(0, 12)) { const o = x as { id?: unknown; snap?: unknown }; const snap = imageSnap(o?.snap); if (snap && typeof o.id === 'string') base.images.push({ id: o.id, snap }); }
+  const imageSnap = (o: unknown): ImageSnap | undefined => { if (!o || typeof o !== 'object') return undefined; const q = o as Record<string, unknown>; const str = (k: string): string => typeof q[k] === 'string' ? q[k] as string : ''; const e = q.imageEngine; const sizes = ['auto', '1024x1024', '1536x1024', '1024x1536']; return { ...(families.includes(str('imageFamily')) ? { imageFamily: str('imageFamily') as SeedreamFamily } : {}), imageOn: q.imageOn === true, imageEngine: e === 'codex' || e === 'ark' || e === 'gemini' || e === 'openrouter' ? e : 'api', imageBaseUrl: str('imageBaseUrl'), imageKey: str('imageKey'), imageModel: str('imageModel'), imageSize: (sizes.includes(str('imageSize')) ? str('imageSize') : 'auto') as AiConfig['imageSize'] }; };
+  if (Array.isArray(r.chats)) for (const x of r.chats.slice(0, 64)) { const o = x as { id?: unknown; snap?: unknown }; const snap = chatSnap(o?.snap); if (snap && typeof o.id === 'string') base.chats.push({ id: o.id, snap }); }
+  if (Array.isArray(r.images)) for (const x of r.images.slice(0, 64)) { const o = x as { id?: unknown; snap?: unknown }; const snap = imageSnap(o?.snap); if (snap && typeof o.id === 'string') base.images.push({ id: o.id, snap }); }
   if (typeof r.chatId === 'string') base.chatId = r.chatId; if (typeof r.imageId === 'string') base.imageId = r.imageId;
   ensureProfiles(base);
   return base;
 }
 const CHAT_KEYS = ['preset', 'protocol', 'baseUrl', 'apiKey', 'model', 'codexBin', 'codexModel'] as const;
-const IMAGE_KEYS = ['imageOn', 'imageEngine', 'imageBaseUrl', 'imageKey', 'imageModel', 'imageSize'] as const;
+const IMAGE_KEYS = ['imageFamily', 'imageOn', 'imageEngine', 'imageBaseUrl', 'imageKey', 'imageModel', 'imageSize'] as const;
 const pickChat = (c: AiConfig): ChatSnap => ({ preset: c.preset, protocol: c.protocol, baseUrl: c.baseUrl, apiKey: c.apiKey, model: c.model, codexBin: c.codexBin, codexModel: c.codexModel });
-const pickImage = (c: AiConfig): ImageSnap => ({ imageOn: c.imageOn, imageEngine: c.imageEngine, imageBaseUrl: c.imageBaseUrl, imageKey: c.imageKey, imageModel: c.imageModel, imageSize: c.imageSize });
+const pickImage = (c: AiConfig): ImageSnap => ({ imageOn: c.imageOn, imageEngine: c.imageEngine, imageBaseUrl: c.imageBaseUrl, imageKey: c.imageKey, imageModel: c.imageModel, imageSize: c.imageSize, ...(c.imageFamily ? { imageFamily: c.imageFamily } : {}) });
 /** First run and old settings files: the flat fields become the first saved models, so nothing the user configured is lost. */
 export function ensureProfiles(c: AiConfig): void {
   if (!c.chats.length) { c.chats.push({ id: 'chat-1', snap: pickChat(c) }); c.chatId = 'chat-1'; }
   if (!c.images.length) { c.images.push({ id: 'image-1', snap: pickImage(c) }); c.imageId = 'image-1'; }
   if (!c.chats.some(x => x.id === c.chatId)) { c.chatId = c.chats[0]!.id; Object.assign(c, c.chats[0]!.snap); }
-  if (!c.images.some(x => x.id === c.imageId)) { c.imageId = c.images[0]!.id; Object.assign(c, c.images[0]!.snap); }
+  if (!c.images.some(x => x.id === c.imageId)) { c.imageId = c.images[0]!.id; c.imageFamily = c.images[0]!.snap.imageFamily; Object.assign(c, c.images[0]!.snap); }
 }
 /** Writes the flat (active) fields back into the active saved models. Call before saving settings. */
 export function syncProfiles(c: AiConfig): void {
@@ -81,7 +85,7 @@ export function syncProfiles(c: AiConfig): void {
 }
 let nextId = 0; const fresh = (prefix: string): string => `${prefix}-${Date.now().toString(36)}${(nextId++).toString(36)}`;
 export function switchChat(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.chats.find(x => x.id === id); if (!p) return false; c.chatId = id; Object.assign(c, p.snap); return true; }
-export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.images.find(x => x.id === id); if (!p) return false; c.imageId = id; Object.assign(c, p.snap); return true; }
+export function switchImage(c: AiConfig, id: string): boolean { syncProfiles(c); const p = c.images.find(x => x.id === id); if (!p) return false; c.imageId = id; c.imageFamily = p.snap.imageFamily; Object.assign(c, p.snap); return true; }
 /** A new saved model starts as a copy of the active one, which becomes active so it can be edited at once. */
 export function addChat(c: AiConfig): string { syncProfiles(c); const id = fresh('chat'); c.chats.push({ id, snap: { ...pickChat(c), apiKey: '' } }); c.chatId = id; c.apiKey = ''; return id; }
 export function addImage(c: AiConfig): string { syncProfiles(c); const id = fresh('image'); c.images.push({ id, snap: { ...pickImage(c), imageKey: '' } }); c.imageId = id; c.imageKey = ''; return id; }
@@ -92,13 +96,18 @@ export function saveChat(c: AiConfig, snap: ChatSnap, editId?: string): string {
 }
 export function saveImage(c: AiConfig, snap: ImageSnap, editId?: string): string {
   syncProfiles(c); const id = editId ?? fresh('image'); const at = c.images.find(x => x.id === id);
-  if (at) at.snap = snap; else c.images.push({ id, snap }); c.imageId = id; Object.assign(c, snap); return id;
+  if (at) at.snap = snap; else c.images.push({ id, snap }); c.imageId = id; c.imageFamily = snap.imageFamily; Object.assign(c, snap); return id;
 }
 export function removeChat(c: AiConfig, id: string): void { if (c.chats.length < 2) return; c.chats = c.chats.filter(x => x.id !== id); if (c.chatId === id) { c.chatId = c.chats[0]!.id; Object.assign(c, c.chats[0]!.snap); } }
-export function removeImage(c: AiConfig, id: string): void { if (c.images.length < 2) return; c.images = c.images.filter(x => x.id !== id); if (c.imageId === id) { c.imageId = c.images[0]!.id; Object.assign(c, c.images[0]!.snap); } }
+export function removeImage(c: AiConfig, id: string): void { if (c.images.length < 2) return; c.images = c.images.filter(x => x.id !== id); if (c.imageId === id) { c.imageId = c.images[0]!.id; c.imageFamily = c.images[0]!.snap.imageFamily; Object.assign(c, c.images[0]!.snap); } }
 /** Short names for menus and chips. */
 export function chatLabel(s: ChatSnap): string { if (s.protocol === 'codex') return 'Codex CLI'; const p = PROVIDER_PRESETS.find(x => x.id === s.preset); return `${p ? p.name.replace(/ \(.*\)$/, '') : s.preset}${s.model ? ` · ${s.model}` : ''}`; }
-export function imageLabel(s: ImageSnap): string { if (!s.imageOn) return '—'; const e = IMAGE_ENGINES.find(x => x.id === s.imageEngine); return s.imageEngine === 'codex' ? 'Codex CLI' : `${e ? e.zh.split('（')[0] : s.imageEngine}${s.imageModel ? ` · ${s.imageModel}` : ''}`; }
+export function imageLabel(s: ImageSnap): string {
+  if (!s.imageOn) return '—'; if (s.imageEngine === 'codex') return 'Codex CLI';
+  const seedream = s.imageEngine === 'ark' && SEEDREAM_MODELS.find(m => m.id === s.imageModel); if (seedream) return seedream.name;
+  if (s.imageEngine === 'api' && /^jimeng-\d\.\d$/.test(s.imageModel)) return `Jimeng ${s.imageModel.slice(7)}`;
+  const e = IMAGE_ENGINES.find(x => x.id === s.imageEngine); return `${e ? e.zh.split('（')[0] : s.imageEngine}${s.imageModel ? ` · ${s.imageModel}` : ''}`;
+}
 void CHAT_KEYS; void IMAGE_KEYS;
 export function aiReady(c: AiConfig): boolean {
   if (!c.enabled) return false;
@@ -121,7 +130,7 @@ export function directImageConfig(c: AiConfig, id: string): AiConfig | undefined
   const profile = c.images.find(p => p.id === id);
   if (!profile && id !== c.imageId) return undefined;
   const snap = id === c.imageId ? pickImage(c) : profile!.snap;
-  return { ...c, ...snap, imageOn: true, chats: c.chats.map(p => ({ ...p, snap: { ...p.snap } })), images: c.images.map(p => ({ ...p, snap: { ...p.snap } })) };
+  return { ...c, ...snap, imageFamily: snap.imageFamily, imageOn: true, chats: c.chats.map(p => ({ ...p, snap: { ...p.snap } })), images: c.images.map(p => ({ ...p, snap: { ...p.snap } })) };
 }
 export function trimBase(url: string): string { return url.trim().replace(/\/+$/, ''); }
 

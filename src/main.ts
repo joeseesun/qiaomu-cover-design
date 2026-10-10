@@ -1,3 +1,6 @@
+import { ImageJobs } from './imagejobs';
+import { VaultImageJobStore } from './imagejobstore';
+import { ImageJobsDialog, ImageResultsDialog } from './imagejobdialog';
 import { App, getLanguage, MarkdownView, Notice, Platform, Plugin, TFile, normalizePath } from 'obsidian';
 import { Design, folderPath, safeName } from './model';
 import { Key, translate } from './i18n';
@@ -16,7 +19,7 @@ import { builtPalette, templateById } from './templates';
 import { SerialWriter } from './model';
 
 export default class CoverPlugin extends Plugin {
-  qiaomuHome?: HomeProvider;
+  qiaomuHome?: HomeProvider; imageJobs!: ImageJobs;
   settings: Settings = structuredClone(DEFAULTS); fonts!: FontService; ai = new AiService(() => this.settings.ai);
   /** Text a new cover should be designed from once its view has loaded, keyed by file path. */
   private briefs = new Map<string, string>();
@@ -46,6 +49,7 @@ export default class CoverPlugin extends Plugin {
     if (!this.ai.ready()) { new Notice(this.t('aiNotReady')); this.openSettings('assistant'); return; }
     await this.createDesign(name, 'minimal', note, name, undefined, text);
   }
+  openImageTasks(): void { new ImageJobsDialog(this).open(); }
   activeCover(): CoverView | undefined { return this.app.workspace.getActiveViewOfType(CoverView) ?? undefined; }
 
   /** After fonts are installed: re-pair the fonts of every open cover. */
@@ -53,6 +57,13 @@ export default class CoverPlugin extends Plugin {
   repairOpenCovers(): void { for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) if (leaf.view instanceof CoverView) leaf.view.repairFonts(); }
   async onload(): Promise<void> {
     this.settings = mergeSettings(await this.loadData());
+    this.imageJobs = new ImageJobs(new VaultImageJobStore(this.app.vault.adapter, `${this.manifest.dir}/image-jobs`), job => {
+      const fragment = document.createDocumentFragment(); const label = document.createElement('div'); label.textContent = this.t(job.state === 'ready' ? 'imageTaskComplete' : 'imageTaskFailed'); fragment.appendChild(label);
+      const button = document.createElement('button'); button.textContent = this.t(job.state === 'ready' ? 'imageViewResults' : 'imageTasks'); fragment.appendChild(button);
+      const notice = new Notice(fragment, 15000); button.addEventListener('click', () => { notice.hide(); if (job.state === 'ready') new ImageResultsDialog(this, job).open(); else this.openImageTasks(); });
+    });
+    await this.imageJobs.refresh();
+    this.addCommand({ id: 'image-tasks', name: this.t('imageTasks'), callback: () => this.openImageTasks() });
     this.fonts = new FontService(this.app, () => this.settings.fontFolder, () => this.manifest.dir ?? '');
     this.registerView(VIEW, leaf => new CoverView(leaf, this));
     this.registerExtensions(['qcover'], VIEW);
@@ -121,7 +132,7 @@ export default class CoverPlugin extends Plugin {
     // Hide the host status bar only while a cover tab is in front.
     this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => { document.body.toggleClass('qc-cover-active', leaf?.view.getViewType() === VIEW); }));
   }
-  onunload(): void { shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
+  onunload(): void { this.imageJobs?.dispose(); shutdownCodex(); document.body.removeClass('qc-cover-active'); window.clearTimeout(this.fontTimer); }
 
   /** Covers opened with one click and not yet touched. They vanish again if closed untouched, so trying the designer leaves no clutter. */
   scratch = new Set<string>();

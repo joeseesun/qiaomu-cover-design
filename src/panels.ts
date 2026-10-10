@@ -1,10 +1,10 @@
 import { usePairing, type Resolved } from './typeset';
-import { Menu } from 'obsidian';
+import { Menu, Modal } from 'obsidian';
 import { ModelDialog } from './modeldialog';
 import { chatLabel, imageLabel, switchChat, switchImage } from './aiparse';
 import { installPack, packMissing } from './fontpack';
 import { Notice, setIcon } from 'obsidian';
-import { Circle, FabricImage, FabricObject, Group, Line, Polygon, Rect, StaticCanvas, Textbox, Triangle } from 'fabric';
+import { ActiveSelection, Circle, FabricImage, FabricObject, Group, Line, Polygon, Rect, StaticCanvas, Textbox, Triangle } from 'fabric';
 import type { CoverView, QObject } from './view';
 import { SHADOWS } from './view';
 import { DrawerTab } from './config';
@@ -413,6 +413,8 @@ function renderObjectPanel(view: CoverView, el: HTMLElement, sel: QObject[]): vo
   iconButton(actions, first.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', t('locked'), () => view.toggleLock(), first.lockMovementX ? 'is-active' : '');
   iconButton(actions, 'copy-plus', t('duplicate'), () => void view.action(() => view.cloneSelection()));
   iconButton(actions, 'trash-2', t('remove'), () => view.removeSelection());
+  const raster = first as FabricImage;
+  if (single && raster instanceof FabricImage) iconButton(actions, 'image-pen', t('aiEditImage'), () => view.openImageGenerator(raster));
 
   if (single && ((first.qcRole === 'subject' || first.qcRole === 'image') && first.qcPrompt !== undefined || first.qcRole === 'subject')) {
     const g = group(el, t('aiRedraw')); g.createDiv({ text: t('aiRedrawHint'), cls: 'qc-hint' });
@@ -522,16 +524,18 @@ function pickReplacement(view: CoverView, img: FabricImage): void {
   input.addEventListener('change', () => { const f = input.files?.[0]; if (f) void view.action(() => view.replaceImage(img, f)); }, { once: true }); input.click();
 }
 export function layerName(view: CoverView, o: FabricObject): string {
+  const named = (o as QObject).qcName; if (named) return named;
   const role = (o as QObject).qcRole;
   if (role === 'subject') return view.t('layerSubject');
   if (role === 'decor') { const k = decorById((o as QObject).qcKind ?? ''); return k ? `${view.t('layerDecor')} · ${k.zh}` : view.t('layerDecor'); }
   if (o instanceof Textbox) return o.text.replace(/\s+/g, ' ').slice(0, 30) || view.t('text');
   if (o instanceof FabricImage) return (o as QObject & { qcCredit?: string }).qcCredit ?? view.t('image');
   if (o instanceof Circle) return view.t('circle'); if (o instanceof Triangle) return view.t('triangle'); if (o instanceof Line) return view.t('line'); if (o instanceof Polygon) return view.t('star');
-  if (o instanceof Group) return view.zh ? '素材' : 'Asset';
+  if (o instanceof Group) return (o as QObject).qcLayerGroup ? view.t('layerGroup') : view.zh ? '素材' : 'Asset';
   return view.t('rectangle');
 }
 function layerIcon(o: FabricObject): string {
+  if ((o as QObject).qcLayerGroup) return 'folder';
   if (o instanceof Textbox) return 'type'; if (o instanceof FabricImage) return 'image'; if (o instanceof Circle) return 'circle'; if (o instanceof Triangle) return 'triangle';
   if (o instanceof Line) return 'minus'; if (o instanceof Polygon) return 'star'; return 'square';
 }
@@ -605,24 +609,53 @@ function renderCanvasPanel(view: CoverView, el: HTMLElement): void {
 }
 
 /* ---------- layers ---------- */
+export function renameLayersDialog(view: CoverView, objects: FabricObject[]): void {
+  if (!objects.length) return;
+  const modal = new Modal(view.app); modal.titleEl.setText(view.t('renameLayers')); modal.contentEl.addClass('qc-modal'); const id = crypto.randomUUID();
+  modal.contentEl.createEl('label', { text: view.t('layerName'), attr: { for: id } }); const input = modal.contentEl.createEl('input', { attr: { id, type: 'text', maxlength: '100' } }); input.value = objects.length === 1 ? layerName(view, objects[0]!) : '';
+  if (objects.length > 1) modal.contentEl.createDiv({ text: view.t('layerBatchName'), cls: 'qc-hint' });
+  const generation = view.imageGuard(), apply = (): void => { if (generation() && input.value.trim()) { view.renameLayers(objects, input.value); modal.close(); } };
+  const footer = modal.contentEl.createDiv('qc-modal-footer'); textButton(footer, view.t('cancel'), () => modal.close()); textButton(footer, view.t('save'), apply, 'qc-primary'); input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) apply(); }); modal.open(); view.win.requestAnimationFrame(() => { input.focus(); input.select(); });
+}
 export function renderLayers(view: CoverView, el: HTMLElement): void {
   const top = el.scrollTop; el.empty(); const c = view.canvas; if (!c) return;
-  const objects = c.getObjects(); const active = c.getActiveObjects();
-  if (!objects.length) { emptyState(el, { icon: 'layers', title: view.zh ? '还没有元素' : 'Nothing here yet', hint: view.zh ? '画布是空的。点顶部的“插入”加文字、形状或素材，或让 AI 设计师出一版。' : 'Use Insert to add text, shapes or stickers.' }); return; }
+  const objects = c.getObjects(), active = c.getActiveObjects(), t = view.t.bind(view);
+  const toolbar = el.createDiv('qc-layer-bar'); toolbar.createSpan({ text: active.length ? t('selected', { n: active.length }) : t('layers'), cls: 'qc-hint' });
+  const groupButton = iconButton(toolbar, 'group', t('groupLayers'), () => view.groupLayers()); groupButton.disabled = active.length < 2 || active.some(o => o.group && !(o.group instanceof ActiveSelection) || o.lockMovementX || o.lockMovementY);
+  const ungroup = iconButton(toolbar, 'ungroup', t('ungroupLayers'), () => view.ungroupLayers()); ungroup.disabled = active.length !== 1 || !(active[0] as QObject)?.qcLayerGroup;
+  const rename = iconButton(toolbar, 'pencil', t('renameLayers'), () => renameLayersDialog(view, active)); rename.disabled = !active.length;
+  const search = el.createEl('input', { cls: 'qc-layer-search', attr: { type: 'search', placeholder: t('layerSearch') } }); search.value = view.layerQuery;
+  if (!objects.length) { emptyState(el, { icon: 'layers', title: view.zh ? '还没有元素' : 'Nothing here yet', hint: view.zh ? '点顶部“插入”添加元素。' : 'Use Insert to add elements.' }); return; }
   const list = el.createDiv('qc-layers'); let dragging: FabricObject | undefined;
-  for (const o of [...objects].reverse()) {
-    const row = list.createDiv({ cls: 'qc-layer', attr: { draggable: 'true' } }); row.classList.toggle('is-selected', active.includes(o)); row.classList.toggle('is-hidden', !o.visible);
-    setIcon(row.createSpan({ cls: 'qc-layer-icon' }), layerIcon(o));
-    row.createSpan({ text: layerName(view, o), cls: 'qc-layer-name' });
-    const tools = row.createDiv('qc-layer-tools');
-    iconButton(tools, o.visible ? 'eye' : 'eye-off', view.t('visible'), e => { e.stopPropagation(); o.set({ visible: !o.visible }); if (!o.visible) c.discardActiveObject(); c.requestRenderAll(); view.changed(); renderLayers(view, el); });
-    iconButton(tools, o.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', view.t('locked'), e => { e.stopPropagation(); c.setActiveObject(o); view.toggleLock(); renderLayers(view, el); }, o.lockMovementX ? 'is-active' : '');
-    row.addEventListener('click', () => { if (!o.visible) return; c.setActiveObject(o); c.requestRenderAll(); renderLayers(view, el); });
-    row.addEventListener('dragstart', e => { dragging = o; e.dataTransfer?.setData('text/plain', 'layer'); row.addClass('is-dragging'); });
-    row.addEventListener('dragend', () => { dragging = undefined; row.removeClass('is-dragging'); });
-    row.addEventListener('dragover', e => { if (dragging) { e.preventDefault(); row.addClass('is-over'); } });
-    row.addEventListener('dragleave', () => row.removeClass('is-over'));
-    row.addEventListener('drop', e => { e.preventDefault(); row.removeClass('is-over'); if (dragging && dragging !== o) { c.moveObjectTo(dragging, c.getObjects().indexOf(o)); c.requestRenderAll(); view.changed(); renderLayers(view, el); } });
-  }
-  el.scrollTop = top;
+  const matches = (o: FabricObject): boolean => !view.layerQuery || layerName(view, o).toLowerCase().includes(view.layerQuery.toLowerCase()) || ((o as QObject).qcLayerGroup && (o as Group).getObjects().some(matches)) === true;
+  const draw = (): void => {
+    list.empty(); const rows: { object: FabricObject; parent?: Group; depth: number }[] = [];
+    const visit = (o: FabricObject, depth: number, parent?: Group): void => { if (!matches(o)) return; rows.push({ object: o, depth, parent }); if ((o as QObject).qcLayerGroup && (!view.layerFolded.has(o) || view.layerQuery)) for (const child of [...(o as Group).getObjects()].reverse()) visit(child, depth + 1, o as Group); };
+    for (const o of [...c.getObjects()].reverse()) visit(o, 0);
+    if (!rows.length) { list.createDiv({ text: t('layerNoMatch'), cls: 'qc-hint' }); return; }
+    for (const { object: o, depth, parent } of rows) {
+      const row = list.createDiv({ cls: 'qc-layer', attr: { draggable: 'true', role: 'option', 'aria-selected': String(c.getActiveObjects().includes(o)), tabindex: '0' } }); row.style.paddingLeft = `${8 + depth * 16}px`; row.classList.toggle('is-selected', c.getActiveObjects().includes(o)); row.classList.toggle('is-hidden', !o.visible);
+      if ((o as QObject).qcLayerGroup) iconButton(row, view.layerFolded.has(o) ? 'chevron-right' : 'chevron-down', t('layerExpand'), e => { e.stopPropagation(); if (view.layerFolded.has(o)) view.layerFolded.delete(o); else view.layerFolded.add(o); draw(); }, 'qc-layer-fold');
+      else row.createSpan({ cls: 'qc-layer-fold-spacer' });
+      setIcon(row.createSpan({ cls: 'qc-layer-icon' }), layerIcon(o)); const name = row.createSpan({ text: layerName(view, o), cls: 'qc-layer-name' }); name.addEventListener('dblclick', e => { e.stopPropagation(); renameLayersDialog(view, [o]); });
+      const tools = row.createDiv('qc-layer-tools');
+      iconButton(tools, 'pencil', t('renameLayers'), e => { e.stopPropagation(); renameLayersDialog(view, [o]); });
+      iconButton(tools, o.visible ? 'eye' : 'eye-off', t('visible'), e => { e.stopPropagation(); o.set({ visible: !o.visible }); if (!o.visible && c.getActiveObjects().includes(o)) c.discardActiveObject(); c.requestRenderAll(); view.changed(); draw(); });
+      iconButton(tools, o.lockMovementX ? 'lock-keyhole' : 'lock-keyhole-open', t('locked'), e => { e.stopPropagation(); c.discardActiveObject(); c.setActiveObject(o); view.toggleLock(); }, o.lockMovementX ? 'is-active' : '');
+      const pick = (event: MouseEvent | KeyboardEvent): void => {
+        if (!o.visible) return;
+        const siblings = rows.filter(r => r.parent === parent).map(r => r.object); let chosen: FabricObject[] = [o];
+        if (event.shiftKey && view.layerAnchor && siblings.includes(view.layerAnchor)) { const a = siblings.indexOf(view.layerAnchor), b = siblings.indexOf(o); chosen = siblings.slice(Math.min(a, b), Math.max(a, b) + 1).filter(o => o.visible); }
+        else if (event.metaKey || event.ctrlKey) { chosen = c.getActiveObjects().filter(x => siblings.includes(x)); if (chosen.includes(o)) chosen = chosen.filter(x => x !== o); else chosen.push(o); }
+        else view.layerAnchor = o;
+        c.discardActiveObject(); if (chosen.length === 1) c.setActiveObject(chosen[0]!); else if (chosen.length) c.setActiveObject(new ActiveSelection(chosen, { canvas: c })); c.requestRenderAll(); renderLayers(view, el);
+      };
+      row.addEventListener('click', pick); row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } if (e.key === 'F2') { e.preventDefault(); renameLayersDialog(view, [o]); } });
+      row.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); const menu = new Menu(); menu.addItem(i => i.setTitle(t('renameLayers')).setIcon('pencil').onClick(() => renameLayersDialog(view, [o]))); menu.showAtMouseEvent(e); });
+      row.addEventListener('dragstart', e => { dragging = o; e.dataTransfer?.setData('text/plain', 'layer'); row.addClass('is-dragging'); }); row.addEventListener('dragend', () => { dragging = undefined; row.removeClass('is-dragging'); });
+      row.addEventListener('dragover', e => { if (dragging && dragging.group === o.group) { e.preventDefault(); row.addClass('is-over'); } }); row.addEventListener('dragleave', () => row.removeClass('is-over'));
+      row.addEventListener('drop', e => { e.preventDefault(); row.removeClass('is-over'); if (dragging && dragging !== o && dragging.group === o.group) { if (parent) parent.moveObjectTo(dragging, parent.getObjects().indexOf(o)); else c.moveObjectTo(dragging, c.getObjects().indexOf(o)); c.requestRenderAll(); view.changed(); draw(); } });
+    }
+  };
+  search.addEventListener('input', () => { view.layerQuery = search.value; draw(); }); draw(); el.scrollTop = top;
 }

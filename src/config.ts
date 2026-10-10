@@ -1,3 +1,4 @@
+import type { ImagePrompt } from './imageprompts';
 import { ExportPrefs } from './model';
 import { DEFAULT_PLATFORM } from './platforms';
 import { AI_DEFAULTS, AiConfig, mergeAi } from './aiparse';
@@ -7,6 +8,7 @@ export type DrawerTab = 'templates' | 'add' | 'fonts' | 'assistant';
 /** A chat turn saved with the design; rich payloads (variants, options, snapshots) are recomputable, so only the words persist. */
 export interface SavedChat { role: 'user' | 'assistant'; text: string; applied?: string[] }
 export interface Settings {
+  imagePrompts?: ImagePrompt[];
   designFolder: string; exportFolder: string; fontFolder: string; language: string; defaultPlatform: string;
   export: Partial<ExportPrefs>;
   guides: { safe: boolean; center: boolean; grid: boolean; snap: boolean };
@@ -47,6 +49,7 @@ export function mergeSettings(raw: unknown): Settings {
   if (typeof r.unsplashSecret === 'string') base.unsplashSecret = r.unsplashSecret;
   if (typeof r.unsplashProxy === 'string' && /^https:\/\//.test(r.unsplashProxy)) base.unsplashProxy = r.unsplashProxy.trim();
   if (typeof r.fontNudgeOff === 'boolean') base.fontNudgeOff = r.fontNudgeOff;
+  if (Array.isArray(r.imagePrompts)) base.imagePrompts = r.imagePrompts.filter((x): x is ImagePrompt => !!x && typeof x === 'object' && typeof x.id === 'string' && typeof x.name === 'string' && typeof x.text === 'string' && (x.mode === 'create' || x.mode === 'edit')).slice(0, 100).map(x => ({ id: x.id.slice(0, 100), name: x.name.slice(0, 100), text: x.text.slice(0, 10000), mode: x.mode }));
   base.ai = mergeAi(r.ai); base.series = mergeSeries(r.series); base.chats = mergeChats(r.chats);
   if (r.drawer === '' || r.drawer === 'templates' || r.drawer === 'add' || r.drawer === 'fonts' || r.drawer === 'assistant') base.drawer = r.drawer;
   return base;

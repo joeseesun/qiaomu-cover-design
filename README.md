@@ -18,9 +18,9 @@
 
 ## 安装与使用
 
-开发源码在 [`codex/obsidian-plugin`](https://github.com/joeseesun/qiaomu-cover-design/tree/codex/obsidian-plugin) 分支；首版安装包准备为 0.1.0 草稿 Release，官方预扫描完成后才公开。
+开发源码在 `main`；测试候选安装包保留为草稿 Release，官方预扫描完成后才公开。
 
-开发版本安装：检出 `codex/obsidian-plugin` 分支，运行 `npm ci && npm run build`，将根目录的 `main.js`、`manifest.json`、`styles.css` 放入库的 `.obsidian/plugins/qiaomu-cover-design/`，在第三方插件中启用。
+开发版本安装：检出 `main` 分支，运行 `npm ci && npm run build`，将根目录的 `main.js`、`manifest.json`、`styles.css` 放入库的 `.obsidian/plugins/qiaomu-cover-design/`，在第三方插件中启用。
 
 命令面板选择「新建封面」或「从当前笔记创建封面」。也可右键 Markdown 笔记创建。双击画布文字可直接输入，选中对象后在属性面板修改；打开库中的 `.qcover` 文件继续编辑。
 
@@ -30,7 +30,7 @@
 
 ## 隐私与边界
 
-无联网、账号、遥测、服务器或用户数据上传。默认不访问库外文件系统；仅当你选择「系统文件夹」导出时，才会写入你指定的库外目录（桌面端）。只接受 PNG/JPEG/WebP，单张不超过 10MB，图片内嵌于设计文件，可随库同步。设计中远程图片和 SVG 地址会被拒绝。
+不收集遥测。离线编辑不上传画布；字体库下载、Unsplash 搜索与用户主动提交的 AI 请求会联网。图片编辑会将所选参考图片发送给指定模型。只接受 PNG/JPEG/WebP，导入单张不超过 25MB，图片内嵌于设计文件，可随库同步。设计中远程图片和 SVG 地址会被拒绝。系统文件夹导出与 Codex CLI 使用桌面端本机能力。
 
 默认字库首次打开时在后台静默下载（约 31 MB，来自 [qiaomu-cover-fonts](https://github.com/joeseesun/qiaomu-cover-fonts) 经 jsDelivr 分发，GitHub 兜底），逐个校验 SHA-256 后存入插件目录，之后离线可用；下载失败的字体下次打开自动补，期间用系统字体兜底。完整安装包已自带字库，无需下载。导入的字体存在库内并随库同步，系统字体换设备时可能不同。首版仅支持桌面端，最低 Obsidian 1.8.7。语言设置在重新打开设计标签页后生效。剪贴板取决于系统权限，失败时可使用 PNG 导出。
 
@@ -44,7 +44,7 @@ npm run check
 npm run dev
 ```
 
-`check` 包含 lint、数据/安全/并发/i18n 测试与类型检查、生产构建。产物只外置 `obsidian`，不带 Next.js、Node/Electron、React 或任何远程加载代码。`npm ci` 安装的 Fabric 可选 Node canvas 不参与浏览器 bundle。
+`check` 包含 lint、数据/安全/并发/i18n 测试与类型检查、生产构建。产物只外置 `obsidian`，不带 Next.js、React 或远程加载的可执行代码；Codex CLI 使用桌面端本机进程。`npm ci` 安装的 Fabric 可选 Node canvas 不参与浏览器 bundle。
 
 [测试与发布状态](docs/VERIFICATION.md) · [来源与许可](THIRD_PARTY.md) · [问题反馈](https://github.com/joeseesun/qiaomu-cover-design/issues)
 
@@ -73,4 +73,28 @@ The default font library is built by `scripts/build-font-library.py` (needs font
 
 ### AI 生图
 
-工具栏「插入」左侧的「AI 生图」可直接调用已配置的 Codex CLI、Seedream 或其他生图模型。输入提示词、选模型和图片比例，点击「生成并插入」；图片作为独立图层加入画布，可移动、缩放、旋转和撤销。图片内文字仍是像素。关闭生成弹层或切换设计后，迟到结果不会插入新画布；失败保留提示词，可手动重试。
+工具栏「插入」左侧的「AI 生图」可直接调用已配置的 Codex CLI、Seedream 或其他生图模型。提交后在后台生图，可继续编辑或切换设计；完成后通知「查看结果」，所有模型先预览，再选择要插入的图片。4K 输出保留原始分辨率。结果保存在插件目录的 `image-jobs/`，不包含 API 密钥；关闭弹层不会丢失结果，也不会自动插入。命令「生图任务」或生图弹层里的同名入口可找回已完成结果。插件重载后已完成结果可恢复；正在生成的连接若中断，不自动重新提交收费请求。失败保留提示词，由你手动提交新任务。
+
+选中图片后，右键「AI 修改图片」（或右侧属性的图片编辑图标），输入修改要求；原始图片会作为参考输入发送给 Seedream 或 Codex CLI。先预览结果，再选择「插入副本」或「替换原图」。替换保留位置、大小、旋转、镜像、裁剪、遮罩和图层顺序，支持撤销和保存重开。图片内文字仍是像素；拆层结果也属于图片图层。
+
+Seedream 使用[火山方舟图片生成 API](https://docs.volcengine.com/docs/ark/image-generation-api?lang=zh)，支持以下能力。每次根据所选版本显示合法选项；接入点 ID 可在「生图选项」指定实际版本，选择会保存在该模型配置中。
+
+| 版本 | 原图 / 多图编辑 | 组图 | 分辨率档位 | 专属能力 |
+| --- | --- | --- | --- | --- |
+| 3.0（兼容） | 无，仅文生图 | 无 | 指定像素 | 随机种子、提示词权重 |
+| 4.0 | 最多 14 张参考图 | 最多 15 张，参考图与结果合计 ≤15 | 1K / 2K / 4K | 标准 / 快速提示词优化 |
+| 4.5 | 最多 14 张参考图 | 同上 | 2K / 4K | 标准提示词优化 |
+| 5.0 Lite | 最多 14 张参考图 | 同上 | 2K / 3K / 4K | 联网搜索、PNG / JPEG |
+| 5.0 Pro / Flash | 最多 10 张参考图 | 单图 | 1K / 1.5K / 2K | PNG / JPEG、透明原图编辑、图层拆分；Pro 还支持快速优化 |
+
+支持自定义像素尺寸、URL / Base64 返回和水印开关，按版本检查总像素与比例限制。参考图入口接受 PNG / JPEG / WebP；透明编辑需要一张透明 PNG，拆层需要一张 PNG / JPEG。拆层按返回的层序与边界框复原为组合，可取消组合后独立移动、缩放、旋转；组图的数量是上限，实际张数由模型决定，部分失败会显示原因并保留成功结果。当前采用非流式请求，全部结果返回后展示预览。模型须在方舟账户中开通，模型列表可见不代表已经开通；旧版模型的可用性以控制台为准。
+
+### 即梦兼容与快捷提示词
+
+已有「自定义」配置可直接识别 `jimeng-api` 地址或国内图片模型 ID，不限定域名。按最近支持比例发送 `ratio`，默认 `resolution:2k`；可选 1K / 2K / 4K。模型列表保留接口返回并补齐国内七个版本的后端映射候选，排除视频；候选不等于当前账号已开通。一次返回的所有图片进入同一个后台任务，支持多选插入。HTTP 200 的业务错误、401、429 与图片下载错误都保留，不自动重发生成 POST。即梦本轮仅文生图，未启用 `/images/compositions` 参考图编辑；普通 OpenAI、Ark、Gemini、OpenRouter、Codex 协议继续独立使用。
+
+默认快捷提示词包括极简背景、纸艺海报、产品摄影、编辑插画；改图提供换背景、纯色背景、水彩、卡通、素描和清晰修复。点击仅填入草稿，确认生成才发送；可编辑、删除或保存自己的提示词。纯色背景不等于透明抠图，改图不会改变像素文字的可编辑性。参考 [poster-studio](https://github.com/joeseesun/poster-studio/tree/a5e991ccabf30edf50d5e7ce8a8a4f47728b1d1d) 的提示词与图生图交互重新实现。
+
+鼠标从画布外、空白处或铺满的背景上拖动可框选前景；Shift 框选追加，锁定与隐藏图层不参与，背景只有完整框入才选中。Shift 点击继续使用 Fabric 原生多选，⌘/Ctrl+A 可选中全部可选元素。
+
+图层面板支持名称搜索、⌘/Ctrl 点选、Shift 连选、批量命名及可折叠分组。⌘/Ctrl+G 分组、⌘/Ctrl+Shift+G 解组，F2 命名；组内元素保持可编辑，分组不会合并成位图。生图弹窗先选模型和比例，再写提示词、添加参考图，高级参数默认折叠。模型发现提供完整下拉列表，也保留手动填写模型 ID；参考图用自定义按钮和缩略图展示。

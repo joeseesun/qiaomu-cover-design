@@ -96,7 +96,7 @@ export function shutdownCodex(): void { if (shared) { clearTimeout(shared.idle);
 export function warmCodex(bin: string): void { try { void session(bin).ready.catch(() => undefined); } catch { /* reported later */ } }
 
 /** Runs one turn on a fresh thread and returns the finished items. `write` allows the image tool to save into `cwd`. */
-async function runTurn(o: CodexOptions, instructions: string, text: string, cwd: string, write: boolean): Promise<{ items: Item[]; error?: string }> {
+async function runTurn(o: CodexOptions, instructions: string, text: string, cwd: string, write: boolean, references: string[] = []): Promise<{ items: Item[]; error?: string }> {
   const sess = session(o.bin); const { rpc } = sess; clearTimeout(sess.idle); sess.busy++;
   const items: Item[] = []; let error: string | undefined; let threadId = '';
   let offClose: (() => void) | undefined;
@@ -112,7 +112,7 @@ async function runTurn(o: CodexOptions, instructions: string, text: string, cwd:
     await sess.ready;
     const thread = await rpc.request('thread/start', { cwd, approvalPolicy: 'never', sandbox: write ? 'workspace-write' : 'read-only', ephemeral: true, serviceName: 'qiaomu_cover_design', ...(o.model ? { model: o.model } : {}), developerInstructions: instructions });
     threadId = (thread.thread as { id?: string } | undefined)?.id ?? ''; if (!threadId) throw new Error('codex did not return a thread id');
-    await rpc.request('turn/start', { threadId, cwd, approvalPolicy: 'never', sandboxPolicy: write ? { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false } : { type: 'readOnly' }, ...(o.model ? { model: o.model } : {}), input: [{ type: 'text', text, text_elements: [] }] });
+    await rpc.request('turn/start', { threadId, cwd, approvalPolicy: 'never', sandboxPolicy: write ? { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false } : { type: 'readOnly' }, ...(o.model ? { model: o.model } : {}), input: [{ type: 'text', text, text_elements: [] }, ...references.map(url => ({ type: 'image', url }))] });
     if ((await done) === 'timeout') throw new Error(`codex timed out after ${ms / 1000}s`);
   } finally {
     clearTimeout(timer); offNote(); offClose?.();
@@ -132,11 +132,11 @@ export async function codexText(o: CodexOptions, system: string, user: string): 
 
 const RELAY = "You are an image-generation relay. Call the built-in image generation tool exactly once for the user's request, then reply with one short sentence. Do not run shell commands, write code, browse, or ask questions.";
 /** Generates one picture with Codex's built-in image tool and returns its bytes. */
-export async function codexImage(o: CodexOptions, prompt: string): Promise<{ data: ArrayBuffer; type: string }> {
+export async function codexImage(o: CodexOptions, prompt: string, references: string[] = []): Promise<{ data: ArrayBuffer; type: string }> {
   const req = nodeRequire(); const fs = req('fs') as typeof import('fs'); const os = req('os') as typeof import('os'); const path = req('path') as typeof import('path');
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'qc-codex-'));
   try {
-    const { items, error } = await runTurn({ ...o, timeoutSec: o.timeoutSec ?? 600 }, RELAY, `Generate this image:\n${prompt}`, dir, true);
+    const { items, error } = await runTurn({ ...o, timeoutSec: o.timeoutSec ?? 600 }, RELAY, `${references.length ? 'Edit the provided reference image(s) according to this instruction' : 'Generate this image'}:\n${prompt}`, dir, true, references);
     const img = items.find(i => i.type === 'imageGeneration');
     if (img?.failure) throw new Error(img.failure.message || 'image generation failed');
     let buf: Buffer | undefined;

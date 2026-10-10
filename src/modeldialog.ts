@@ -1,3 +1,4 @@
+import { jimengModels } from './jimeng';
 /**
  * The "add model" dialog, modelled on the Qiaomu Clipper flow: pick a source from a card gallery, then a short form (key, model, and an
  * advanced fold for the address), instead of copying the current model and editing it in place. The same form edits a saved model.
@@ -71,10 +72,14 @@ export class ModelDialog extends Modal {
     }
     const modelInput = field(z ? '模型' : 'Model', box => { const i = box.createEl('input', { type: 'text', attr: { placeholder: s.models[0]?.id ?? (codex ? (z ? '留空用默认' : 'default') : 'model-id'), spellcheck: 'false' } }); i.value = cur.model; return i; }) as HTMLInputElement;
     const listWrap = modelInput.closest('.qc-md-field')!.createDiv('qc-md-models'); let all: PopularModel[] = [...s.models];
+    const pickerId = crypto.randomUUID(); listWrap.createEl('label', { cls: 'qc-sr-only', text: z ? '选择模型' : 'Choose a model', attr: { for: pickerId } });
+    const picker = listWrap.createEl('select', { cls: 'qc-md-model-picker', attr: { id: pickerId } });
     const renderModels = (): void => {
-      listWrap.empty(); const q = modelInput.value.trim().toLowerCase(); const hits = all.filter(m => !q || m.id.toLowerCase().includes(q) || (m.name ?? '').toLowerCase().includes(q)).slice(0, 40);
-      for (const m of hits) { const b = listWrap.createEl('button', { cls: `qc-md-model${m.id === modelInput.value ? ' is-active' : ''}`, attr: { type: 'button' } }); b.createSpan({ text: m.name ?? m.id }); if (m.name) b.createSpan({ text: m.id, cls: 'qc-hint' }); b.addEventListener('click', () => { modelInput.value = m.id; renderModels(); }); }
+      picker.empty(); picker.createEl('option', { value: '', text: z ? '选择模型（也可在上方手动填写）' : 'Choose a model (or enter one above)' });
+      for (const m of all) picker.createEl('option', { value: m.id, text: m.name ? `${m.name} · ${m.id}` : m.id });
+      picker.value = all.some(m => m.id === modelInput.value) ? modelInput.value : ''; picker.disabled = !all.length;
     };
+    picker.addEventListener('change', () => { if (picker.value) modelInput.value = picker.value; });
     modelInput.addEventListener('input', renderModels); renderModels();
     const status = el.createDiv('qc-md-status');
     if (!codex) {
@@ -123,7 +128,10 @@ export class ModelDialog extends Modal {
     const anthropic = s.id === 'anthropic'; const url = anthropic ? `${base}/v1/models` : `${base}/models`;
     const res = await requestUrl({ url, headers: anthropic ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' } : key ? { Authorization: `Bearer ${key}` } : {}, throw: false });
     if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
+    const payload = res.json as { code?: number; message?: string };
+    if (payload.code !== undefined && payload.code !== 0) throw new Error(payload.message?.slice(0, 240) || `Code ${payload.code}`);
     const list = ((res.json as { data?: { id: string; display_name?: string }[] }).data ?? []).map(m => ({ id: m.id, ...(m.display_name ? { name: m.display_name } : {}) }));
-    return imageOnly ? list.filter(m => /image|flux|diffusion|dall|cogview|seedream|imagen/i.test(m.id)) : list;
+    if (imageOnly && list.length && !jimengModels(base, list).length) throw new Error(this.zh ? '服务返回了列表，但没有识别到图片模型' : 'The list contains no recognized image models');
+    return imageOnly ? jimengModels(base, list) : list;
   }
 }

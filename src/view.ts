@@ -1,3 +1,5 @@
+import { bindMarquee } from './marquee';
+import type { GeneratedPicture } from './seedream';
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { ActiveSelection, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
@@ -7,8 +9,6 @@ import { calmLayout, clearCopyOfZones, decorOnText, layoutPass } from './calm';
 import { faceFor, isSingleWeight, pillFor, styleText, textPresetById, type TextPreset } from './textstyles';
 import { openInsertPopover } from './insertpop';
 import { ImageGenerateDialog } from './imagegenerate';
-import { AiService } from './ai';
-import { imageReady, type AiConfig } from './aiparse';
 import { BASIC_SHAPES, PATH_SHAPES, type BasicShape } from './shapes';
 import { AssetCat, assetSvg, loadAssets } from './assets';
 import { assignIds, layoutIssues, placeBox, regionOf, resolveTarget, WHERE_ZH, type Box as SceneBox, type NodeKind, type SceneMeta, type SceneNode, type Target } from './scene';
@@ -37,7 +37,7 @@ import { Align, AssistantInput, CanvasItem, CoverApi, DecorSpec, DesignSpec, Op,
 import { runOps } from './capabilities';
 import { Key } from './i18n';
 import type CoverPlugin from './main';
-import { renderDrawer, renderInspector, renderLayers } from './panels';
+import { renderDrawer, renderInspector, renderLayers, renameLayersDialog } from './panels';
 import { iconButton, textButton, toggleButton } from './ui';
 import { ExportModal, RenameModal, SizeModal, ShortcutsModal, PickFile } from './modals';
 
@@ -47,8 +47,8 @@ export interface Variant { id: string; label: string; url: string; spec?: Design
 export interface Suggestion { id: string; label: string }
 export interface AssetPick { target: string; chosen: string; items: { cat: AssetCat; id: string }[] }
 export interface ChatMessage { role: 'user' | 'assistant'; text: string; failed?: boolean; applied?: string[]; /** Notes that need attention (e.g. the model narrated without acting), shown with a warning icon. */ warn?: string[]; retry?: boolean; variants?: Variant[]; variantScroll?: number; tweaks?: boolean; options?: string[]; suggestions?: Suggestion[]; /** Runner-up library items for icons this turn added; tapping one swaps it in. */ picks?: AssetPick[]; /** Canvas state right after this turn, so the chat doubles as a visual version history. */ snapshot?: string }
-export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean; /** Stable short id the assistant refers to (t1, i3…). */ qcId?: string; /** Palette token the colour follows. */ qcTone?: string; /** Library item, e.g. line:guitar or sticker:rocket. */ qcAsset?: string };
-export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit', 'qcId', 'qcTone', 'qcAsset'];
+export type QObject = FabricObject & { qcRole?: string; qcShadow?: string; qcKind?: string; qcPrompt?: string; qcAnchor?: string; qcWrapped?: boolean; qcHug?: boolean; qcTpl?: boolean; /** Stable short id the assistant refers to (t1, i3…). */ qcId?: string; qcImageId?: string; qcName?: string; qcLayerGroup?: boolean; /** Palette token the colour follows. */ qcTone?: string; /** Library item, e.g. line:guitar or sticker:rocket. */ qcAsset?: string };
+export const PROPS = ['qcRole', 'qcShadow', 'qcKind', 'qcPrompt', 'qcAnchor', 'qcWrapped', 'qcSource', 'qcHug', 'qcTpl', 'qcCredit', 'qcId', 'qcImageId', 'qcName', 'qcLayerGroup', 'qcTone', 'qcAsset'];
 type Layout = Pick<DesignSpec, 'title' | 'subtitle' | 'badge' | 'points' | 'palette' | 'titleFont' | 'bodyFont'>;
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_SIDE = 2600;
@@ -173,7 +173,7 @@ export class CoverView extends FileView implements CoverApi {
     this.platformBtn.addEventListener('click', e => this.platformMenu(e));
     const mid = header.createDiv('qc-header-mid');
     textButton(mid, this.t('aiGenerateImage'), () => this.openImageGenerator(), 'qc-btn-sm qc-ai-image-btn', 'image-plus');
-    const insertBtn = textButton(mid, this.zh ? '插入' : 'Insert', () => openInsertPopover(this, insertBtn), 'qc-btn-sm', 'plus');
+    const insertBtn = textButton(mid, this.zh ? '插入' : 'Insert', () => openInsertPopover(this, insertBtn), 'qc-btn-sm qc-insert-btn', 'plus');
     mid.createSpan({ cls: 'qc-sep' });
     this.undoBtn = iconButton(mid, 'undo-2', this.t('undo'), () => void this.action(() => this.travel(-1)));
     this.redoBtn = iconButton(mid, 'redo-2', this.t('redo'), () => void this.action(() => this.travel(1)));
@@ -204,7 +204,7 @@ export class CoverView extends FileView implements CoverApi {
     this.bindCanvas();
     const wrapper = this.canvas.wrapperEl;
     // Clicking the grey area around the artboard deselects, like every design tool. Panels on either side keep the selection because they edit it.
-    this.stage.addEventListener('pointerdown', e => { if (!wrapper.contains(e.target as Node) && this.canvas?.getActiveObject()) { this.canvas.discardActiveObject(); this.canvas.requestRenderAll(); } });
+    this.register(bindMarquee(this.stage, this.canvas, design.width, design.height));
     this.guidesEl = wrapper.createDiv('qc-guides'); this.snapEl = wrapper.createDiv('qc-snaplines');
     this.zoomBar(center);
     this.inspectorEl = main.createDiv('qc-inspector');
@@ -329,11 +329,15 @@ export class CoverView extends FileView implements CoverApi {
   }
   private contextMenu(e: MouseEvent): void {
     const c = this.canvas; if (!c || this.restoring) return;
-    const point = c.getScenePoint(e);
-    const hit = c.getObjects().slice().reverse().find(o => o.visible && o.containsPoint(point));
-    if (hit && !c.getActiveObjects().includes(hit)) { c.setActiveObject(hit); c.requestRenderAll(); }
+    const hit = c.findTarget(e).target;
+    if (hit && hit !== c.getActiveObject() && !c.getActiveObjects().includes(hit)) { c.setActiveObject(hit); c.requestRenderAll(); }
     const has = c.getActiveObjects().length > 0; const m = new Menu();
     if (has) {
+      const selected = c.getActiveObject();
+      if (selected instanceof FabricImage) m.addItem(i => i.setTitle(this.t('aiEditImage')).setIcon('image-pen').onClick(() => this.openImageGenerator(selected)));
+      m.addItem(i => i.setTitle(this.t('renameLayers')).setIcon('pencil').onClick(() => renameLayersDialog(this, c.getActiveObjects())));
+      if (c.getActiveObjects().length > 1) m.addItem(i => i.setTitle(this.t('groupLayers')).setIcon('group').onClick(() => this.groupLayers()));
+      if ((selected as QObject | undefined)?.qcLayerGroup) m.addItem(i => i.setTitle(this.t('ungroupLayers')).setIcon('ungroup').onClick(() => this.ungroupLayers()));
       m.addItem(i => i.setTitle(this.t('copyObj')).setIcon('copy').onClick(() => void this.action(() => this.copyObjects())));
       m.addItem(i => i.setTitle(this.t('duplicate')).setIcon('copy-plus').onClick(() => void this.action(() => this.cloneSelection())));
     }
@@ -690,23 +694,55 @@ export class CoverView extends FileView implements CoverApi {
     await this.addBackgroundPhoto(blob, `Unsplash · ${photo.author}`);
     return this.t('photoAdded', { author: photo.author });
   }
+  layerQuery = ''; layerAnchor?: FabricObject; layerFolded = new WeakSet<FabricObject>();
+  groupLayers(): void {
+    const c = this.canvas; if (!c) return;
+    const chosen = c.getObjects().filter(o => c.getActiveObjects().includes(o));
+    if (chosen.length < 2 || chosen.some(o => o.lockMovementX || o.lockMovementY)) return;
+    this.beginTurn();
+    try {
+      c.discardActiveObject(); const index = c.getObjects().filter(o => !chosen.includes(o) && c.getObjects().indexOf(o) < c.getObjects().indexOf(chosen[chosen.length - 1]!)).length;
+      c.remove(...chosen);
+      const group = new Group(chosen, { subTargetCheck: true, interactive: true }) as Group & QObject;
+      group.qcLayerGroup = true; group.qcName = this.t('layerGroup'); c.insertAt(index, group); c.setActiveObject(group); group.setCoords(); this.changed();
+    } finally { this.endTurn(); }
+    c.requestRenderAll(); this.refreshInspector(true);
+  }
+  ungroupLayers(): void {
+    const c = this.canvas, selected = c?.getActiveObject() as (Group & QObject) | undefined;
+    if (!c || !(selected instanceof Group) || !selected.qcLayerGroup || selected.lockMovementX || selected.lockMovementY) return;
+    this.beginTurn();
+    try { c.discardActiveObject(); const parent = selected.parent, owner = parent ?? c, index = owner.getObjects().indexOf(selected); const children = selected.removeAll(); owner.remove(selected); owner.insertAt(index, ...children); if (children.length === 1) c.setActiveObject(children[0]!); else if (children.length) c.setActiveObject(new ActiveSelection(children, { canvas: c })); for (const child of children) child.setCoords(); this.changed(); }
+    finally { this.endTurn(); }
+    c.requestRenderAll(); this.refreshInspector(true);
+  }
+  renameLayers(objects: FabricObject[], name: string): void {
+    const c = this.canvas; if (!c || !name.trim() || !objects.length) return;
+    this.beginTurn(); try { objects.forEach((o, i) => { (o as QObject).qcName = `${name.trim().slice(0, 100)}${objects.length > 1 ? ` ${i + 1}` : ''}`; }); this.changed(); } finally { this.endTurn(); } this.refreshInspector(true);
+  }
   removeSelection(): void {
     const c = this.canvas; if (!c) return;
     const targets = c.getActiveObjects(); if (!targets.length) return;
-    c.discardActiveObject(); c.remove(...targets); c.requestRenderAll(); this.refreshInspector(true);
+    this.beginTurn(); try {
+      c.discardActiveObject();
+      for (const o of targets) { const parent = o.parent; if (parent) { parent.remove(o); if (!parent.getObjects().length) { if (parent.parent) parent.parent.remove(parent); else c.remove(parent); } } else c.remove(o); }
+      this.changed();
+    } finally { this.endTurn(); } c.requestRenderAll(); this.refreshInspector(true);
   }
   async cloneSelection(): Promise<void> {
     const c = this.canvas; if (!c) return; const generation = this.generation;
-    const copies = await Promise.all(c.getActiveObjects().map(o => o.clone(PROPS)));
+    const sources = c.getActiveObjects().map(o => ({ object: o, matrix: o.calcTransformMatrix() }));
+    const copies = await Promise.all(sources.map(async ({ object, matrix }) => { const copy = await object.clone(PROPS); util.applyTransformToObject(copy, matrix); return copy; }));
     if (generation !== this.generation || this.closingView) return;
     c.discardActiveObject();
-    for (const copy of copies) { copy.set({ left: copy.left + 28, top: copy.top + 28 }); c.add(copy); }
+    for (const copy of copies) { clearImageIds(copy); copy.set({ left: copy.left + 28, top: copy.top + 28 }); c.add(copy); }
     if (copies.length === 1) c.setActiveObject(copies[0]!); else if (copies.length > 1) c.setActiveObject(new ActiveSelection(copies, { canvas: c }));
     c.requestRenderAll(); this.refreshInspector(true);
   }
   async copyObjects(): Promise<void> {
     const c = this.canvas; if (!c) return;
-    this.clip = (await Promise.all(c.getActiveObjects().map(o => o.clone(PROPS)))).map(o => o.toObject(PROPS));
+    const sources = c.getActiveObjects().map(o => ({ object: o, matrix: o.calcTransformMatrix() }));
+    this.clip = (await Promise.all(sources.map(async ({ object, matrix }) => { const copy = await object.clone(PROPS); util.applyTransformToObject(copy, matrix); return copy; }))).map(o => o.toObject(PROPS));
     if (this.clip.length) new Notice(this.t('copiedObj'));
   }
   async pasteObjects(): Promise<void> {
@@ -715,7 +751,7 @@ export class CoverView extends FileView implements CoverApi {
     const copies = await util.enlivenObjects<FabricObject>(structuredClone(this.clip));
     if (generation !== this.generation || this.closingView) return;
     c.discardActiveObject();
-    for (const o of copies) { o.set({ left: o.left + 28, top: o.top + 28 }); c.add(o); }
+    for (const o of copies) { clearImageIds(o); o.set({ left: o.left + 28, top: o.top + 28 }); c.add(o); }
     this.clip = copies.map(o => o.toObject(PROPS));
     if (copies.length === 1) c.setActiveObject(copies[0]!); else if (copies.length > 1) c.setActiveObject(new ActiveSelection(copies, { canvas: c }));
     c.requestRenderAll(); this.refreshInspector(true);
@@ -1744,24 +1780,69 @@ export class CoverView extends FileView implements CoverApi {
       return await readDataUrl(this.win, out);
     } finally { bitmap.close(); }
   }
-  openImageGenerator(): void {
-    if (this.directImageBusy) { new Notice(this.t('imageGenerating')); return; }
+  openImageGenerator(target?: FabricImage): void {
     if (this.imageDialog) return;
-    const dialog = new ImageGenerateDialog(this, () => { if (this.imageDialog === dialog) this.imageDialog = undefined; });
+    const dialog = new ImageGenerateDialog(this, () => { if (this.imageDialog === dialog) this.imageDialog = undefined; }, target);
     this.imageDialog = dialog; dialog.open();
   }
-  /** One image request, bound to this canvas; the layout planner and existing layers are untouched. */
-  async generateInsertedImage(prompt: string, config: AiConfig, width: number, height: number, keep: () => boolean): Promise<boolean> {
-    if (this.directImageBusy || this.restoring || this.closingView || !this.canvas || !this.design) return false;
-    if (!prompt.trim() || !imageReady(config)) throw new Error(this.t('imageSkipped'));
-    const generation = this.generation; const canvas = this.canvas;
-    const current = (): boolean => keep() && generation === this.generation && canvas === this.canvas && !this.closingView && !this.restoring;
-    this.directImageBusy = true;
-    try {
-      const pic = await new AiService(() => config).image(prompt, width, height, '', false, 'direct');
-      if (!current()) return false;
-      return await this.importImage(new Blob([pic.data], { type: pic.type }), current);
-    } finally { this.directImageBusy = false; }
+  /** A delayed result belongs to its original file and raster, even if another tab is now active. */
+  imageGuard(target?: FabricImage): () => boolean {
+    const generation = this.generation, canvas = this.canvas, source = target?.getSrc();
+    return () => !!canvas && canvas === this.canvas && generation === this.generation && !this.closingView && !this.restoring && (!target || (objectsContain(canvas.getObjects(), target) && target.getSrc() === source));
+  }
+  /** Prepare every result before changing the scene; one group import is one undo step. */
+  async applyImageResult(pictures: GeneratedPicture[], target: FabricImage | undefined, layers: boolean, keep: () => boolean): Promise<boolean> {
+    if (!pictures.length || !keep()) return false;
+    const c = this.canvas!, d = this.design!;
+    const images = await Promise.all(pictures.map(async pic => {
+      const blob = new Blob([pic.data], { type: pic.type });
+      // AI output retains its native resolution, including 4K and transparent layers.
+      if (blob.size > MAX_IMAGE_BYTES || !['image/png', 'image/jpeg', 'image/webp'].includes(pic.type)) throw new Error(this.t('imageLimit'));
+      const image = await FabricImage.fromURL(await readDataUrl(this.win, blob));
+      if (pic.name) (image as QObject & { qcCredit?: string }).qcCredit = pic.name.slice(0, 128);
+      return image;
+    }));
+    if (!keep()) return false;
+    if (target && !layers) {
+      const replacement = await target.clone(PROPS) as FabricImage;
+      if (!keep()) return false;
+      const old = target.getElement() as HTMLImageElement;
+      const sx = images[0]!.width / (old.naturalWidth || old.width), sy = images[0]!.height / (old.naturalHeight || old.height);
+      await replacement.setSrc(images[0]!.getSrc());
+      if (!keep()) return false;
+      replacement.set({ width: target.width * sx, height: target.height * sy, cropX: target.cropX * sx, cropY: target.cropY * sy, scaleX: target.scaleX / sx, scaleY: target.scaleY / sy, left: target.left, top: target.top, angle: target.angle, skewX: target.skewX, skewY: target.skewY, flipX: target.flipX, flipY: target.flipY });
+      if (replacement.clipPath && !replacement.clipPath.absolutePositioned) { const clip = replacement.clipPath; clip.set({ left: clip.left * sx, top: clip.top * sy, scaleX: clip.scaleX * sx, scaleY: clip.scaleY * sy }); }
+      this.beginTurn();
+      try {
+        const parent = target.parent;
+        if (parent) {
+          const at = parent.getObjects().indexOf(target);
+          util.applyTransformToObject(replacement, util.multiplyTransformMatrices(target.group!.calcTransformMatrix(), replacement.calcOwnMatrix()));
+          c.discardActiveObject(); parent.remove(target); parent.insertAt(at, replacement);
+        } else { const at = c.getObjects().indexOf(target); c.discardActiveObject(); c.remove(target); c.insertAt(at, replacement); }
+        replacement.setCoords(); c.setActiveObject(replacement); this.changed();
+      }
+      finally { this.endTurn(); }
+    } else if (layers) {
+      const baseAt = pictures.findIndex(p => p.zIndex === 0); if (baseAt < 0) throw new Error('Seedream: missing base layer');
+      const base = images[baseAt]!;
+      const ordered = pictures.map((pic, i) => ({ pic, img: images[i]! })).sort((a, b) => (a.pic.zIndex ?? 0) - (b.pic.zIndex ?? 0));
+      for (const { pic, img } of ordered) {
+        if (pic.zIndex === 0) img.set({ left: 0, top: 0 });
+        else {
+          const b = pic.box; if (!b || b.length !== 4 || !b.every(Number.isFinite) || b[2]! <= b[0]! || b[3]! <= b[1]!) throw new Error('Seedream: invalid layer bounding box');
+          img.set({ left: b[0], top: b[1], scaleX: (b[2]! - b[0]!) / img.width, scaleY: (b[3]! - b[1]!) / img.height });
+        }
+      }
+      const group = new Group(ordered.map(p => p.img)) as Group & QObject; group.qcLayerGroup = true; group.qcName = this.t('imageInsertLayers'); group.scaleToWidth(Math.min(d.width * .7, base.width)); if (group.getScaledHeight() > d.height * .8) group.scaleToHeight(d.height * .8);
+      group.set({ left: (d.width - group.getScaledWidth()) / 2, top: (d.height - group.getScaledHeight()) / 2 });
+      this.beginTurn(); try { this.place(group); } finally { this.endTurn(); }
+    } else {
+      this.beginTurn();
+      try { for (const [index, image] of images.entries()) { image.scaleToWidth(Math.min(d.width * .7, image.width)); if (image.getScaledHeight() > d.height * .8) image.scaleToHeight(d.height * .8); image.set({ left: (d.width - image.getScaledWidth()) / 2 + (index - (images.length - 1) / 2) * Math.min(d.width * .04, d.width * .2 / Math.max(1, images.length - 1)), top: (d.height - image.getScaledHeight()) / 2 + (index - (images.length - 1) / 2) * Math.min(d.height * .03, d.height * .15 / Math.max(1, images.length - 1)) }); this.place(image); } }
+      finally { this.endTurn(); }
+    }
+    c.requestRenderAll(); this.refreshInspector(true); return true;
   }
   async importImage(blob: Blob, keep: () => boolean = () => true): Promise<boolean> {
     const generation = this.generation; const url = await this.prepareImage(blob);
@@ -1788,6 +1869,8 @@ export class CoverView extends FileView implements CoverApi {
     else if (mod && k === 's') run = () => this.flush();
     else if (mod && k === 'd') run = () => this.cloneSelection();
     else if (mod && k === 'c') run = () => this.copyObjects();
+    else if (mod && k === 'g') run = () => { if (event.shiftKey) this.ungroupLayers(); else this.groupLayers(); };
+    else if (k === 'f2') run = () => renameLayersDialog(this, this.canvas!.getActiveObjects());
     else if (mod && k === 'a') run = () => { const c = this.canvas!; const all = c.getObjects().filter(o => o.selectable); c.discardActiveObject(); if (all.length === 1) c.setActiveObject(all[0]!); else if (all.length) c.setActiveObject(new ActiveSelection(all, { canvas: c })); c.requestRenderAll(); };
     else if (mod && event.shiftKey && k === 'e') run = () => this.quickExport();
     else if (mod && event.shiftKey && k === 'c') run = () => this.copyToClipboard();
@@ -1908,6 +1991,8 @@ export class CoverView extends FileView implements CoverApi {
   safeBase(): string { return safeName(this.file?.basename ?? 'Cover'); }
 }
 
+function objectsContain(objects: FabricObject[], target: FabricObject): boolean { return objects.some(o => o === target || o instanceof Group && objectsContain(o.getObjects(), target)); }
+function clearImageIds(object: FabricObject): void { (object as QObject).qcImageId = undefined; if (object instanceof Group) object.getObjects().forEach(clearImageIds); }
 function mimeOf(ext: string): string { const e = ext.toLowerCase(); return e === 'webp' ? 'image/webp' : e === 'png' ? 'image/png' : 'image/jpeg'; }
 function readDataUrl(win: Window, blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => { const r = new (win as Window & typeof globalThis).FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(blob); });

@@ -226,3 +226,11 @@ test('a headline the writer broke into lines keeps one line per paragraph', () =
   const text = '7 个技巧\n笔记效率翻倍'; const size = fitTitle(text, 700, 900, 190);
   assert.deepEqual(wrapLines(text, 700, size), ['7 个技巧', '笔记效率翻倍'], String(size));
 });
+
+test('Seedream family survives opaque endpoint profile persistence without leaking to other models', async () => {
+  const { AI_DEFAULTS, mergeAi, saveImage, switchImage, directImageConfig } = await import('../src/aiparse');
+  const config = mergeAi(AI_DEFAULTS); const old = config.imageId;
+  const id = saveImage(config, { imageOn: true, imageEngine: 'ark', imageBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', imageKey: 'fixture', imageModel: 'ep-custom', imageSize: 'auto', imageFamily: '4.5' });
+  const restored = mergeAi(JSON.parse(JSON.stringify(config))); assert.equal(directImageConfig(restored, id)?.imageFamily, '4.5');
+  switchImage(restored, old); assert.equal(restored.imageFamily, undefined); assert.equal(directImageConfig(restored, id)?.imageFamily, '4.5');
+});
