@@ -765,6 +765,15 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 
 /* Scroll containers reserve space for complete borders and keyboard focus. */
 .qc-tray-list { padding: 6px; scroll-padding: 6px; }
+.qc-image-generate-modal { width: min(520px, 94vw); }
+.qc-image-generate { padding: 6px; min-width: 0; max-height: 75vh; overflow-y: auto; scroll-padding: 6px; }
+.qc-image-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.qc-image-field > label { font-size: 12.5px; font-weight: 600; }
+.qc-image-field > :is(textarea, select) { width: 100%; min-width: 0; }
+.qc-image-prompt { min-height: 132px; max-height: 240px; resize: vertical; line-height: 1.6; }
+.qc-image-field > button { align-self: flex-start; }
+.qc-image-status { color: var(--qc-muted); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qc-image-status:empty, .qc-image-note:empty { display: none; }
 .qc-model-dialog { min-width: 0; padding: 6px; }
 .qc-modal :is(.qc-new, .qc-export, .qc-md-gallery) { box-sizing: border-box; min-width: 0; }
 @media (max-width: 640px) {

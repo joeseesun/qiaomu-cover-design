@@ -116,6 +116,13 @@ export function imageReady(c: AiConfig): boolean {
   const key = c.imageKey.trim() || (c.imageBaseUrl.trim() ? '' : c.apiKey.trim());
   return !!base && (!!key || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(base));
 }
+/** An explicit image request opts into its selected profile without changing the designer's defaults. */
+export function directImageConfig(c: AiConfig, id: string): AiConfig | undefined {
+  const profile = c.images.find(p => p.id === id);
+  if (!profile && id !== c.imageId) return undefined;
+  const snap = id === c.imageId ? pickImage(c) : profile!.snap;
+  return { ...c, ...snap, imageOn: true, chats: c.chats.map(p => ({ ...p, snap: { ...p.snap } })), images: c.images.map(p => ({ ...p, snap: { ...p.snap } })) };
+}
 export function trimBase(url: string): string { return url.trim().replace(/\/+$/, ''); }
 
 /** Nearest size the common image endpoints accept for a canvas aspect ratio. */

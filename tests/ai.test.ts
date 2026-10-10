@@ -1,9 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AI_DEFAULTS, aiReady, extractJson, imageReady, mergeAi, pickImageSize, sanitizeOps } from '../src/aiparse';
+import { AI_DEFAULTS, aiReady, directImageConfig, extractJson, imageReady, mergeAi, pickImageSize, sanitizeOps } from '../src/aiparse';
 import { STARTERS, IMAGE_STYLES } from '../src/prompts';
 
 const catalog = { platforms: ['xhs', 'youtube'], templates: ['number', 'impact', 'photo'] };
+
+test('direct image profile selection opts in locally without changing saved defaults or the master switch', () => {
+  const c = mergeAi({ enabled: true, imageOn: false, imageEngine: 'codex', images: [{ id: 'seed', snap: { imageOn: false, imageEngine: 'ark', imageKey: 'fixture', imageModel: 'seedream', imageBaseUrl: '', imageSize: 'auto' } }] });
+  const before = JSON.stringify(c);
+  const direct = directImageConfig(c, 'seed')!;
+  assert.equal(direct.imageOn, true); assert.equal(direct.imageEngine, 'ark'); assert.ok(imageReady(direct));
+  direct.images[0]!.snap.imageKey = 'changed';
+  assert.equal(JSON.stringify(c), before);
+  assert.equal(directImageConfig(c, 'missing'), undefined);
+  assert.equal(imageReady(directImageConfig({ ...c, enabled: false }, 'seed')!), false);
+});
 
 test('extracts JSON from fenced or chatty model replies', () => {
   assert.deepEqual(extractJson('```json\n{"a":1}\n```'), { a: 1 });

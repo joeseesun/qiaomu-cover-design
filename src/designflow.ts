@@ -1,4 +1,5 @@
 import type { AssistantResult, DesignSpec, Op } from './ops';
+export const DESIGN_PREVIEW_LIMIT = 7;
 
 /** Enforced at the execution boundary, even if a provider ignores the prompt. */
 export function withoutPictures(spec: DesignSpec): DesignSpec {

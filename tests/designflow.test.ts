@@ -22,6 +22,10 @@ test('proposal replies validate each independent copy and layout and never auto-
   const r = sanitizeOps({ designs: [{ template: 'keyword', title: 'AI 写作第一课', subtitle: '从笔记开始' }, { template: 'bad', title: 'x' }, { template: 'notes', title: '先整理再动笔', points: ['列出要点', '核对事实'] }], ops: [{ op: 'export' }] }, { platforms: ['xhs'], templates: ['keyword', 'notes'] });
   assert.equal(r.designs!.length, 2); assert.equal(r.designs![1]!.title, '先整理再动笔'); assert.deepEqual(r.ops, []);
 });
+test('recommendation replies accept up to seven previews and cap excess proposals', () => {
+  const r = sanitizeOps({ designs: Array.from({ length: 10 }, (_, i) => ({ template: 'keyword', title: `Direction ${i}` })) }, { platforms: ['xhs'], templates: ['keyword'] });
+  assert.equal(r.designs!.length, 7); assert.equal(r.designs!.at(-1)!.title, 'Direction 6');
+});
 test('bundled fonts give individual templates distinct typography and fall back gracefully', () => {
   const fonts = new Set(['得意黑', '未来荧黑', '霞鹜文楷', '思源黑体 Bold', '思源黑体', '马善政楷书']);
   assert.equal(resolvePair('keyword', f => fonts.has(f)).title, '得意黑');

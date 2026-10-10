@@ -70,13 +70,14 @@ export class AiService {
   /** One-line round trip used by the settings "test" button. */
   async ping(): Promise<string> { return (await this.complete('Reply with the single word OK.', [], 'ping')).trim().slice(0, 60); }
 
-  async image(prompt: string, width: number, height: number, style = '', subject = false): Promise<{ data: ArrayBuffer; type: string }> {
+  async image(prompt: string, width: number, height: number, style = '', subject = false, mode: 'cover' | 'direct' = 'cover'): Promise<{ data: ArrayBuffer; type: string }> {
     const c = this.cfg();
+    const text = mode === 'direct' ? prompt.trim() : [prompt.trim(), style, subject ? SUBJECT_RULES : IMAGE_RULES].filter(Boolean).join('. ');
     if (c.imageEngine === 'codex') {
       const ratio = `${width}x${height} pixels (aspect ratio ${(width / height).toFixed(2)}:1)`;
-      return codexImage({ bin: findCodex(c.codexBin), model: c.codexModel.trim() || undefined }, [prompt.trim(), style, subject ? SUBJECT_RULES : `Compose for a ${ratio} canvas`, subject ? '' : IMAGE_RULES].filter(Boolean).join('. '));
+      const instructions = mode === 'direct' ? `${text}\nRequested image size: ${ratio}` : [prompt.trim(), style, subject ? SUBJECT_RULES : `Compose for a ${ratio} canvas`, subject ? '' : IMAGE_RULES].filter(Boolean).join('. ');
+      return codexImage({ bin: findCodex(c.codexBin), model: c.codexModel.trim() || undefined }, instructions);
     }
-    const text = [prompt.trim(), style, subject ? SUBJECT_RULES : IMAGE_RULES].filter(Boolean).join('. ');
     const fromB64 = (b64: string, type = 'image/png'): { data: ArrayBuffer; type: string } => { const bin = atob(b64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return { data: bytes.buffer, type: ['image/png', 'image/jpeg', 'image/webp'].includes(type) ? type : 'image/png' }; };
     const fromUrl = async (url: string): Promise<{ data: ArrayBuffer; type: string }> => {
       if (url.startsWith('data:')) { const m = /^data:([^;]+);base64,(.*)$/s.exec(url); if (!m) throw new Error('empty-image'); return fromB64(m[2]!, m[1]); }
@@ -109,9 +110,8 @@ export class AiService {
     }
     const own = !!c.imageBaseUrl.trim();
     const base = trimBase(own ? c.imageBaseUrl : c.baseUrl); const key = (own ? c.imageKey : c.imageKey || c.apiKey).trim();
-    const full = [prompt.trim(), style, subject ? SUBJECT_RULES : IMAGE_RULES].filter(Boolean).join('. ');
     const headers: Record<string, string> = key ? { Authorization: `Bearer ${key}` } : {};
-    const { json } = await send({ url: `${base}/images/generations`, method: 'POST', contentType: 'application/json', headers, body: JSON.stringify({ model: c.imageModel, prompt: full, n: 1, size: pickImageSize(width, height, c.imageSize) }) });
+    const { json } = await send({ url: `${base}/images/generations`, method: 'POST', contentType: 'application/json', headers, body: JSON.stringify({ model: c.imageModel, prompt: text, n: 1, size: pickImageSize(width, height, c.imageSize) }) });
     const body = json as { data?: { b64_json?: string; url?: string }[]; images?: { url?: string }[] } | undefined;
     const item = body?.data?.[0]; const b64 = item?.b64_json;
     if (b64) { const bin = atob(b64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return { data: bytes.buffer, type: 'image/png' }; }
