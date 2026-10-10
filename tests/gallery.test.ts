@@ -1,3 +1,4 @@
+import { pictureIndex, removeGalleryEntries } from '../src/gallery-actions';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm,writeFile,mkdir,symlink,readFile,access} from 'node:fs/promises';
@@ -30,4 +31,19 @@ test('folder settings ignore malformed or relative paths and keep user-chosen ab
 });
 test('reference images stay outside manifests, replay hydrates them, and deleting a task cleans old prompts and references',async()=>{
  const root=await mkdtemp(join(tmpdir(),'qc-recipe-'));try{const adapter=diskAdapter(root),store=new VaultImageJobStore(adapter,'jobs'),jobs=new ImageJobs(store,()=>{});const url='data:image/png;base64,AQ==';const job=await jobs.submit({...input,request:{modelId:'configured-model',width:160,height:100,options:{references:[{url,width:160,height:100}]}}},async()=>result);await until(()=>job.state==='ready');const saved=(await store.list())[0]!;assert.equal(saved.request!.options.references![0]!.url,'qcover-reference:0');const replay=await jobs.recipe(saved);assert.equal(replay.request!.options.references![0]!.url,url);await jobs.removeRecord(job);const files=(await adapter.list(`jobs/${job.id}`)).files;assert.equal(files.filter(f=>f.endsWith('.json')).length,1);assert.ok(!files.some(f=>f.endsWith('.reference')));const remaining=(await store.list())[0]!;assert.equal(remaining.prompt,'');assert.equal(remaining.request,undefined);assert.equal((await store.result(remaining)).pictures.length,3);}finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('batch deletion resolves changing indices, keeps unselected siblings, and survives restart',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'qc-batch-'));try{const store=new VaultImageJobStore(diskAdapter(root),'jobs'),jobs=new ImageJobs(store,()=>{}),job=await jobs.submit(input,async()=>result);await until(()=>job.state==='ready');
+ const entries=[0,1].map(id=>({id:String(id),remove:()=>jobs.removePicture(job,pictureIndex(job,id))})),done:string[]=[];
+ assert.deepEqual(await removeGalleryEntries(entries,id=>done.push(id)),{removed:2,failed:0});assert.deepEqual(done,['0','1']);
+ assert.deepEqual((await jobs.result(job)).pictures.map(p=>new Uint8Array(p.data)[0]),[3]);
+ const next=new ImageJobs(new VaultImageJobStore(diskAdapter(root),'jobs'),()=>{});await next.refresh();const saved=next.jobs.get(job.id)!;assert.equal(pictureIndex(saved,2),0);assert.throws(()=>pictureIndex(saved,1));assert.deepEqual(new Uint8Array((await next.result(saved)).pictures[0]!.data),new Uint8Array([3]));
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+test('batch failures retain failed selections and never delete read-only entries',async()=>{
+ const selected=new Set(['a','failed','b','remote']);let active=0,max=0;
+ const remove=async()=>{active++;max=Math.max(max,active);await new Promise(r=>setTimeout(r,5));active--;};
+ const entries=[{id:'a',remove},{id:'failed',remove:async()=>{throw Error('disk unavailable');}},{id:'b',remove},{id:'remote'}];
+ assert.deepEqual(await removeGalleryEntries(entries,id=>selected.delete(id)),{removed:2,failed:1});assert.equal(max,1);assert.deepEqual([...selected],['failed','remote']);
 });

@@ -1,3 +1,4 @@
+import { pictureIndex, removeGalleryEntries } from './gallery-actions';
 import { Menu, Modal, Platform, setIcon } from 'obsidian';
 import type CoverPlugin from './main';
 import type { CoverView } from './view';
@@ -16,7 +17,7 @@ export class GalleryDialog extends Modal {
   private tab:GalleryTab;private view?:CoverView;private closed=false;private busy=false;private token=0;private urls:string[]=[];private observer?:IntersectionObserver;private off?:()=>void;
   private selected=new Map<string,Entry>();private entries:Entry[]=[];private uploads:GalleryImage[]=[];private query='';private filter='all';private folder='';private page=1;private shown=48;
   private tabs!:HTMLElement;private tools!:HTMLElement;private body!:HTMLElement;private status!:HTMLElement;private count!:HTMLElement;private insert!:HTMLButtonElement;private upload!:HTMLInputElement;
-  private hideSelected?:HTMLButtonElement;private photos:Photo[]=[];private lastSearch='';private photoLoading=false;
+  private deleteSelected!:HTMLButtonElement;private photos:Photo[]=[];private lastSearch='';private photoLoading=false;
   constructor(private plugin:CoverPlugin,tab:GalleryTab='images',view?:CoverView){super(plugin.app);this.tab=tab;this.view=view??plugin.activeCover();const cached=recommendations.get(plugin);if(cached&&Date.now()-cached.at<300000&&cached.source===`${plugin.settings.unsplashSecret}\0${plugin.settings.unsplashProxy}`)this.photos=cached.photos;}
   private w(zh:string,en:string):string{return this.plugin.isZh()?zh:en;}
   onOpen():void{
@@ -24,7 +25,7 @@ export class GalleryDialog extends Modal {
     const el=this.contentEl;this.tabs=el.createDiv({cls:'qc-gallery-tabs',attr:{role:'tablist'}});quietName(this.tabs,this.w('图片来源','Image sources'));
     this.tools=el.createDiv('qc-gallery-tools');this.body=el.createDiv({cls:'qc-gallery-body',attr:{role:'tabpanel',tabindex:'0'}});
     const footer=el.createDiv('qc-gallery-footer');this.count=footer.createSpan('qc-gallery-count');this.status=footer.createSpan({cls:'qc-gallery-status',attr:{role:'status','aria-live':'polite'}});
-    textButton(footer,this.w('清空选择','Clear selection'),()=>{this.selected.clear();this.sync();},'qc-btn-sm qc-gallery-clear');
+    this.deleteSelected=iconButton(footer,'trash-2',this.w('删除选中图片','Delete selected images'),()=>this.removeSelection(),'qc-gallery-delete');
     this.insert=textButton(footer,this.w('插入画布','Insert into canvas'),()=>void this.apply(),'qc-primary','plus');
     this.upload=el.createEl('input',{cls:'qc-hidden',attr:{type:'file',accept:'image/png,image/jpeg,image/webp',multiple:''}});quietName(this.upload,this.w('上传图片','Upload images'),el);
     this.upload.addEventListener('change',()=>{const files=Array.from(this.upload.files??[]);this.upload.value='';void this.importFiles(files);});
@@ -38,7 +39,7 @@ export class GalleryDialog extends Modal {
   private async act(fn:()=>Promise<void>):Promise<void>{if(this.busy||this.closed)return;this.busy=true;this.sync();try{await fn();}catch(e){this.error(e);}finally{this.busy=false;if(!this.closed){this.sync();await this.draw();}}}
   private cleanup():void{this.observer?.disconnect();for(const u of this.urls)URL.revokeObjectURL(u);this.urls=[];}
   private async draw():Promise<void>{
-    if(this.closed)return;const token=++this.token;this.cleanup();this.body.empty();this.tools.empty();this.hideSelected=undefined;this.tabs.empty();
+    if(this.closed)return;const token=++this.token;this.cleanup();this.body.empty();this.tools.empty();this.tabs.empty();
     for(const [id,zh,en,icon] of [['images','我的图片','My images','images'],['tasks','生图任务','Generation tasks','sparkles'],['folders','本地文件夹','Local folders','folder-open'],['unsplash','Unsplash','Unsplash','camera']] as const){
       const b=textButton(this.tabs,this.w(zh,en),()=>{if(this.busy)return;this.tab=id;this.query='';this.shown=48;this.status.empty();void this.draw();},'',icon);b.dataset.tab=id;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(this.tab===id));b.id=`qc-gallery-tab-${id}`;b.tabIndex=this.tab===id?0:-1;
       b.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const all=Array.from(this.tabs.querySelectorAll<HTMLButtonElement>('[role=tab]')),at=all.indexOf(b),next=e.key==='Home'?0:e.key==='End'?all.length-1:(at+(e.key==='ArrowRight'?1:-1)+all.length)%all.length;const id=all[next]!.dataset.tab;all[next]!.click();this.tabs.querySelector<HTMLButtonElement>(`[data-tab="${id}"]`)?.focus();});
@@ -62,7 +63,7 @@ export class GalleryDialog extends Modal {
         const f=folders.find(x=>x.id===this.folder);if(f){iconButton(this.tools,'refresh-cw',this.w('刷新文件夹','Refresh folder'),()=>void this.draw());iconButton(this.tools,'folder-minus',this.w('移除文件夹引用','Remove folder reference'),()=>this.confirm(this.w('移除文件夹？','Remove folder?'),this.w('只移除图库中的引用，原文件保持不变。','Only removes this reference. Original files stay unchanged.'),()=>this.act(async()=>{this.plugin.settings.galleryFolders=folders.filter(x=>x.id!==f.id);await this.plugin.saveSettings();this.selected.forEach((e,id)=>{if(id.startsWith(`folder:${f.id}:`))this.selected.delete(id);});})));}
         if(!f){emptyState(this.body,{icon:'folder-open',title:this.w('连接你的图片文件夹','Connect an image folder'),hint:this.w('直接浏览 PNG、JPG、WebP；选中插入时才复制到封面。','Browse PNG, JPG and WebP. Images are copied only when inserted.'),actions:[{label:this.w('添加文件夹','Add folder'),run:()=>void this.addFolder(),primary:true}]});this.entries=[];this.sync();return;}
         const files=await folderImages(f.path);if(this.closed||token!==this.token)return;
-        this.hideSelected=textButton(this.tools,this.w('隐藏选中','Hide selected'),()=>this.confirm(this.w('隐藏选中的本地图片？','Hide selected local images?'),this.w('只隐藏图库展示，原文件不变，可从“已隐藏”恢复。','Only hides images in this library. Originals stay unchanged; restore from Hidden.'),()=>this.act(async()=>{for(const [id,e] of this.selected)if(e.source==='folder'&&id.startsWith(`folder:${f.id}:`)){await e.remove?.();this.selected.delete(id);}})),'qc-btn-sm','eye-off');
+
         if(f.hidden?.length)textButton(this.tools,this.w(`已隐藏 ${f.hidden.length} 张`,`Hidden: ${f.hidden.length}`),()=>this.restoreFolder(f),'qc-btn-sm','eye-off');
         this.entries=files.filter(image=>!f.hidden?.includes(image.name)).map(image=>({id:`folder:${f.id}:${image.name}`,name:image.name,source:'folder' as const,created:image.modified,meta:f.name,data:async()=>({data:await folderImageData(f.path,image),type:image.type,name:image.name}),remove:async()=>{f.hidden=[...new Set([...(f.hidden??[]),image.name])];await this.plugin.saveSettings();}}));
       }else{
@@ -76,7 +77,10 @@ export class GalleryDialog extends Modal {
     }catch(e){if(token===this.token){this.error(e);emptyState(this.body,{icon:'circle-alert',title:this.w('暂时无法读取图片','Could not read these images'),actions:[{label:this.w('重试','Retry'),run:()=>void this.draw()}]});}}
   }
   private uploadEntry(image:GalleryImage):Entry{return {id:`upload:${image.id}`,name:image.name,source:'upload',created:image.created,meta:`${image.width} × ${image.height}`,data:async()=>({data:await this.plugin.gallery.data(image),type:image.type,name:image.name}),rename:name=>this.plugin.gallery.rename(image,name),remove:()=>this.plugin.gallery.remove(image)};}
-  private generated():Entry[]{return [...this.plugin.imageJobs.jobs.values()].filter(j=>j.state==='ready').flatMap(job=>(Array.isArray(job.pictures)?job.pictures:[]).map((pic,index)=>({id:`job:${job.id}:${pic.storageIndex??index}`,name:pic.name||job.name||job.prompt.replace(/\s+/g,' ').slice(0,45)||this.w('生成图片','Generated image'),source:'generated' as const,created:job.created,meta:job.model,data:()=>this.plugin.imageJobs.picture(job,index),rename:name=>this.plugin.imageJobs.renamePicture(job,index,name),remove:async()=>{this.selected.forEach((_,id)=>{if(id.startsWith(`job:${job.id}:`))this.selected.delete(id);});await this.plugin.imageJobs.removePicture(job,index);}})));}
+  private generated():Entry[]{return [...this.plugin.imageJobs.jobs.values()].filter(j=>j.state==='ready').flatMap(job=>(Array.isArray(job.pictures)?job.pictures:[]).map((pic,index)=>{
+    const storageIndex=pic.storageIndex??index;
+    return {id:`job:${job.id}:${storageIndex}`,name:pic.name||job.name||job.prompt.replace(/\s+/g,' ').slice(0,45)||this.w('生成图片','Generated image'),source:'generated' as const,created:job.created,meta:job.model,data:()=>this.plugin.imageJobs.picture(job,pictureIndex(job,storageIndex)),rename:name=>this.plugin.imageJobs.renamePicture(job,pictureIndex(job,storageIndex),name),remove:()=>this.plugin.imageJobs.removePicture(job,pictureIndex(job,storageIndex))};
+  }));}
   private photoEntry(photo:Photo):Entry{return {id:`unsplash:${photo.id}`,name:photo.author,source:'unsplash',created:0,thumb:photo.thumb,photo,data:async()=>{const blob=await downloadPhoto(this.source(),photo);return {data:await blob.arrayBuffer(),type:blob.type,name:`Unsplash · ${photo.author} · ${photo.page}`};}};}
   private source():Source{return {key:unsplashKey(this.plugin.app,this.plugin.settings.unsplashSecret),proxy:this.plugin.settings.unsplashProxy};}
   private renderGrid():void{
@@ -101,7 +105,22 @@ export class GalleryDialog extends Modal {
     if(entries.length>this.shown)textButton(this.body,this.w('显示更多','Show more'),()=>{this.shown+=48;this.renderGrid();},'qc-btn-sm qc-gallery-load');
     if(this.tab==='unsplash'&&this.photos.length>=this.page*24)textButton(this.body,this.w('加载更多照片','Load more photos'),()=>void this.search(true),'qc-btn-sm qc-gallery-load');
   }
-  private sync():void{if(this.closed)return;this.count.setText(this.selected.size?this.w(`已选 ${this.selected.size} 张`,`${this.selected.size} selected`):this.w('选择图片后插入画布','Select images to insert'));if(this.hideSelected)this.hideSelected.disabled=this.busy||![...this.selected.keys()].some(id=>id.startsWith(`folder:${this.folder}:`));this.insert.disabled=this.busy||!this.selected.size||!this.view?.canvas;this.insert.setText(this.busy?this.w('处理中…','Working…'):this.w('插入画布','Insert into canvas'));this.contentEl.querySelectorAll('.qc-gallery-tile').forEach(tile=>tile.querySelector('.qc-gallery-card')?.setAttribute('aria-pressed',String(this.selected.has((tile as HTMLElement).dataset.id!))));if(!this.view?.canvas)this.status.setText(this.w('打开一张封面后即可插入','Open a cover to insert images'));}
+  private sync():void{if(this.closed)return;this.deleteSelected.disabled=this.busy||![...this.selected.values()].some(e=>e.remove);this.count.setText(this.selected.size?this.w(`已选 ${this.selected.size} 张`,`${this.selected.size} selected`):this.w('选择图片后插入画布','Select images to insert'));this.insert.disabled=this.busy||!this.selected.size||!this.view?.canvas;this.insert.setText(this.busy?this.w('处理中…','Working…'):this.w('插入画布','Insert into canvas'));this.contentEl.querySelectorAll('.qc-gallery-tile').forEach(tile=>tile.querySelector('.qc-gallery-card')?.setAttribute('aria-pressed',String(this.selected.has((tile as HTMLElement).dataset.id!))));if(!this.view?.canvas)this.status.setText(this.w('打开一张封面后即可插入','Open a cover to insert images'));}
+  private removeSelection():void{
+    if(this.busy||this.closed)return;
+    const entries=[...this.selected.values()].filter(e=>e.remove);if(!entries.length)return;
+    const local=entries.filter(e=>e.source==='folder').length,owned=entries.length-local,readonly=this.selected.size-entries.length;
+    const title=this.w(owned?`删除选中的 ${entries.length} 张图片？`:`隐藏选中的 ${local} 张本地图片？`,owned?`Delete ${entries.length} selected images?`:`Hide ${local} local images?`);
+    const parts:string[]=[];
+    if(owned)parts.push(this.w(`${owned} 张生成或上传的图片将从图库永久删除。`,`${owned} generated or uploaded images will be permanently deleted from the library.`));
+    if(local)parts.push(this.w(`${local} 张本地图片只从图库隐藏，原文件不变，可从“已隐藏”恢复。`,`${local} local images will only be hidden; originals stay unchanged and can be restored from Hidden.`));
+    parts.push(this.w('已经插入封面的图片保持不变。','Images already inserted in covers stay unchanged.'));
+    if(readonly)parts.push(this.w(`另外 ${readonly} 张 Unsplash 照片保留。`,`${readonly} Unsplash photos will be kept.`));
+    this.confirm(title,parts.join(' '),()=>this.act(async()=>{
+      const result=await removeGalleryEntries(entries,id=>this.selected.delete(id));
+      this.status.setText(this.w(`已处理 ${result.removed} 张${result.failed?`，${result.failed} 张失败，保留选择可重试`:''}`,`${result.removed} removed${result.failed?`; ${result.failed} failed and remain selected for retry`:''}`));
+    }));
+  }
   private async apply():Promise<void>{if(this.busy||!this.selected.size||!this.view?.canvas)return;const view=this.view,guard=view.imageGuard();await this.act(async()=>{const pictures:GeneratedPicture[]=[];for(const e of this.selected.values()){if(this.closed)return;pictures.push({...await e.data(),name:e.source==='unsplash'?`Unsplash · ${e.photo!.author} · ${e.photo!.page}`:e.name});}
     if(await view.applyImageResult(pictures,undefined,false,()=>!this.closed&&guard())){await view.flush();this.close();}else throw Error(this.w('画布已经变动，请重新打开图库','Canvas changed. Reopen the library.'));});}
   private async importFiles(files:File[]):Promise<void>{if(!files.length)return;await this.act(async()=>{let added=0;const failed:string[]=[];for(const file of files.slice(0,50)){if(this.closed)break;try{if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>30*1024*1024)throw Error('PNG / JPG / WebP, ≤30 MB');const bitmap=await createImageBitmap(file);try{if(bitmap.width*bitmap.height>36e6)throw Error('Image exceeds 36 MP');await this.plugin.gallery.add(file.name,file.type,await file.arrayBuffer(),bitmap.width,bitmap.height);added++;}finally{bitmap.close();}}catch{failed.push(file.name);}}
