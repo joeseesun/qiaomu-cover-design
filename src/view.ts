@@ -1233,11 +1233,13 @@ export class CoverView extends FileView implements CoverApi {
     let fixed = 0;
     const panels = c.getObjects().filter(o => !(o instanceof Textbox) && !(o instanceof FabricImage) && !['decor', 'subject', 'image', 'scrim'].includes((o as QObject).qcRole ?? '') && o.opacity >= 0.5);
     const onPanel = (t: Textbox): boolean => panels.some(p => { const r = p.getBoundingRect(); const cx = t.left + t.getScaledWidth() / 2, cy = t.top + t.getScaledHeight() / 2; return cx > r.left && cx < r.left + r.width && cy > r.top && cy < r.top + r.height && r.width < d.width * 0.98; });
-    if (bg && !fullBleed) for (const t of texts) {
-      if (t.textBackgroundColor || t.stroke || typeof t.fill !== 'string' || onPanel(t)) continue;
-      const next = ensureReadable(t.fill, bg); if (next === t.fill) continue;
+    for (const t of texts) {
+      // A badge has its own opaque background; testing it against the page can erase readable label text.
+      const backdrop = t instanceof BadgeBox ? t.badgeBg : !fullBleed && !onPanel(t) ? bg : undefined;
+      if (!backdrop || t.textBackgroundColor || t.stroke || typeof t.fill !== 'string') continue;
+      const next = ensureReadable(t.fill, backdrop); if (next === t.fill) continue;
       // A colour the user just asked for is theirs: keep it, say why it may be hard to read, and offer the fix as a suggestion.
-      if (this.chosenColor.has(t)) { const ratio = contrast(t.fill, bg) ?? 1; this.turnNotes.push(this.t('lowContrast', { what: this.layerLabel(t), ratio: ratio.toFixed(1) })); continue; }
+      if (this.chosenColor.has(t)) { const ratio = contrast(t.fill, backdrop) ?? 1; this.turnNotes.push(this.t('lowContrast', { what: this.layerLabel(t), ratio: ratio.toFixed(1) })); continue; }
       t.set({ fill: next }); fixed++;
     }
     if (fixed) notes.push(this.zh ? `已提高 ${fixed} 处文字的对比度` : `Raised contrast on ${fixed} text layer${fixed > 1 ? 's' : ''}`);
@@ -1426,7 +1428,7 @@ export class CoverView extends FileView implements CoverApi {
     };
   }
   /** Sends a request to the selected assistant and applies what comes back. Shared by the chat box, retry and auto-design. */
-  async ask(prompt: string, display = prompt): Promise<void> {
+  async ask(prompt: string, display = prompt, options: { applyFirst?: boolean } = {}): Promise<void> {
     if (this.busy || this.restoring || !this.canvas) return;
     const list = this.plugin.assistantList(); const extras = list.some(p => p.id !== 'ai' && p.id !== 'offline'); const provider = (extras ? list.find(p => p.id === this.plugin.settings.assistant) : list.find(p => p.id === 'ai')) ?? list[0]!;
     const generation = this.generation;
@@ -1457,7 +1459,12 @@ export class CoverView extends FileView implements CoverApi {
         const variants = await this.designChoices(proposals);
         if (generation !== this.generation || !this.canvas) return;
         if (!variants.length) throw new Error(this.t('previewFailed'));
-        this.chat.push({ role: 'assistant', text: this.t('chooseDirection'), variants });
+        const message: ChatMessage = { role: 'assistant', text: this.t('chooseDirection'), variants };
+        if (options.applyFirst && !this.turnSelection?.length) {
+          if (!await this.applyVariant(message, variants[0]!)) return;
+          message.text = this.t('firstDirectionApplied');
+        }
+        this.chat.push(message);
         return;
       }
       // The model would rather ask than guess: show its question with tappable answers and change nothing.
@@ -1536,15 +1543,22 @@ export class CoverView extends FileView implements CoverApi {
     if (this.busy || this.task || this.restoring || !this.canvas) return;
     this.busy = true; this.onChat?.();
     try {
-      if (variant.spec) message.applied = usefulFeedback(await this.applyDesign(withoutPictures(variant.spec)));
-        else this.applyTemplate(variant.id, {}, true);
-      for (const v of message.variants ?? []) v.selected = v === variant;
-      message.text = this.t('directionApplied');
-      message.tweaks = true;
-      message.snapshot = this.snapshot();
-      message.suggestions = this.thumbSuggestions();
+      await this.applyVariant(message, variant);
     } catch (e) { new Notice(this.t('error', { message: e instanceof Error ? e.message : String(e) })); }
     finally { this.busy = false; this.onChat?.(); this.persistChat(); }
+  }
+  /** Initial creation and later choice clicks use the same editable layout and selected state. */
+  private async applyVariant(message: ChatMessage, variant: Variant): Promise<boolean> {
+    const generation = this.generation, canvas = this.canvas;
+    if (!canvas) return false;
+    const applied = variant.spec ? usefulFeedback(await this.applyDesign(withoutPictures(variant.spec))) : undefined;
+    if (generation !== this.generation || canvas !== this.canvas || this.closingView) return false;
+    if (!variant.spec) this.applyTemplate(variant.id, {}, true);
+    message.applied = applied;
+    for (const v of message.variants ?? []) v.selected = v === variant;
+    message.text = this.t('directionApplied'); message.tweaks = true;
+    message.snapshot = this.snapshot(); message.suggestions = this.thumbSuggestions();
+    return true;
   }
   /** Returns the canvas to the state captured right after that chat turn — the chat doubles as a version history. */
   async restoreSnapshot(snapshot: string): Promise<void> {
@@ -1727,7 +1741,7 @@ export class CoverView extends FileView implements CoverApi {
   }
   private async autoDesign(brief: string): Promise<void> {
     this.plugin.settings.drawer = 'assistant'; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom();
-    await this.ask(this.design?.source ? brief : `${this.t('briefPrefix')}\n${brief}`, brief.length > 140 ? `${brief.slice(0, 140)}…` : brief);
+    await this.ask(this.design?.source ? brief : `${this.t('briefPrefix')}\n${brief}`, brief.length > 140 ? `${brief.slice(0, 140)}…` : brief, { applyFirst: true });
   }
   styleText(target: Target, change: TextChange): boolean {
     const c = this.canvas; if (!c) return false;

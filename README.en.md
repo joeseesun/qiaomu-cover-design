@@ -12,7 +12,7 @@ The editorial illustrations in this guide were made with Codex's built-in image 
 
 **Desktop Obsidian 1.11.4+ · Offline core editing · Optional AI · Free and open source**
 
-Previously Qiaomu Cover Design. The plugin ID `qiaomu-cover-design` and `.qcover` format remain unchanged. Existing designs, settings and image history do not need to be migrated because of the rename. This guide describes the **0.3.1** implementation.
+Previously Qiaomu Cover Design. The plugin ID `qiaomu-cover-design` and `.qcover` format remain unchanged. Existing designs, settings and image history do not need to be migrated because of the rename. This guide describes the **0.3.2** implementation.
 
 ## Start with a note; finish with a reusable design
 
@@ -45,7 +45,7 @@ Configure a layout model under **Models & services**, then enter a brief or use 
 
 Expand the Note row above the composer to inspect the exact body, selection or summary used. Missing notes, empty bodies and failed summaries report an error. Image links in notes are text references, not visual model input. Local colour edits and offline commands do not invoke note summarization.
 
-Compare up to seven candidate previews, choose one and keep editing the resulting canvas. Layout instructions can create editable text and shapes. Image generation is optional and off by default for the layout flow. You can request changes to copy, colors, fonts and composition; complex requests are limited by the supported operation protocol and model output.
+When creating from a note, **Create** or Enter reads its body with AI and applies the first design; alternatives remain available to switch. **Create manually** only applies the chosen template without AI. Without a configured layout model, Create opens setup instead of silently falling back to the filename. Explicitly requesting new proposals on an existing canvas keeps it intact until you choose one of up to seven previews. Layout instructions can create editable text and shapes. Image generation is optional and off by default for the layout flow. You can request changes to copy, colors, fonts and composition; complex requests are limited by the supported operation protocol and model output.
 
 Example brief:
 
