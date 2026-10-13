@@ -1120,3 +1120,15 @@ body:not(.is-mobile) .workspace-leaf-content[data-type="qiaomu-cover-design"] > 
 .qc-md-model-step > .qc-md-steps, .qc-md-model-step > .qc-md-status { flex-shrink: 0; }
 .qc-md-selection-body { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 1px; }
 .qc-md-selection-body > * { flex-shrink: 0; }
+
+/* Linked-note material stays beside the composer; expanded text is an exact request preview. */
+.qc-root .qc-note-context { margin: 0 0 8px; color: var(--text-muted); font-size: 12px; }
+.qc-root .qc-note-context > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 0; list-style: none; }
+.qc-root .qc-note-context > summary::-webkit-details-marker { display: none; }
+.qc-root .qc-note-context > summary:hover { color: var(--text-normal); }
+.qc-root .qc-note-context > summary:focus-visible { outline: 1px solid var(--text-muted); outline-offset: 2px; }
+.qc-root .qc-note-context-icon { display: flex; flex: 0 0 14px; }
+.qc-root .qc-note-context-icon svg { width: 14px; height: 14px; }
+.qc-root .qc-note-context-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qc-root .qc-note-context-content { max-height: 210px; overflow: auto; padding: 8px 0; }
+.qc-root .qc-note-context-content pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; font: inherit; color: var(--text-normal); }

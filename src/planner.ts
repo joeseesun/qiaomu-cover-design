@@ -3,6 +3,7 @@
  * reply had no usable JSON or commands that failed validation, send the reasons back once for a corrected reply. The plugin
  * passes an Obsidian-backed `Complete`; the intent eval passes a fetch-based one, so both run the very same logic.
  */
+import { noteMaterial } from './notecontext';
 import { extractJson } from './aiparse';
 import { sanitizeOps, type Domain } from './capabilities';
 import type { AssistantInput, AssistantResult } from './ops';
@@ -23,13 +24,14 @@ export async function planTurn(complete: Complete, input: AssistantInput, imageO
   const blank = input.scene ? !input.scene.nodes.some(n => n.kind !== 'effect') : !(input.canvas ?? []).length;
   const { domains } = routeDomains(input.prompt, { blank });
   const system = buildPrompt(input, imageOn, domains);
-  const text = await complete(system, input.history ?? [], input.prompt);
+  const user = input.prompt + noteMaterial(input.source);
+  const text = await complete(system, input.history ?? [], user);
   let { parsed, error } = parse(text);
   let result = parsed !== undefined ? sanitizeOps(parsed, catalog()) : undefined;
   const problems = error ? [error] : result?.rejected ?? [];
   // One repair round: the model sees exactly why its reply could not be used and answers the same request again.
   if (problems.length && !(result && result.options?.length)) {
-    const fix = `${input.prompt}\n\n[系统] 你上一次的输出：${text.trim().slice(0, 1200)}\n问题：${problems.join('；')}\n请只输出修正后的完整 JSON 对象（intent / reply / ops），指令名和参数必须来自“可用指令”。`;
+    const fix = `${user}\n\n[系统] 你上一次的输出：${text.trim().slice(0, 1200)}\n问题：${problems.join('；')}\n请只输出修正后的完整 JSON 对象（intent / reply / ops），指令名和参数必须来自“可用指令”。`;
     const retry = parse(await complete(system, input.history ?? [], fix));
     if (retry.parsed !== undefined) {
       const second = sanitizeOps(retry.parsed, catalog());

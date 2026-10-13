@@ -216,6 +216,19 @@ function drawerAssistant(view: CoverView, body: HTMLElement): void {
     if (label) { const clear = iconButton(selChip, 'x', view.t('chatClearSelection'), () => { if (view.busy) return; view.canvas?.discardActiveObject(); view.canvas?.requestRenderAll(); view.refreshInspector(true); updateSelChip(); }, 'qc-chat-scope-clear'); clear.removeAttribute('aria-label'); quietName(clear, view.t('chatClearSelection')); clear.disabled = view.busy; }
   };
   view.onSelection = updateSelChip; updateSelChip();
+  const source = compose.createEl('details', { cls: 'qc-note-context' });
+  const sourceLabel = source.createEl('summary'); const sourceContent = source.createDiv('qc-note-context-content');
+  const updateSource = (): void => {
+    const context = view.noteContext;
+    source.classList.toggle('qc-hidden', !view.design?.source);
+    const scope = view.t(view.noteState === 'reading' ? 'noteReading' : view.noteState === 'error' ? 'noteReadFailed' : context?.kind === 'summary' ? context.selection ? 'noteSelectionSummary' : 'noteSummary' : view.design?.noteSelection ? 'noteSelection' : context ? 'noteFull' : 'notePending');
+    sourceLabel.empty(); setIcon(sourceLabel.createSpan({ cls: 'qc-note-context-icon' }), 'file-text');
+    sourceLabel.createSpan({ text: view.t('noteSourceLabel', { name: context?.title ?? view.sourceNote()?.basename ?? view.design?.source?.replace(/^.*\//, '').replace(/\.md$/, '') ?? '', scope }), cls: 'qc-note-context-label' });
+    sourceContent.empty();
+    if (context) { sourceContent.createDiv({ text: view.t('notePreviewHint', { scope: view.t(context.kind === 'summary' ? context.selection ? 'noteSelectionSummary' : 'noteSummary' : context.kind === 'selection' ? 'noteSelection' : 'noteFull'), count: context.characters }), cls: 'qc-hint' }); sourceContent.createEl('pre', { text: context.text }); }
+    else sourceContent.createDiv({ text: view.t(view.noteState === 'error' ? 'noteReadError' : 'notePreviewPending'), cls: 'qc-hint' });
+  };
+  view.onNoteContext = updateSource; updateSource();
   const input = compose.createEl('textarea', { cls: 'qc-chat-input', attr: { rows: '2', placeholder: current ? view.t('chatPlaceholderPattern', { name: view.zh ? current.zh : current.en }) : view.t(sel.value === 'ai' ? 'chatPlaceholderAi' : 'chatPlaceholder') } });
   input.value = view.chatDraft;
   const bar = compose.createDiv('qc-compose-bar');
