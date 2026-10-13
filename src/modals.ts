@@ -24,7 +24,7 @@ export class PickFolder extends FuzzySuggestModal<TFolder> {
 
 /* ---------- new cover ---------- */
 export class NewCoverModal extends Modal {
-  constructor(private plugin: CoverPlugin, private note?: TFile, private titleText = '') { super(plugin.app); }
+  constructor(private plugin: CoverPlugin, private note?: TFile, private titleText = '', private noteSelection?: string) { super(plugin.app); }
   onOpen(): void {
     const t = this.plugin.t.bind(this.plugin); const zh = this.plugin.isZh();
     this.titleEl.setText(t('create')); this.modalEl.addClass('qc-modal-wide'); this.contentEl.addClass('qc-modal');
@@ -37,7 +37,7 @@ export class NewCoverModal extends Modal {
 
     const briefRow = form.createDiv('qc-new-field qc-new-brief'); briefRow.createEl('label', { text: t('newBrief') });
     const briefInput = briefRow.createEl('textarea', { cls: 'qc-textarea', attr: { rows: '3', spellcheck: 'false', placeholder: t('newBriefPlaceholder') } });
-    briefInput.addEventListener('input', () => { brief = briefInput.value; }); briefRow.createDiv({ text: t('newBriefHint'), cls: 'qc-hint' });
+    briefInput.addEventListener('input', () => { brief = briefInput.value; }); briefRow.createDiv({ text: t(this.note ? 'newBriefNoteHint' : 'newBriefHint'), cls: 'qc-hint' });
 
     form.createEl('label', { text: t('platform') });
     const plats = form.createDiv('qc-plat-grid qc-plat-grid-wide');
@@ -70,9 +70,9 @@ export class NewCoverModal extends Modal {
       if (withBrief && !this.plugin.ai.ready()) { new Notice(t('aiNotReady')); this.plugin.openSettings('assistant'); return; }
       create.disabled = true; aiCreate.disabled = true;
       const title = (name.split('\n')[0] || (withBrief ? brief.split('\n')[0]?.slice(0, 24) : '') || t('untitled')).slice(0, 60);
-      void this.plugin.createDesign(title, template, this.note, name.trim() || undefined, platform, withBrief ? brief : undefined).then(() => this.close()).catch(e => { this.plugin.report(e); create.disabled = false; aiCreate.disabled = false; });
+      void this.plugin.createDesign(title, template, this.note, name.trim() || undefined, platform, withBrief ? brief.trim() || t('noteDesignRequest') : undefined, this.noteSelection).then(() => this.close()).catch(e => { this.plugin.report(e); create.disabled = false; aiCreate.disabled = false; });
     };
-    const aiCreate = textButton(footer, t('createWithAi'), () => { if (!brief.trim()) { briefInput.focus(); return; } make(true); }, '', 'sparkles');
+    const aiCreate = textButton(footer, t('createWithAi'), () => { if (!brief.trim() && !this.note) { briefInput.focus(); return; } make(true); }, '', 'sparkles');
     const create = textButton(footer, t('createAction'), () => make(false), 'qc-primary');
     onEnter(input, e => { e.preventDefault(); create.click(); });
     window.setTimeout(() => { input.focus(); input.select(); }, 30);

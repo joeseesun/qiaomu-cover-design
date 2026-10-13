@@ -12,7 +12,7 @@ The editorial illustrations in this guide were made with Codex's built-in image 
 
 **Desktop Obsidian 1.11.4+ · Offline core editing · Optional AI · Free and open source**
 
-Previously Qiaomu Cover Design. The plugin ID `qiaomu-cover-design` and `.qcover` format remain unchanged. Existing designs, settings and image history do not need to be migrated because of the rename. This guide describes the **0.2.3** implementation.
+Previously Qiaomu Cover Design. The plugin ID `qiaomu-cover-design` and `.qcover` format remain unchanged. Existing designs, settings and image history do not need to be migrated because of the rename. This guide describes the **0.3.1** implementation.
 
 ## Start with a note; finish with a reusable design
 
@@ -41,7 +41,9 @@ The complete ZIP contains fonts and license files. A three-file install (`main.j
 
 ![Concept illustration: brief, candidate layouts, editable composition](docs/images/readme/02-ai-layout.png)
 
-Configure a layout model under **Models & services**, then enter a brief or use the command to create a cover from your current note or selection. The note command takes at most the first 6,000 characters; select the important passage for long notes.
+Configure a layout model under **Models & services**, then enter a brief or use the command to create a cover from your current note or selection. Each AI request reads the linked note’s latest body, including follow-ups and reopened designs. Notes up to 16,000 characters are sent in full; longer notes are summarized section by section, including the tail. Summaries are cached with the design and refreshed when the body changes. Selected text is saved as a fixed snapshot; explicitly ask to read the full note to expand that scope.
+
+Expand the Note row above the composer to inspect the exact body, selection or summary used. Missing notes, empty bodies and failed summaries report an error. Image links in notes are text references, not visual model input. Local colour edits and offline commands do not invoke note summarization.
 
 Compare up to seven candidate previews, choose one and keep editing the resulting canvas. Layout instructions can create editable text and shapes. Image generation is optional and off by default for the layout flow. You can request changes to copy, colors, fonts and composition; complex requests are limited by the supported operation protocol and model output.
 
@@ -158,11 +160,11 @@ Canvas focus is required; text editing retains normal input behavior. Use Comman
 
 ## Privacy, storage and limits
 
-Core editing collects no client telemetry and does not upload your canvas. Network requests occur for font downloads, explicitly configured AI services, Unsplash and About-page follow/donation QR images hosted at `radio.qiaomu.ai`. AI requests send prompts, relevant text/canvas context and selected reference images to your chosen provider. Custom endpoints/proxies are your responsibility.
+Core editing collects no client telemetry and does not upload your canvas. Network requests occur for font downloads, explicitly configured AI services, Unsplash and About-page follow/donation QR images hosted at `radio.qiaomu.ai`. AI layout requests send prompts, linked-note bodies, selected text or summaries, and canvas context to your chosen provider. Long-note summaries use the same configured text model. Image-generation requests may include selected reference images. Custom endpoints/proxies are your responsibility.
 
 Codex CLI runs a local process using your configured account. Local-folder browsing and system export can access chosen locations outside the vault. Unsplash credentials use Obsidian secret storage. AI configuration lives in local plugin settings, not `.qcover` files; **do not publish or casually sync `data.json` containing credentials**.
 
-Back up designs, exports, imported fonts, `data.json`, `gallery/` and `image-jobs/`. External folder references do not move original files. Embedded images increase design size. Autosave/conflict protection is not a replacement for backups; avoid simultaneous edits on different devices.
+Design files can contain selected-text snapshots and long-note summaries; treat them as note content when sharing. Back up designs, exports, imported fonts, `data.json`, `gallery/` and `image-jobs/`. External folder references do not move original files. Embedded images increase design size. Autosave/conflict protection is not a replacement for backups; avoid simultaneous edits on different devices.
 
 Desktop only. No hosted sharing service or vector-node editor. Windows/Linux, physical stylus hardware, Codex image editing and popout windows remain outside the recorded certification. The plugin is free; donations do not unlock features. Provider fees and third-party licenses still apply.
 

@@ -53,12 +53,18 @@ export default class CoverPlugin extends Plugin {
   }
   takeBrief(path: string): string | undefined { const brief = this.briefs.get(path); this.briefs.delete(path); return brief; }
   /** Designs a cover for a block of text without asking anything else. */
-  async coverFromText(name: string, text: string, note?: TFile): Promise<void> {
+  async coverFromText(name: string, text: string, note?: TFile, selection = true): Promise<void> {
     if (!this.ai.ready()) { new Notice(this.t('aiNotReady')); this.openSettings('assistant'); return; }
-    await this.createDesign(name, 'minimal', note, name, undefined, text);
+    await this.createDesign(name, 'minimal', note, name, undefined, note ? this.t('noteDesignRequest') : text, note && selection ? text : undefined);
   }
   openGallery(tab:GalleryTab='images',view?:CoverView):void{this.galleryDialog?.close();this.galleryDialog=new GalleryDialog(this,tab,view);this.galleryDialog.open();}
   openImageTasks(): void { this.openGallery('tasks'); }
+  /** Find the source's own editor, never whichever note happens to be active. */
+  async readNote(note: TFile): Promise<string> {
+    const view = this.app.workspace.getLeavesOfType('markdown').map(leaf => leaf.view)
+      .find((view): view is MarkdownView => view instanceof MarkdownView && view.file?.path === note.path);
+    return view?.editor ? view.editor.getValue() : this.app.vault.cachedRead(note);
+  }
   activeCover(): CoverView | undefined { return this.app.workspace.getActiveViewOfType(CoverView) ?? undefined; }
 
   /** After fonts are installed: re-pair the fonts of every open cover. */
@@ -104,17 +110,19 @@ export default class CoverPlugin extends Plugin {
     this.addCommand({ id: 'open-designer', name: this.t('open'), callback: () => void this.startBlank().catch(e => this.report(e)) });
     this.addCommand({ id: 'open-existing', name: this.t('openExisting'), callback: () => this.chooseDesign() });
     this.addCommand({ id: 'cover-from-note', name: this.t('fromNote'), checkCallback: checking => {
-      const note = this.app.workspace.getActiveFile(); const editor = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
+      const note = this.app.workspace.getActiveFile(); const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const editor = view?.file?.path === note?.path ? view?.editor : undefined;
       if (!note || note.extension !== 'md') return false;
-      if (!checking) new NewCoverModal(this, note, editor?.getSelection() || note.basename).open();
+      if (!checking) new NewCoverModal(this, note, editor?.getSelection() || note.basename, editor?.getSelection() || undefined).open();
       return true;
     } });
     this.addCommand({ id: 'ai-cover-from-note', name: this.t('aiFromNote'), checkCallback: checking => {
-      const note = this.app.workspace.getActiveFile(); const editor = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
+      const note = this.app.workspace.getActiveFile(); const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const editor = view?.file?.path === note?.path ? view?.editor : undefined;
       if (!note || note.extension !== 'md') return false;
       if (!checking) void (async () => {
-        const text = (editor?.getSelection() || (editor ? editor.getValue() : await this.app.vault.cachedRead(note))).slice(0, 6000);
-        await this.coverFromText(note.basename, text, note);
+        const selection = editor?.getSelection();
+        await this.coverFromText(note.basename, selection || '', note, !!selection);
       })().catch(e => this.report(e));
       return true;
     } });
@@ -196,8 +204,10 @@ export default class CoverPlugin extends Plugin {
     while (this.app.vault.getAbstractFileByPath(path)) path = `${base} ${i++}.${extension}`;
     return path;
   }
-  async createDesign(name: string, template: string, note?: TFile, title?: string, platformId?: string, brief?: string): Promise<TFile> {
-    return this.createFile(name, this.initialDesign(template, title || name, this.t('subtext'), note?.path, platformId), brief);
+  async createDesign(name: string, template: string, note?: TFile, title?: string, platformId?: string, brief?: string, selection?: string): Promise<TFile> {
+    const design = this.initialDesign(template, title || name, this.t('subtext'), note?.path, platformId);
+    if (selection?.trim()) design.noteSelection = selection;
+    return this.createFile(name, design, brief);
   }
   private async createFile(name: string, design: Design, brief?: string): Promise<TFile> {
     let created: TFile | undefined;

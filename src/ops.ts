@@ -106,6 +106,8 @@ export interface CoverApi {
 }
 export interface CanvasItem { role?: string; text?: string; size?: number; color?: string; kind: string }
 export interface AssistantInput {
+  /** Source material, independent of abbreviated chat history. */
+  source?: import('./notecontext').NoteContext;
   prompt: string; zh: boolean; fonts: string[]; platform?: string; size: { width: number; height: number }; selected?: string;
   /** Frozen when the user sends the request; the model cannot expand this edit boundary. */
   editScope?: { kind: 'canvas' } | { kind: 'selection'; ids: string[] };

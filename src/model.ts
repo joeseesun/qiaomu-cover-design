@@ -1,3 +1,5 @@
+import type { NoteSummary } from './notecontext';
+
 export type Background = { kind: 'solid'; color: string } | { kind: 'linear'; from: string; to: string; angle: number };
 export type ExportFormat = 'png' | 'jpeg' | 'webp';
 export type Destination = 'folder' | 'note' | 'system';
@@ -10,6 +12,8 @@ export const EXPORT_DEFAULTS: ExportPrefs = {
 };
 export interface Design {
   format: 'qiaomu-cover-design'; schema: 1; width: number; height: number; source?: string;
+  /** Explicit selected-text scope is a snapshot; whole-note scope reads the linked note afresh. */
+  noteSelection?: string; noteSummary?: NoteSummary;
   /** Platform preset id. Informational: width/height remain the source of truth. */
   platform?: string; bg?: Background; export?: Partial<ExportPrefs>;
   /** Id of the template this cover was laid out from. Lets a platform switch re-lay it out instead of just scaling it. */
@@ -57,6 +61,8 @@ export function parseDesign(raw: string): Design {
   if (raw.length > 40_000_000) throw new Error('invalid-design');
   const d = JSON.parse(raw) as Design;
   if (!d || d.format !== 'qiaomu-cover-design' || d.schema !== 1 || !validSize(d.width,d.height) || !d.canvas || !Array.isArray(d.canvas.objects) || d.canvas.objects.length > 500 || (d.source !== undefined && typeof d.source !== 'string') || (d.platform !== undefined && typeof d.platform !== 'string') || (d.template !== undefined && typeof d.template !== 'string') || (d.bg !== undefined && !validBackground(d.bg)) || (d.export !== undefined && (typeof d.export !== 'object' || d.export === null))) throw new Error('invalid-design');
+  if (d.noteSelection !== undefined && (typeof d.noteSelection !== 'string' || !d.noteSelection.trim() || d.noteSelection.length > 2_000_000)) throw new Error('invalid-design');
+  if (d.noteSummary !== undefined && (!d.noteSummary || typeof d.noteSummary.hash !== 'string' || !/^v1:[a-f0-9]{64}$/.test(d.noteSummary.hash) || typeof d.noteSummary.text !== 'string' || !d.noteSummary.text.trim() || d.noteSummary.text.length > 10_000)) delete d.noteSummary;
   checkCanvas(d.canvas);
   if (d.palette !== undefined && (typeof d.palette !== 'object' || d.palette === null || !['bg', 'bg2', 'ink', 'sub', 'accent', 'accentInk'].every(k => /^#[\da-f]{6}$/i.test(String((d.palette as Record<string, unknown>)[k]))))) delete d.palette;
   return d;

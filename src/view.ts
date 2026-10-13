@@ -5,6 +5,7 @@ import { snapAxis, type SnapHit } from './snapping';
 import { bindMarquee } from './marquee';
 import { imageHash, type ImageSelection } from './imagejobs';
 import type { GeneratedPicture, ImageReference } from './seedream';
+import { prepareNote, wantsWholeNote, type NoteContext } from './notecontext';
 import { FileView, MarkdownView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { ActiveSelection, Point, Canvas, StaticCanvas, Circle, FabricImage, FabricObject, Gradient, Group, Line, Path, Polygon, Rect, Shadow, Textbox, Triangle, getEnv, loadSVGFromString, setEnv, util } from 'fabric';
 import { cutout, opaqueBounds } from './cutout';
@@ -68,6 +69,8 @@ export const SHADOWS: Record<string, (fill: string) => Shadow | null> = {
 
 export class CoverView extends FileView implements CoverApi {
   canvas?: Canvas; design?: Design;
+  noteContext?: NoteContext; noteState: 'pending' | 'reading' | 'ready' | 'error' = 'pending';
+  onNoteContext?: () => void;
   private expected = ''; private writer = new SerialWriter(); private history = new History(); private codec = new SnapshotCodec();
   restoring = false; private closingView = false; private dirty = false; private saveTimer?: number; private historyTimer?: number; private revision = 0;
   private task = false; private generation = 0; private observer?: ResizeObserver; private resizeFrame?: number; private clip: Record<string, unknown>[] = [];
@@ -103,7 +106,7 @@ export class CoverView extends FileView implements CoverApi {
     try {
       const raw = await this.app.vault.read(file); const design = parseDesign(raw);
       if (generation !== this.generation) return;
-      this.expected = raw; this.design = design; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History(); this.busy = false; this.inTurn = false; this.turnSelection = undefined; this.turnSelectedObjects = [];
+      this.expected = raw; this.design = design; this.noteContext = undefined; this.noteState = 'pending'; this.templateId = design.template; this.palette = design.palette; this.codec = new SnapshotCodec(); this.history = new History(); this.busy = false; this.inTurn = false; this.turnSelection = undefined; this.turnSelectedObjects = [];
       await this.plugin.fonts.register(this.doc);
       this.build();
       if (generation !== this.generation || !this.canvas) return;
@@ -1400,7 +1403,7 @@ export class CoverView extends FileView implements CoverApi {
       return { kind: o instanceof FabricImage ? 'image' : 'shape', role: q.qcRole };
     });
   }
-  assistantInput(prompt: string): AssistantInput {
+  assistantInput(prompt: string, source = this.noteContext): AssistantInput {
     const sel = this.selection()[0];
     // Failed turns (prose-only replies the model narrated without acting) stay OUT of history:
     // the model imitates its own past replies, so one bad example breeds more.
@@ -1413,6 +1416,7 @@ export class CoverView extends FileView implements CoverApi {
     const ids = this.inTurn ? this.turnSelection : meta.selection;
     if (this.inTurn) meta.selection = [...(ids ?? [])];
     return {
+      source,
       editScope: ids?.length ? { kind: 'selection', ids: [...ids] } : { kind: 'canvas' },
       prompt, zh: this.zh, fonts: book.map(f => f.family), platform: this.platform()?.id, size: { width: this.design!.width, height: this.design!.height },
       selected: sel instanceof Textbox ? sel.text : undefined, canvas: this.canvasItems(), scene: { nodes, meta }, history, imageStyle: imageStyleById(this.plugin.settings.imageStyle).prompt || undefined, pattern: this.currentPattern, noPicture: !(this.pictureRequested || requestsPicture(prompt)) || this.plugin.settings.imageStyle === 'none', chooseDesigns: !ids?.length && !(this.pictureRequested || requestsPicture(prompt)), series: this.plugin.settings.series,
@@ -1431,8 +1435,11 @@ export class CoverView extends FileView implements CoverApi {
     this.setProgress(this.t('progressPlan'));
     this.beginTurn();
     try {
-      const request = this.assistantInput(prompt);
       const colour = this.turnSelection?.length ? simpleColour(prompt) : undefined;
+      const readsSource = !colour && provider.id !== 'offline' && (provider.id !== 'ai' || this.plugin.ai.ready());
+      const source = readsSource ? await this.prepareSource(prompt, generation) : undefined;
+      if (generation !== this.generation || this.closingView || (readsSource && this.design?.source && !source)) return;
+      const request = this.assistantInput(prompt, source);
       let result: AssistantResult = colour ? { reply: this.t('chatSelectionUpdated'), ops: [{ op: 'recolor', target: [...this.turnSelection!], color: colour }] } : picturePolicy(await provider.run(request), !request.noPicture);
       if (generation !== this.generation) return;
       // One silent second chance: models sometimes narrate instead of emitting commands, and a reworded
@@ -1470,7 +1477,7 @@ export class CoverView extends FileView implements CoverApi {
       // with the fresh scene, and its corrected commands run in the same turn and the same undo step.
       if (run.problems.length && !colour && provider.id !== 'offline' && generation === this.generation && this.canvas) {
         this.setProgress(this.t('progressFix'));
-        const secondInput = { ...this.assistantInput(prompt), feedback: run.problems };
+        const secondInput = { ...this.assistantInput(prompt, request.source), feedback: run.problems };
         const correction = guardSelection(picturePolicy(await provider.run(secondInput), !request.noPicture), secondInput);
         const second = correction.result;
         if (generation !== this.generation || !this.canvas) return;
@@ -1681,16 +1688,46 @@ export class CoverView extends FileView implements CoverApi {
   retry(): Promise<void> { return this.ask(`${this.lastPrompt}\n\n${this.t('retryHint')}`, this.t('retry')); }
   /** The note this cover was made for, when it still exists. Lets the empty chat offer a one-click cover. */
   sourceNote(): TFile | undefined { const path = this.design?.source; const f = path ? this.plugin.app.vault.getFileByPath(path) : null; return f && f.extension === 'md' ? f : undefined; }
-  /** Designs from the linked note's text (frontmatter and fenced code stripped) without any copy-paste. */
+  /** Read material on submission, so follow-ups and reopened covers always have a source. */
+  private async prepareSource(prompt: string, generation: number): Promise<NoteContext | undefined> {
+    const design = this.design; if (!design) return;
+    const whole = wantsWholeNote(prompt);
+    if (!design.source) {
+      if (whole) throw new Error(this.t('noteNoSource'));
+      return;
+    }
+    const path = design.source;
+    const current = (): boolean => generation === this.generation && design === this.design && design.source === path && !this.closingView;
+    this.noteState = 'reading'; this.onNoteContext?.();
+    try {
+      const selection = !whole ? design.noteSelection : undefined;
+      const note = this.sourceNote();
+      if (!selection && !note) throw new Error('note-missing');
+      const raw = selection ?? await this.plugin.readNote(note!);
+      if (!current()) return;
+      const result = await prepareNote({ path: design.source, title: note?.basename ?? design.source.replace(/^.*\//, '').replace(/\.md$/, ''), raw, selection: !!selection, cache: design.noteSummary },
+        async (...args) => { try { return await this.plugin.ai.summarizeNote(...args); } catch { throw new Error('note-summary-failed'); } }, current);
+      if (!current()) return;
+      // Persist scope/summary with the design, not in the preview-length chat history.
+      if ((whole && design.noteSelection) || JSON.stringify(result.cache) !== JSON.stringify(design.noteSummary)) {
+        if (whole) delete design.noteSelection;
+        design.noteSummary = result.cache; this.changed();
+      }
+      this.noteContext = result.context; this.noteState = 'ready'; this.onNoteContext?.();
+      return result.context;
+    } catch (error) {
+      if (!current()) return;
+      this.noteContext = undefined; this.noteState = 'error'; this.onNoteContext?.();
+      const key = error instanceof Error ? error.message : '';
+      throw new Error(this.t(key === 'note-empty' ? 'noteEmpty' : key === 'note-too-large' ? 'noteTooLarge' : key === 'note-summary-failed' ? 'noteSummaryFailed' : key === 'note-missing' ? 'sourceMissing' : 'noteReadError'));
+    }
+  }
   async coverFromSourceNote(): Promise<void> {
-    const note = this.sourceNote(); if (!note) return;
-    const raw = await this.plugin.app.vault.cachedRead(note);
-    const text = raw.replace(/^---\n[\s\S]*?\n---\n/, '').replace(/```[\s\S]*?```/g, '').trim().slice(0, 6000);
-    await this.autoDesign(`${note.basename}\n\n${text}`);
+    await this.autoDesign(this.t('noteDesignRequest'));
   }
   private async autoDesign(brief: string): Promise<void> {
     this.plugin.settings.drawer = 'assistant'; void this.plugin.saveSettings(); this.refreshDrawer(); this.applyZoom();
-    await this.ask(`${this.t('briefPrefix')}\n${brief}`, brief.length > 140 ? `${brief.slice(0, 140)}…` : brief);
+    await this.ask(this.design?.source ? brief : `${this.t('briefPrefix')}\n${brief}`, brief.length > 140 ? `${brief.slice(0, 140)}…` : brief);
   }
   styleText(target: Target, change: TextChange): boolean {
     const c = this.canvas; if (!c) return false;
