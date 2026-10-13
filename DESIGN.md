@@ -2,7 +2,8 @@
 
 The existing neutral Obsidian drawer remains the visual baseline. The user's content and the cover canvas are the focus.
 
-- Describe a topic or paste source material, then compare up to seven complete copy/layout previews. Applying a proposal is an explicit click; requesting proposals leaves the existing canvas intact.
+- Describe a topic or paste source material, then compare up to seven complete copy/layout previews. Initial AI creation applies the first proposal and keeps the alternatives available. Explicitly requesting proposals on an existing canvas leaves it intact until a choice is clicked.
+- Creating from a linked note reads its body with AI by default; manual template-only creation is an explicit secondary action. Missing model configuration opens setup instead of silently falling back to the note filename.
 - Image service configuration describes capability. Each request separately opts into generation. Otherwise image operations are removed before execution, including from third-party assistants.
 - Keep one short outcome in chat. Hide successful template/decor/safe-area housekeeping; retain errors, readability warnings and export paths.
 - Templates use distinct installed display fonts for titles and calm body faces. Font loading precedes preview measurement. All exported text remains editable on the canvas.

@@ -35,7 +35,7 @@ export class NewCoverModal extends Modal {
     input.addEventListener('input', () => { name = input.value; });
     if (this.note) nameRow.createDiv({ text: t('fromNoteHint', { note: this.note.basename }), cls: 'qc-hint' });
 
-    const briefRow = form.createDiv('qc-new-field qc-new-brief'); briefRow.createEl('label', { text: t('newBrief') });
+    const briefRow = form.createDiv('qc-new-field qc-new-brief'); briefRow.createEl('label', { text: t(this.note ? 'noteDesignBrief' : 'newBrief') });
     const briefInput = briefRow.createEl('textarea', { cls: 'qc-textarea', attr: { rows: '3', spellcheck: 'false', placeholder: t('newBriefPlaceholder') } });
     briefInput.addEventListener('input', () => { brief = briefInput.value; }); briefRow.createDiv({ text: t(this.note ? 'newBriefNoteHint' : 'newBriefHint'), cls: 'qc-hint' });
 
@@ -72,8 +72,11 @@ export class NewCoverModal extends Modal {
       const title = (name.split('\n')[0] || (withBrief ? brief.split('\n')[0]?.slice(0, 24) : '') || t('untitled')).slice(0, 60);
       void this.plugin.createDesign(title, template, this.note, name.trim() || undefined, platform, withBrief ? brief.trim() || t('noteDesignRequest') : undefined, this.noteSelection).then(() => this.close()).catch(e => { this.plugin.report(e); create.disabled = false; aiCreate.disabled = false; });
     };
-    const aiCreate = textButton(footer, t('createWithAi'), () => { if (!brief.trim() && !this.note) { briefInput.focus(); return; } make(true); }, '', 'sparkles');
-    const create = textButton(footer, t('createAction'), () => make(false), 'qc-primary');
+    const aiCreate = textButton(footer, t(this.note ? 'createManually' : 'createWithAi'), () => {
+      if (this.note) { make(false); return; }
+      if (!brief.trim()) { briefInput.focus(); return; } make(true);
+    }, '', this.note ? undefined : 'sparkles');
+    const create = textButton(footer, t('createAction'), () => make(!!this.note), 'qc-primary');
     onEnter(input, e => { e.preventDefault(); create.click(); });
     window.setTimeout(() => { input.focus(); input.select(); }, 30);
   }
