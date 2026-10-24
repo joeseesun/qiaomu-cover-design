@@ -1,3 +1,5 @@
+import { UpdateNotes } from './update-notes';
+import { UPDATE_ENTRIES } from './update-notes-release';
 import { cancelAccountLogins } from './model-access/services/provider-auth';
 import { cancelKeyLogins } from './authflow';
 import { cancelCodexLogins } from './codex';
@@ -25,6 +27,7 @@ import { builtPalette, templateById } from './templates';
 import { SerialWriter } from './model';
 
 export default class CoverPlugin extends Plugin {
+  updateNotes!: UpdateNotes;
   qiaomuHome?: HomeProvider; imageJobs!: ImageJobs; gallery!: GalleryStore; private galleryDialog?: GalleryDialog;
   modelAccessDialogs = new Set<{ close(): void }>();
   settings: Settings = structuredClone(DEFAULTS); fonts!: FontService; ai = new AiService(() => this.settings.ai, this.app.secretStorage);
@@ -142,6 +145,7 @@ export default class CoverPlugin extends Plugin {
       return true;
     } });
     this.addRibbonIcon(COVER_ICON, this.t('open'), () => void this.startBlank().catch(e => this.report(e)));
+    this.updateNotes = new UpdateNotes(this, UPDATE_ENTRIES, () => this.lang());
     this.settingsTab = new CoverSettings(this.app, this); this.addSettingTab(this.settingsTab);
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (file instanceof TFile && file.extension === 'md') menu.addItem(item => item.setTitle(this.t('fromNote')).setIcon('image').onClick(() => new NewCoverModal(this, file, file.basename).open()));
