@@ -224,7 +224,7 @@ export class CoverSettings extends PluginSettingTab {
     const hero = body.createDiv('qcs-about-hero'); const rel = hero.createDiv('qcs-about-release');
     rel.createSpan({ text: zh ? '当前版本' : 'Version', cls: 'qcs-about-label' }); rel.createSpan({ text: `${this.plugin.manifest.name}  v${this.plugin.manifest.version}`, cls: 'qcs-about-version' });
     const actions = hero.createDiv('qcs-about-actions');
-    link(actions, zh ? '更新日志' : 'Changelog', `${repo}/releases`, 'history'); link(actions, zh ? '反馈问题' : 'Report a bug', `${repo}/issues/new`, 'bug'); link(actions, zh ? '使用说明' : 'Readme', `${repo}#readme`, 'book-open');
+    this.plugin.updateNotes.addButton(actions); link(actions, zh ? '反馈问题' : 'Report a bug', `${repo}/issues/new`, 'bug'); link(actions, zh ? '使用说明' : 'Readme', `${repo}#readme`, 'book-open');
     const help = section(body, t('s_help'));
     new Row(help, t('shortcuts')).addButton(b => b.setButtonText(zh ? '查看' : 'View').onClick(() => new ShortcutsModal(this.plugin).open()));
     const support = body.createDiv('qcs-about-support');
